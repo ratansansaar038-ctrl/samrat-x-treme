@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#08010f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Samrat X-Treme" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+
   <title>Samrat X-Treme</title>
 
   <style>
@@ -115,6 +123,28 @@
       filter:
         drop-shadow(0 0 12px rgba(134,57,255,.8))
         drop-shadow(0 0 24px rgba(255,91,0,.25));
+    }
+
+    .install-wrap{
+      display:none;
+      margin:8px 0 2px;
+    }
+
+    .install-wrap.show{
+      display:block;
+    }
+
+    .install-btn{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #8a63e8;
+      border-radius:14px;
+      color:#fff;
+      font-weight:900;
+      letter-spacing:.5px;
+      background:linear-gradient(90deg,#3a1f7f,#6c2bd9,#a72cc6);
+      box-shadow:0 0 18px rgba(115,49,220,.4);
+      cursor:pointer;
     }
 
     .market{
@@ -308,14 +338,8 @@
     }
 
     @keyframes resultPop{
-      from{
-        opacity:0;
-        transform:scale(.75);
-      }
-      to{
-        opacity:1;
-        transform:scale(1);
-      }
+      from{opacity:0;transform:scale(.75);}
+      to{opacity:1;transform:scale(1);}
     }
 
     .result-title{
@@ -529,13 +553,8 @@
     }
 
     @media(max-width:350px){
-      .market{
-        grid-template-columns:1fr;
-      }
-
-      .main-logo{
-        max-width:270px;
-      }
+      .market{grid-template-columns:1fr;}
+      .main-logo{max-width:270px;}
     }
   </style>
 </head>
@@ -547,9 +566,7 @@
   <div class="topbar">
     <div>
       <div class="wallet-title">X-TREME WALLET</div>
-      <div class="wallet">
-        🪙 <span id="wallet">10,000</span>
-      </div>
+      <div class="wallet">🪙 <span id="wallet">10,000</span></div>
     </div>
 
     <div class="live-badge">
@@ -558,84 +575,56 @@
     </div>
   </div>
 
-
   <div class="logo">
-    <img
-      src="samrat-logo.png"
-      alt="Samrat X-Treme Logo"
-      class="main-logo"
-    >
+    <img src="samrat-logo.png" alt="Samrat X-Treme Logo" class="main-logo">
   </div>
 
+  <div class="install-wrap" id="installWrap">
+    <button class="install-btn" id="installButton">
+      📲 INSTALL SAMRAT X-TREME
+    </button>
+  </div>
 
   <div class="market">
-
     <div class="market-card">
       <div class="market-name">₿ BTC / USDT</div>
-      <div class="market-price btc" id="btcPrice">
-        Loading...
-      </div>
-      <div class="updated" id="btcUpdated">
-        Connecting to market
-      </div>
+      <div class="market-price btc" id="btcPrice">Loading...</div>
+      <div class="updated" id="btcUpdated">Connecting to market</div>
     </div>
 
     <div class="market-card">
       <div class="market-name">GOLD / XAU-USD</div>
-      <div class="market-price gold" id="goldPrice">
-        Loading...
-      </div>
-      <div class="updated" id="goldUpdated">
-        Connecting to market
-      </div>
+      <div class="market-price gold" id="goldPrice">Loading...</div>
+      <div class="updated" id="goldUpdated">Connecting to market</div>
     </div>
-
   </div>
-
 
   <div class="round-box">
     <span>ROUND <b id="roundId">1001</b></span>
     <span>LIVE SNAPSHOT GAME</span>
   </div>
 
-
-  <div class="section-title">
-    CHOOSE YOUR NUMBER
-  </div>
+  <div class="section-title">CHOOSE YOUR NUMBER</div>
 
   <div class="numbers">
     <button class="number" onclick="selectNumber(1,this)">1</button>
     <button class="number" onclick="selectNumber(2,this)">2</button>
     <button class="number" onclick="selectNumber(3,this)">3</button>
-
     <button class="number" onclick="selectNumber(4,this)">4</button>
     <button class="number" onclick="selectNumber(5,this)">5</button>
     <button class="number" onclick="selectNumber(6,this)">6</button>
-
     <button class="number" onclick="selectNumber(7,this)">7</button>
     <button class="number" onclick="selectNumber(8,this)">8</button>
     <button class="number" onclick="selectNumber(9,this)">9</button>
   </div>
 
-
-  <div class="section-title">
-    PLAY COINS
-  </div>
+  <div class="section-title">PLAY COINS</div>
 
   <div class="coins">
-    <button class="coin active" onclick="selectCoins(100,this)">
-      🪙 100
-    </button>
-
-    <button class="coin" onclick="selectCoins(250,this)">
-      🪙 250
-    </button>
-
-    <button class="coin" onclick="selectCoins(500,this)">
-      🪙 500
-    </button>
+    <button class="coin active" onclick="selectCoins(100,this)">🪙 100</button>
+    <button class="coin" onclick="selectCoins(250,this)">🪙 250</button>
+    <button class="coin" onclick="selectCoins(500,this)">🪙 500</button>
   </div>
-
 
   <button class="lock" id="lockButton" onclick="lockPrediction()">
     🔒 LOCK PREDICTION
@@ -645,24 +634,13 @@
     Live market connect hone ka wait karo...
   </div>
 
-
   <div class="result" id="result">
-
-    <div class="result-title">
-      X-TREME NUMBER
-    </div>
-
-    <div class="winning-number" id="winningNumber">
-      -
-    </div>
-
+    <div class="result-title">X-TREME NUMBER</div>
+    <div class="winning-number" id="winningNumber">-</div>
     <div class="outcome" id="outcome"></div>
-
     <div class="coin-change" id="coinChange"></div>
 
-
     <div class="snapshot">
-
       <div class="snap">
         LOCKED BTC
         <strong id="lockedBtc">-</strong>
@@ -672,21 +650,14 @@
         LOCKED GOLD
         <strong id="lockedGold">-</strong>
       </div>
-
     </div>
-
 
     <div class="formula" id="formula"></div>
 
-    <button class="new-round" onclick="newRound()">
-      NEXT ROUND
-    </button>
-
+    <button class="new-round" onclick="newRound()">NEXT ROUND</button>
   </div>
 
-
   <div class="stats">
-
     <div class="stat">
       <div class="stat-value" id="totalGames">0</div>
       <div class="stat-name">ROUNDS</div>
@@ -701,20 +672,12 @@
       <div class="stat-value" id="losses">0</div>
       <div class="stat-name">LOSSES</div>
     </div>
-
   </div>
 
-
   <div class="history-card">
-
     <div class="history-head">
-      <div class="history-title">
-        X-TREME HISTORY
-      </div>
-
-      <button class="clear-history" onclick="clearHistory()">
-        CLEAR
-      </button>
+      <div class="history-title">X-TREME HISTORY</div>
+      <button class="clear-history" onclick="clearHistory()">CLEAR</button>
     </div>
 
     <div class="history-list" id="historyList">
@@ -722,14 +685,11 @@
         <div class="history-main">No rounds played yet.</div>
       </div>
     </div>
-
   </div>
-
 
   <button class="reset" onclick="resetWallet()">
     Reset Demo Wallet to 10,000
   </button>
-
 
   <div class="warning">
     Entertainment / educational game only.<br>
@@ -738,115 +698,66 @@
     Market prices are third-party reference data and may differ slightly
     from other exchanges or trading platforms.
   </div>
-
 </div>
 
-
 <script>
-
-  let wallet =
-    Number(localStorage.getItem("samratWallet")) || 10000;
-
+  let wallet = Number(localStorage.getItem("samratWallet")) || 10000;
   let selectedNumber = null;
   let selectedCoins = 100;
-
-  let roundId =
-    Number(localStorage.getItem("samratRound")) || 1001;
-
+  let roundId = Number(localStorage.getItem("samratRound")) || 1001;
   let roundLocked = false;
 
   let liveBtcPrice = null;
   let liveGoldPrice = null;
-
   let btcReady = false;
   let goldReady = false;
 
-  let history =
-    JSON.parse(localStorage.getItem("samratHistory") || "[]");
+  let history = JSON.parse(localStorage.getItem("samratHistory") || "[]");
 
-
-  document.getElementById("wallet").innerText =
-    wallet.toLocaleString("en-IN");
-
-  document.getElementById("roundId").innerText =
-    roundId;
-
+  document.getElementById("wallet").innerText = wallet.toLocaleString("en-IN");
+  document.getElementById("roundId").innerText = roundId;
 
   function updateMarketStatus(){
-
     const ready = btcReady && goldReady;
-
-    const dot =
-      document.getElementById("liveDot");
-
-    const text =
-      document.getElementById("marketStatus");
-
-    const lockButton =
-      document.getElementById("lockButton");
+    const dot = document.getElementById("liveDot");
+    const text = document.getElementById("marketStatus");
+    const lockButton = document.getElementById("lockButton");
 
     if(ready){
-
       dot.classList.remove("offline");
-
-      text.innerText =
-        "LIVE MARKET";
-
+      text.innerText = "LIVE MARKET";
       lockButton.disabled = false;
 
       if(!roundLocked){
         document.getElementById("message").innerText =
           "Market ready ⚡ Apna number choose karo.";
       }
-
     }else{
-
       dot.classList.add("offline");
-
-      text.innerText =
-        "CONNECTING";
-
+      text.innerText = "CONNECTING";
       lockButton.disabled = true;
-
     }
-
   }
-
 
   function formatTime(){
-
-    return new Date().toLocaleTimeString(
-      "en-IN",
-      {
-        hour:"2-digit",
-        minute:"2-digit",
-        second:"2-digit"
-      }
-    );
-
+    return new Date().toLocaleTimeString("en-IN", {
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit"
+    });
   }
 
-
   async function loadLiveBitcoin(){
-
     try{
-
       const response = await fetch(
         "https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT",
-        {
-          cache:"no-store"
-        }
+        {cache:"no-store"}
       );
 
-      if(!response.ok){
-        throw new Error("BTC HTTP " + response.status);
-      }
+      if(!response.ok) throw new Error("BTC HTTP " + response.status);
 
-      const data =
-        await response.json();
-
-      const price =
-        Number(data.price);
+      const data = await response.json();
+      const price = Number(data.price);
 
       if(!Number.isFinite(price) || price <= 0){
         throw new Error("Invalid BTC price");
@@ -856,60 +767,35 @@
       btcReady = true;
 
       document.getElementById("btcPrice").innerText =
-        "$" +
-        price.toLocaleString(
-          "en-US",
-          {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-          }
-        );
+        "$" + price.toLocaleString("en-US", {
+          minimumFractionDigits:2,
+          maximumFractionDigits:2
+        });
 
       document.getElementById("btcUpdated").innerText =
         "Updated " + formatTime();
 
     }catch(error){
-
-      console.log(
-        "BTC/USDT price error:",
-        error
-      );
-
+      console.log("BTC/USDT price error:", error);
       btcReady = false;
-
-      document.getElementById("btcPrice").innerText =
-        "Unavailable";
-
-      document.getElementById("btcUpdated").innerText =
-        "Retrying...";
-
+      document.getElementById("btcPrice").innerText = "Unavailable";
+      document.getElementById("btcUpdated").innerText = "Retrying...";
     }
 
     updateMarketStatus();
-
   }
 
-
   async function loadLiveGold(){
-
     try{
-
       const response = await fetch(
         "https://xaus.com/api/v1/spot?compact=1",
-        {
-          cache:"no-store"
-        }
+        {cache:"no-store"}
       );
 
-      if(!response.ok){
-        throw new Error("Gold HTTP " + response.status);
-      }
+      if(!response.ok) throw new Error("Gold HTTP " + response.status);
 
-      const data =
-        await response.json();
-
-      const price =
-        Number(data.spot_usd_oz);
+      const data = await response.json();
+      const price = Number(data.spot_usd_oz);
 
       if(!Number.isFinite(price) || price <= 0){
         throw new Error("Invalid Gold price");
@@ -919,91 +805,51 @@
       goldReady = true;
 
       document.getElementById("goldPrice").innerText =
-        "$" +
-        price.toLocaleString(
-          "en-US",
-          {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-          }
-        );
+        "$" + price.toLocaleString("en-US", {
+          minimumFractionDigits:2,
+          maximumFractionDigits:2
+        });
 
       document.getElementById("goldUpdated").innerText =
         "Updated " + formatTime();
 
     }catch(error){
-
-      console.log(
-        "XAU/USD price error:",
-        error
-      );
-
+      console.log("XAU/USD price error:", error);
       goldReady = false;
-
-      document.getElementById("goldPrice").innerText =
-        "Unavailable";
-
-      document.getElementById("goldUpdated").innerText =
-        "Retrying...";
-
+      document.getElementById("goldPrice").innerText = "Unavailable";
+      document.getElementById("goldUpdated").innerText = "Retrying...";
     }
 
     updateMarketStatus();
-
   }
 
-
   function selectNumber(number,element){
+    if(roundLocked) return;
 
-    if(roundLocked){
-      return;
-    }
+    selectedNumber = number;
 
-    selectedNumber =
-      number;
-
-    document
-      .querySelectorAll(".number")
-      .forEach(
-        button =>
-          button.classList.remove("selected")
-      );
+    document.querySelectorAll(".number")
+      .forEach(button => button.classList.remove("selected"));
 
     element.classList.add("selected");
 
     document.getElementById("message").innerText =
-      "Number " +
-      number +
-      " selected 👑";
-
+      "Number " + number + " selected 👑";
   }
-
 
   function selectCoins(amount,element){
+    if(roundLocked) return;
 
-    if(roundLocked){
-      return;
-    }
+    selectedCoins = amount;
 
-    selectedCoins =
-      amount;
-
-    document
-      .querySelectorAll(".coin")
-      .forEach(
-        button =>
-          button.classList.remove("active")
-      );
+    document.querySelectorAll(".coin")
+      .forEach(button => button.classList.remove("active"));
 
     element.classList.add("active");
-
   }
 
-
   function getDateNumber(){
-
-    const now =
-      new Date();
+    const now = new Date();
 
     const digits =
       String(now.getDate()) +
@@ -1017,118 +863,48 @@
     }
 
     while(total > 9){
-
-      total =
-        String(total)
-          .split("")
-          .reduce(
-            (sum,digit) =>
-              sum + Number(digit),
-            0
-          );
-
+      total = String(total)
+        .split("")
+        .reduce((sum,digit) => sum + Number(digit), 0);
     }
 
     return total;
-
   }
-
 
   function priceCode(price){
-
-    /*
-      Price is converted to cents.
-
-      Example:
-      BTC 62823.47
-      becomes 6282347
-
-      Last 3 digits = 347.
-
-      Same rule is applied to Gold.
-    */
-
-    return (
-      Math.round(price * 100) % 1000
-    );
-
+    return Math.round(price * 100) % 1000;
   }
 
-
   function lockPrediction(){
-
-    if(roundLocked){
-      return;
-    }
+    if(roundLocked) return;
 
     if(!btcReady || !goldReady){
-
       document.getElementById("message").innerText =
         "⚠️ Live market abhi ready nahi hai.";
-
       return;
     }
 
     if(selectedNumber === null){
-
       document.getElementById("message").innerText =
         "⚠️ Pehle 1 se 9 me number choose karo.";
-
       return;
     }
 
     if(wallet < selectedCoins){
-
       document.getElementById("message").innerText =
         "⚠️ Wallet me enough coins nahi hain.";
-
       return;
     }
 
-
     roundLocked = true;
+    document.getElementById("lockButton").disabled = true;
 
-    document.getElementById("lockButton").disabled =
-      true;
+    const lockedBtc = liveBtcPrice;
+    const lockedGold = liveGoldPrice;
 
-
-    /*
-      IMPORTANT:
-
-      Prediction lock ke waqt live prices copy ho rahi hain.
-
-      Result ke beech market refresh hone se
-      locked round change nahi hoga.
-    */
-
-    const lockedBtc =
-      liveBtcPrice;
-
-    const lockedGold =
-      liveGoldPrice;
-
-
-    const btcCode =
-      priceCode(lockedBtc);
-
-    const goldCode =
-      priceCode(lockedGold);
-
-    const dateNumber =
-      getDateNumber();
-
-
-    /*
-      WINNING NUMBER FORMULA:
-
-      BTC code
-      + Gold code
-      + Round ID
-      + Date numerology number
-
-      Then modulo 9 + 1
-      gives result from 1 to 9.
-    */
+    const btcCode = priceCode(lockedBtc);
+    const goldCode = priceCode(lockedGold);
+    const dateNumber = getDateNumber();
 
     const rawTotal =
       btcCode +
@@ -1136,153 +912,69 @@
       roundId +
       dateNumber;
 
-    const winningNumber =
-      (rawTotal % 9) + 1;
-
+    const winningNumber = (rawTotal % 9) + 1;
 
     wallet -= selectedCoins;
-
 
     let won = false;
     let netChange = -selectedCoins;
 
-
     if(selectedNumber === winningNumber){
-
       won = true;
-
-      /*
-        1 out of 9 number match.
-
-        Total return = 9x selected coins.
-        Since selected coins were already deducted,
-        net profit = 8x.
-      */
-
-      const totalReturn =
-        selectedCoins * 9;
-
+      const totalReturn = selectedCoins * 9;
       wallet += totalReturn;
-
-      netChange =
-        totalReturn - selectedCoins;
-
+      netChange = totalReturn - selectedCoins;
     }
 
-
-    localStorage.setItem(
-      "samratWallet",
-      wallet
-    );
-
+    localStorage.setItem("samratWallet", wallet);
 
     document.getElementById("wallet").innerText =
       wallet.toLocaleString("en-IN");
 
-
     document.getElementById("winningNumber").innerText =
       winningNumber;
 
-
-    const outcome =
-      document.getElementById("outcome");
-
+    const outcome = document.getElementById("outcome");
 
     if(won){
-
-      outcome.className =
-        "outcome win";
-
-      outcome.innerText =
-        "🔥 X-TREME WIN 🔥";
+      outcome.className = "outcome win";
+      outcome.innerText = "🔥 X-TREME WIN 🔥";
 
       document.getElementById("coinChange").innerText =
-        "+" +
-        netChange.toLocaleString("en-IN") +
-        " coins";
-
+        "+" + netChange.toLocaleString("en-IN") + " coins";
     }else{
-
-      outcome.className =
-        "outcome lose";
-
-      outcome.innerText =
-        "X-TREME MISS";
+      outcome.className = "outcome lose";
+      outcome.innerText = "X-TREME MISS";
 
       document.getElementById("coinChange").innerText =
-        "-" +
-        selectedCoins.toLocaleString("en-IN") +
-        " coins";
-
+        "-" + selectedCoins.toLocaleString("en-IN") + " coins";
     }
 
-
     document.getElementById("lockedBtc").innerText =
-      "$" +
-      lockedBtc.toLocaleString(
-        "en-US",
-        {
-          minimumFractionDigits:2,
-          maximumFractionDigits:2
-        }
-      );
-
+      "$" + lockedBtc.toLocaleString("en-US", {
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
 
     document.getElementById("lockedGold").innerText =
-      "$" +
-      lockedGold.toLocaleString(
-        "en-US",
-        {
-          minimumFractionDigits:2,
-          maximumFractionDigits:2
-        }
-      );
-
+      "$" + lockedGold.toLocaleString("en-US", {
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
 
     document.getElementById("formula").innerHTML =
+      "YOUR PICK: <b>" + selectedNumber + "</b><br>" +
+      "BTC Code: <b>" + btcCode +
+      "</b> &nbsp;|&nbsp; Gold Code: <b>" + goldCode + "</b><br>" +
+      "Date Number: <b>" + dateNumber +
+      "</b> &nbsp;|&nbsp; Round: <b>" + roundId + "</b><br><br>" +
+      "(" + btcCode + " + " + goldCode + " + " + roundId + " + " + dateNumber +
+      ") % 9 + 1 = <b>" + winningNumber + "</b>";
 
-      "YOUR PICK: <b>" +
-      selectedNumber +
-
-      "</b><br>" +
-
-      "BTC Code: <b>" +
-      btcCode +
-
-      "</b> &nbsp;|&nbsp; Gold Code: <b>" +
-      goldCode +
-
-      "</b><br>" +
-
-      "Date Number: <b>" +
-      dateNumber +
-
-      "</b> &nbsp;|&nbsp; Round: <b>" +
-      roundId +
-
-      "</b><br><br>" +
-
-      "(" +
-      btcCode +
-      " + " +
-      goldCode +
-      " + " +
-      roundId +
-      " + " +
-      dateNumber +
-      ") % 9 + 1 = <b>" +
-      winningNumber +
-      "</b>";
-
-
-    document
-      .getElementById("result")
-      .classList.add("show");
-
+    document.getElementById("result").classList.add("show");
 
     document.getElementById("message").innerText =
       "Prediction locked 🔒 Result generated from locked market snapshot.";
-
 
     saveHistory({
       round:roundId,
@@ -1295,232 +987,141 @@
       gold:lockedGold,
       time:new Date().toLocaleString("en-IN")
     });
-
   }
-
 
   function saveHistory(item){
-
     history.unshift(item);
+    history = history.slice(0,30);
 
-    history =
-      history.slice(0,30);
-
-    localStorage.setItem(
-      "samratHistory",
-      JSON.stringify(history)
-    );
-
+    localStorage.setItem("samratHistory", JSON.stringify(history));
     renderHistory();
-
   }
-
 
   function renderHistory(){
+    const list = document.getElementById("historyList");
+    const wins = history.filter(item => item.won).length;
+    const losses = history.filter(item => !item.won).length;
 
-    const list =
-      document.getElementById("historyList");
-
-    const wins =
-      history.filter(item => item.won).length;
-
-    const losses =
-      history.filter(item => !item.won).length;
-
-    document.getElementById("totalGames").innerText =
-      history.length;
-
-    document.getElementById("wins").innerText =
-      wins;
-
-    document.getElementById("losses").innerText =
-      losses;
-
+    document.getElementById("totalGames").innerText = history.length;
+    document.getElementById("wins").innerText = wins;
+    document.getElementById("losses").innerText = losses;
 
     if(history.length === 0){
-
       list.innerHTML =
         '<div class="history-row">' +
-        '<div class="history-main">' +
-        'No rounds played yet.' +
-        '</div>' +
+        '<div class="history-main">No rounds played yet.</div>' +
         '</div>';
-
       return;
-
     }
 
+    list.innerHTML = history.map(item => {
+      const changeClass = item.won ? "history-win" : "history-loss";
+      const changeText = item.won ? "+" + item.change : "-" + item.coins;
 
-    list.innerHTML =
-      history
-        .map(item => {
-
-          const changeClass =
-            item.won
-              ? "history-win"
-              : "history-loss";
-
-          const changeText =
-            item.won
-              ? "+" + item.change
-              : "-" + item.coins;
-
-          return (
-
-            '<div class="history-row">' +
-
-              '<div>' +
-
-                '<div class="history-main">' +
-                  'Round ' +
-                  item.round +
-                  ' • Pick ' +
-                  item.pick +
-                  ' → Result ' +
-                  item.result +
-                '</div>' +
-
-                '<div class="history-sub">' +
-                  item.time +
-                '</div>' +
-
-              '</div>' +
-
-              '<div class="' +
-                changeClass +
-              '">' +
-
-                changeText +
-                ' 🪙' +
-
-              '</div>' +
-
-            '</div>'
-
-          );
-
-        })
-        .join("");
-
+      return (
+        '<div class="history-row">' +
+          '<div>' +
+            '<div class="history-main">' +
+              'Round ' + item.round +
+              ' • Pick ' + item.pick +
+              ' → Result ' + item.result +
+            '</div>' +
+            '<div class="history-sub">' + item.time + '</div>' +
+          '</div>' +
+          '<div class="' + changeClass + '">' +
+            changeText + ' 🪙' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
   }
 
-
   function newRound(){
-
     roundId++;
 
-    localStorage.setItem(
-      "samratRound",
-      roundId
-    );
+    localStorage.setItem("samratRound", roundId);
 
-    roundLocked =
-      false;
+    roundLocked = false;
+    selectedNumber = null;
 
-    selectedNumber =
-      null;
+    document.getElementById("roundId").innerText = roundId;
 
-    document.getElementById("roundId").innerText =
-      roundId;
+    document.querySelectorAll(".number")
+      .forEach(button => button.classList.remove("selected"));
 
-
-    document
-      .querySelectorAll(".number")
-      .forEach(
-        button =>
-          button.classList.remove("selected")
-      );
-
-
-    document
-      .getElementById("result")
-      .classList.remove("show");
-
+    document.getElementById("result").classList.remove("show");
 
     document.getElementById("message").innerText =
       "New X-Treme round ready ⚡ Choose your number.";
 
-
     document.getElementById("lockButton").disabled =
       !(btcReady && goldReady);
-
   }
-
 
   function clearHistory(){
-
-    const ok =
-      confirm(
-        "X-Treme game history clear karni hai?"
-      );
-
-    if(!ok){
-      return;
-    }
+    const ok = confirm("X-Treme game history clear karni hai?");
+    if(!ok) return;
 
     history = [];
-
-    localStorage.removeItem(
-      "samratHistory"
-    );
-
+    localStorage.removeItem("samratHistory");
     renderHistory();
-
   }
 
-
   function resetWallet(){
-
-    const ok =
-      confirm(
-        "Wallet ko 10,000 demo coins par reset karna hai?"
-      );
-
-    if(!ok){
-      return;
-    }
+    const ok = confirm("Wallet ko 10,000 demo coins par reset karna hai?");
+    if(!ok) return;
 
     wallet = 10000;
-
-    localStorage.setItem(
-      "samratWallet",
-      wallet
-    );
+    localStorage.setItem("samratWallet", wallet);
 
     document.getElementById("wallet").innerText =
       wallet.toLocaleString("en-IN");
 
     document.getElementById("message").innerText =
       "Wallet reset to 10,000 coins.";
-
   }
 
+  // -------- PWA INSTALL --------
+  let deferredInstallPrompt = null;
+  const installWrap = document.getElementById("installWrap");
+  const installButton = document.getElementById("installButton");
+
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installWrap.classList.add("show");
+  });
+
+  installButton.addEventListener("click", async () => {
+    if(!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+
+    deferredInstallPrompt = null;
+    installWrap.classList.remove("show");
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installWrap.classList.remove("show");
+    deferredInstallPrompt = null;
+  });
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("service-worker.js")
+        .catch(error => console.log("Service worker error:", error));
+    });
+  }
 
   renderHistory();
-
   updateMarketStatus();
-
   loadLiveBitcoin();
   loadLiveGold();
 
-
-  /*
-    Refresh market values every 60 seconds.
-
-    XAUS recommends caching for at least 30 seconds,
-    so 60 seconds is comfortably within that.
-  */
-
-  setInterval(
-    loadLiveBitcoin,
-    60000
-  );
-
-  setInterval(
-    loadLiveGold,
-    60000
-  );
-
+  setInterval(loadLiveBitcoin, 60000);
+  setInterval(loadLiveGold, 60000);
 </script>
 
 </body>
