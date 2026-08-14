@@ -3,78 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Elite - Samrat X-Treme</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <title>X-Treme Signup | Samrat Global</title>
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #050505; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #111; padding: 30px; border-radius: 20px; border: 1px solid #ffd700; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(255, 215, 0, 0.1); }
-        h2 { color: #ffd700; margin-bottom: 20px; letter-spacing: 2px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; outline: none; }
-        input:focus { border-color: #ffd700; }
+        .card { background: #111; padding: 30px; border-radius: 20px; border: 2px solid #ffd700; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.1); }
+        h2 { color: #ffd700; letter-spacing: 2px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; }
         .btn-reg { width: 100%; padding: 14px; background: linear-gradient(90deg, #ffd700, #b8860b); color: black; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
-        .footer-link { margin-top: 20px; font-size: 13px; color: #666; }
-        .footer-link a { color: #ffd700; text-decoration: none; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>JOIN ELITE</h2>
-    <p style="font-size: 11px; color: #444; margin-top: -15px; margin-bottom: 20px;">X-TREME NUMEROLOGY PORTAL</p>
-    
+    <h2>X-TREME JOIN</h2>
     <input type="text" id="name" placeholder="Full Name">
     <input type="text" id="phone" placeholder="Mobile Number">
-    <input type="password" id="pass" placeholder="Create Access PIN">
-    
-    <button class="btn-reg" onclick="register()">ACTIVATE ACCOUNT</button>
-    
-    <div class="footer-link">
-        Existing Member? <a href="login.html">Login Here</a>
-    </div>
+    <input type="password" id="pass" placeholder="Access PIN">
+    <button class="btn-reg" onclick="register()">ACTIVATE ELITE ACCESS</button>
 </div>
 
 <script>
-    // --- APKI FIREBASE CONFIG ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyD_Da_doRKedyGEVjZemzP9Gq6VIPfokhw",
-        authDomain: "number-samrat.firebaseapp.com",
-        projectId: "number-samrat",
-        storageBucket: "number-samrat.firebasestorage.app",
-        messagingSenderId: "154722781783",
-        appId: "1:154722781783:web:7b6136cec1c34a11b3f112"
-    };
-
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-    const db = firebase.firestore();
+    // --- SUPABASE CONFIG ---
+    // Bhai yahan apni Supabase details dalo
+    const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
+    const SUPABASE_KEY = "YOUR_ANON_KEY";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function register() {
         const n = document.getElementById("name").value.trim();
         const p = document.getElementById("phone").value.trim();
         const pw = document.getElementById("pass").value.trim();
 
-        if(!n || !p || !pw) return alert("Bhai saari details bharo!");
+        if(!n || !p || !pw) return alert("Details bharo bhai!");
 
-        try {
-            // Check in users_xtreme
-            const check = await db.collection("users_xtreme").where("phone", "==", p).get();
-            if(!check.empty) return alert("Ye number pehle se active hai!");
+        // Supabase mein data insert karna
+        const { data, error } = await supabase
+            .from('users_xtreme')
+            .insert([{ name: n, phone: p, password: pw, wallet: 0, status: 'active' }]);
 
-            // Create Member
-            await db.collection("users_xtreme").add({
-                name: n,
-                phone: p,
-                password: pw,
-                wallet: 0,
-                status: "active",
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            alert("Account Activated! Now Login.");
-            window.location.href = "login.html";
-
-        } catch (error) {
+        if (error) {
             alert("Error: " + error.message);
+        } else {
+            alert("Elite Account Activated! Now Login.");
+            window.location.href = "login.html";
         }
     }
 </script>
