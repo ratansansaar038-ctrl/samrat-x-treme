@@ -1,52 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>X-Treme Signup | Samrat Global</title>
+    <title>Elite Signup | Samrat X-Treme</title>
     <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #050505; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #111; padding: 30px; border-radius: 20px; border: 2px solid #ffd700; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.1); }
-        h2 { color: #ffd700; letter-spacing: 2px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; }
-        .btn-reg { width: 100%; padding: 14px; background: linear-gradient(90deg, #ffd700, #b8860b); color: black; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        .card { background: #111; padding: 35px; border-radius: 25px; border: 2px solid #ffd700; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.15); }
+        h2 { color: #ffd700; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 25px; }
+        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; outline: none; font-size: 16px; }
+        input:focus { border-color: #ffd700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
+        .btn-reg { width: 100%; padding: 15px; background: linear-gradient(90deg, #ffd700, #b8860b); color: black; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 18px; margin-top: 15px; text-transform: uppercase; transition: 0.3s; }
+        .btn-reg:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>X-TREME JOIN</h2>
-    <input type="text" id="name" placeholder="Full Name">
-    <input type="text" id="phone" placeholder="Mobile Number">
-    <input type="password" id="pass" placeholder="Access PIN">
-    <button class="btn-reg" onclick="register()">ACTIVATE ELITE ACCESS</button>
+    <h2>Elite Signup</h2>
+    <input type="text" id="userName" placeholder="Apna Poora Naam">
+    <input type="text" id="userPhone" placeholder="Mobile Number">
+    <input type="password" id="userPass" placeholder="Naya Access PIN">
+    <button class="btn-reg" onclick="handleSignup()">Activate Account</button>
 </div>
 
 <script>
-    // --- SUPABASE CONFIG ---
-    // Bhai yahan apni Supabase details dalo
-    const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
-    const SUPABASE_KEY = "YOUR_ANON_KEY";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // --- APKI ASLI SUPABASE DETAILS (Maine Photo se nikaal li hain) ---
+    const SUPABASE_URL = "https://ugqcxyjrtjzgrsjnsdzz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_Vh_h43bueeQGhN_vXeey6w_V0rnZ"; // Yahan apni poori Anon Key dalo
 
-    async function register() {
-        const n = document.getElementById("name").value.trim();
-        const p = document.getElementById("phone").value.trim();
-        const pw = document.getElementById("pass").value.trim();
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        if(!n || !p || !pw) return alert("Details bharo bhai!");
+    async function handleSignup() {
+        const name = document.getElementById("userName").value.trim();
+        const phone = document.getElementById("userPhone").value.trim();
+        const pass = document.getElementById("userPass").value.trim();
 
-        // Supabase mein data insert karna
-        const { data, error } = await supabase
+        if(!name || !phone || !pass) return alert("Bhai saari details bharo!");
+
+        // Supabase mein data bhejna
+        const { data, error } = await _supabase
             .from('users_xtreme')
-            .insert([{ name: n, phone: p, password: pw, wallet: 0, status: 'active' }]);
+            .insert([{ name: name, phone: phone, password: pass, wallet: 0, status: 'active' }]);
 
         if (error) {
-            alert("Error: " + error.message);
+            alert("Error: " + error.message + "\nTip: Check karein ki SQL Editor mein Table banayi hai ya nahi.");
         } else {
-            alert("Elite Account Activated! Now Login.");
+            alert("Mubarak ho! Elite Account ban gaya. Ab Login karein.");
             window.location.href = "login.html";
         }
     }
