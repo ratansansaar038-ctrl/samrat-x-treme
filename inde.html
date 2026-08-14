@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Samrat X-Treme | Global Numerology Analysis</title>
+    <style>
+        :root { --gold: #ffd700; --neon: #bc13fe; --dark: #050505; --text: #e0e0e0; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--dark); color: var(--text); margin: 0; overflow-x: hidden; text-align: center; }
+
+        /* VIP Glowing Background */
+        .bg-glow { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%); z-index: -1; }
+
+        /* Global Ticker (Price Bar) */
+        .ticker-wrap { background: rgba(255, 215, 0, 0.1); border-bottom: 1px solid var(--gold); padding: 10px 0; overflow: hidden; white-space: nowrap; }
+        .ticker { display: inline-block; animation: marquee 20s linear infinite; font-weight: bold; font-size: 14px; color: var(--gold); }
+        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+        /* Header */
+        header { padding: 40px 20px; position: relative; }
+        .logo-crown { font-size: 50px; filter: drop-shadow(0 0 10px var(--gold)); margin-bottom: 10px; }
+        h1 { font-size: 2.5rem; color: var(--gold); text-shadow: 0 0 15px rgba(255, 215, 0, 0.5); margin: 0; letter-spacing: 3px; }
+        .tagline { color: #888; font-size: 1.1rem; margin-top: 5px; }
+
+        /* Main Buttons */
+        .btn-container { display: flex; flex-direction: column; gap: 20px; align-items: center; margin-top: 40px; }
+        .btn { width: 85%; max-width: 350px; padding: 18px; border-radius: 50px; font-weight: 800; text-decoration: none; font-size: 1.2rem; text-transform: uppercase; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.5); border: 2px solid transparent; }
+        
+        .btn-premium { background: linear-gradient(90deg, #ffd700, #b8860b); color: black; border-color: #fff; animation: pulse 2s infinite; }
+        .btn-outline { background: transparent; border-color: var(--neon); color: var(--neon); box-shadow: 0 0 10px var(--neon); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+        /* Live Feed (Social Proof) */
+        .live-feed { background: #111; border: 1px solid #333; margin: 30px auto; width: 90%; max-width: 450px; padding: 15px; border-radius: 15px; text-align: left; }
+        .feed-item { font-size: 13px; color: #00ff00; margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 5px; }
+
+        /* Markets Info */
+        .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; max-width: 500px; margin: 0 auto; }
+        .market-box { background: #1a1a1a; padding: 15px; border-radius: 12px; border: 1px solid #333; }
+        .market-box span { display: block; font-size: 12px; color: #666; }
+        .market-box b { color: var(--gold); font-size: 1.1rem; }
+
+        footer { padding: 40px; color: #444; font-size: 11px; }
+    </style>
+</head>
+<body>
+
+    <div class="ticker-wrap">
+        <div class="ticker">
+            BITCOIN: $58,234.45 (Analyzing...) • GOLD: $2,452.10 • DOLLAR INDEX: 101.42 • SAMRAT X-TREME PULSE IS LIVE!
+        </div>
+    </div>
+
+    <div class="bg-glow"></div>
+
+    <header>
+        <div class="logo-crown">👑</div>
+        <h1>SAMRAT X-TREME</h1>
+        <p class="tagline">Global Data Numerology & Analysis</p>
+    </header>
+
+    <div class="btn-container">
+        <a href="login.html" class="btn btn-premium">🚀 START LIVE ANALYSIS</a>
+        <a href="signup.html" class="btn btn-outline">📝 JOIN THE ELITE</a>
+    </div>
+
+    <div class="market-grid">
+        <div class="market-box"><span>GLOBAL PULSE</span><b>1-MIN</b></div>
+        <div class="market-box"><span>ACCURACY</span><b>99.9%</b></div>
+        <div class="market-box"><span>DATA SOURCE</span><b>BINANCE</b></div>
+        <div class="market-box"><span>SETTLEMENT</span><b>AUTO</b></div>
+    </div>
+
+    <div class="live-feed">
+        <div style="color: #666; font-size: 11px; margin-bottom: 10px;">LIVE ANALYSIS FEED:</div>
+        <div id="feed-container">
+            <div class="feed-item">✓ User 7823... analyzed round #452 successfully</div>
+            <div class="feed-item">✓ New connection from Delhi, India</div>
+        </div>
+    </div>
+
+    <footer>
+        © 2024 SAMRAT GLOBAL. DEVELOPED FOR NUMEROLOGY RESEARCH & KNOWLEDGE PURPOSE ONLY.
+    </footer>
+
+    <script>
+        // Fake social feed logic
+        const users = ["User 912x", "User 441z", "User 002q", "User 559p", "User 123m"];
+        setInterval(() => {
+            const feed = document.getElementById('feed-container');
+            const randomUser = users[Math.floor(Math.random() * users.length)];
+            const newItem = document.createElement('div');
+            newItem.className = 'feed-item';
+            newItem.innerHTML = ✓ ${randomUser} achieved 9x growth in analysis;
+            feed.prepend(newItem);
+            if (feed.children.length > 3) feed.lastChild.remove();
+        }, 4000);
+    </script>
+
+</body>
+</html>
