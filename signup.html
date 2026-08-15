@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#08010f">
 
-  <title>Sign Up | Samrat X-Treme</title>
+  <title>Elite Signup | Samrat X-Treme</title>
 
   <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 
@@ -20,18 +20,18 @@
     body{
       min-height:100vh;
       display:flex;
-      justify-content:center;
       align-items:center;
+      justify-content:center;
       padding:20px;
       color:#fff;
       background:
-        radial-gradient(circle at 50% 0%,#47126d 0%,#160520 40%,#050108 75%,#000 100%);
+        radial-gradient(circle at 50% 0%,#3f1769 0%,#15051f 42%,#050108 75%,#000 100%);
     }
 
-    .box{
+    .card{
       width:100%;
       max-width:420px;
-      padding:28px 22px;
+      padding:30px 22px;
       border-radius:24px;
       background:linear-gradient(145deg,#171027,#281047);
       border:1px solid #7046d8;
@@ -40,9 +40,9 @@
 
     .logo{
       width:220px;
-      max-width:80%;
+      max-width:82%;
       display:block;
-      margin:0 auto 12px;
+      margin:0 auto 14px;
       filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
     }
 
@@ -50,6 +50,7 @@
       text-align:center;
       font-size:25px;
       margin-bottom:5px;
+      color:#ffe16a;
     }
 
     .sub{
@@ -113,8 +114,8 @@
     .login{
       margin-top:18px;
       text-align:center;
-      font-size:12px;
       color:#9587ad;
+      font-size:12px;
     }
 
     .login a{
@@ -125,82 +126,82 @@
 
     .note{
       margin-top:20px;
-      font-size:9px;
       text-align:center;
-      line-height:1.5;
       color:#675d76;
+      font-size:9px;
+      line-height:1.5;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="box">
+<div class="card">
 
-    <img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
+  <img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
 
-    <h1>Create Account</h1>
+  <h1>ELITE SIGNUP</h1>
 
-    <div class="sub">
-      Join Samrat X-Treme
-    </div>
-
-    <form id="signupForm">
-
-      <label>Your Name</label>
-      <input
-        id="name"
-        type="text"
-        placeholder="Enter your name"
-        maxlength="128"
-        required
-      >
-
-      <label>Email</label>
-      <input
-        id="email"
-        type="email"
-        placeholder="Enter your email"
-        required
-      >
-
-      <label>Password</label>
-      <input
-        id="password"
-        type="password"
-        placeholder="Minimum 8 characters"
-        minlength="8"
-        required
-      >
-
-      <label>Confirm Password</label>
-      <input
-        id="confirmPassword"
-        type="password"
-        placeholder="Enter password again"
-        minlength="8"
-        required
-      >
-
-      <button id="signupButton" type="submit">
-        CREATE ACCOUNT
-      </button>
-
-    </form>
-
-    <div id="message"></div>
-
-    <div class="login">
-      Already have an account?
-      <a href="login.html">LOGIN</a>
-    </div>
-
-    <div class="note">
-      Entertainment / educational game only.<br>
-      Virtual coins have no cash value.
-    </div>
-
+  <div class="sub">
+    Create your Samrat X-Treme account
   </div>
+
+  <form id="signupForm">
+
+    <label>Name</label>
+    <input
+      id="name"
+      type="text"
+      placeholder="Enter your name"
+      maxlength="128"
+      required
+    >
+
+    <label>Email</label>
+    <input
+      id="email"
+      type="email"
+      placeholder="Enter your email"
+      required
+    >
+
+    <label>Password</label>
+    <input
+      id="password"
+      type="password"
+      placeholder="Minimum 8 characters"
+      minlength="8"
+      required
+    >
+
+    <label>Confirm Password</label>
+    <input
+      id="confirmPassword"
+      type="password"
+      placeholder="Enter password again"
+      minlength="8"
+      required
+    >
+
+    <button id="signupButton" type="submit">
+      ACTIVATE ACCOUNT
+    </button>
+
+  </form>
+
+  <div id="message"></div>
+
+  <div class="login">
+    Already registered?
+    <a href="login.html">LOGIN</a>
+  </div>
+
+  <div class="note">
+    Entertainment / educational game only.<br>
+    Virtual coins have no cash value.
+  </div>
+
+</div>
 
 
 <script>
@@ -223,7 +224,6 @@ const client = new Appwrite.Client();
 client
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
-
 
 const account =
   new Appwrite.Account(client);
@@ -260,13 +260,14 @@ form.addEventListener("submit", async function(event){
 
 
   if(password.length < 8){
+    message.style.color = "#ff6b87";
     message.innerText =
       "Password kam se kam 8 characters ka hona chahiye.";
     return;
   }
 
-
   if(password !== confirmPassword){
+    message.style.color = "#ff6b87";
     message.innerText =
       "Password aur Confirm Password match nahi kar rahe.";
     return;
@@ -276,6 +277,7 @@ form.addEventListener("submit", async function(event){
   button.disabled = true;
   button.innerText = "CREATING ACCOUNT...";
 
+  message.style.color = "#ffcf79";
   message.innerText =
     "Account create ho raha hai...";
 
@@ -320,7 +322,7 @@ form.addEventListener("submit", async function(event){
 
     message.style.color = "#60ff9a";
     message.innerText =
-      "Account created successfully ✅";
+      "Account successfully created ✅";
 
 
     setTimeout(function(){
@@ -342,7 +344,7 @@ form.addEventListener("submit", async function(event){
     }
 
     button.disabled = false;
-    button.innerText = "CREATE ACCOUNT";
+    button.innerText = "ACTIVATE ACCOUNT";
   }
 
 });
