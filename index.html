@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+ <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script> 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -701,6 +702,21 @@
 </div>
 
 <script>
+  const APPWRITE_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID = "6a7f2add0011a7bfc21a";
+const APPWRITE_DATABASE_ID = "6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE = "user_profiles";
+const GAME_HISTORY_TABLE = "game_history";
+
+const appwriteClient = new Appwrite.Client();
+
+appwriteClient
+  .setEndpoint(APPWRITE_ENDPOINT)
+  .setProject(APPWRITE_PROJECT_ID);
+
+const account = new Appwrite.Account(appwriteClient);
+const tablesDB = new Appwrite.TablesDB(appwriteClient);
   let wallet = Number(localStorage.getItem("samratWallet")) || 10000;
   let selectedNumber = null;
   let selectedCoins = 100;
