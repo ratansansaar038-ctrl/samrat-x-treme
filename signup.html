@@ -1,354 +1,346 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#08010f">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
 
-  <title>Elite Signup | Samrat X-Treme</title>
+<title>Elite Signup | Samrat X-Treme</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 
-  <style>
-    *{
-      box-sizing:border-box;
-      margin:0;
-      padding:0;
-      font-family:Arial,Helvetica,sans-serif;
-    }
+<style>
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+font-family:Arial,Helvetica,sans-serif
+}
 
-    body{
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-      color:#fff;
-      background:
-        radial-gradient(circle at 50% 0%,#3f1769 0%,#15051f 42%,#050108 75%,#000 100%);
-    }
+body{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+color:#fff;
+background:
+radial-gradient(circle at 50% 0%,#3f1769 0%,#15051f 42%,#050108 75%,#000 100%)
+}
 
-    .card{
-      width:100%;
-      max-width:420px;
-      padding:30px 22px;
-      border-radius:24px;
-      background:linear-gradient(145deg,#171027,#281047);
-      border:1px solid #7046d8;
-      box-shadow:0 0 35px rgba(111,50,255,.35);
-    }
+.card{
+width:100%;
+max-width:420px;
+padding:30px 22px;
+border-radius:24px;
+background:linear-gradient(145deg,#171027,#281047);
+border:1px solid #7046d8;
+box-shadow:0 0 35px rgba(111,50,255,.35)
+}
 
-    .logo{
-      width:220px;
-      max-width:82%;
-      display:block;
-      margin:0 auto 14px;
-      filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
-    }
+.logo{
+width:220px;
+max-width:82%;
+display:block;
+margin:0 auto 14px;
+filter:drop-shadow(0 0 15px rgba(143,59,255,.7))
+}
 
-    h1{
-      text-align:center;
-      font-size:25px;
-      margin-bottom:5px;
-      color:#ffe16a;
-    }
+h1{
+text-align:center;
+font-size:25px;
+margin-bottom:5px;
+color:#ffe16a
+}
 
-    .sub{
-      text-align:center;
-      color:#a99bc5;
-      font-size:12px;
-      margin-bottom:24px;
-    }
+.sub{
+text-align:center;
+color:#a99bc5;
+font-size:12px;
+margin-bottom:24px
+}
 
-    label{
-      display:block;
-      margin:13px 0 6px;
-      font-size:11px;
-      color:#c9b9ee;
-    }
+label{
+display:block;
+margin:13px 0 6px;
+font-size:11px;
+color:#c9b9ee
+}
 
-    input{
-      width:100%;
-      padding:14px;
-      border-radius:13px;
-      border:1px solid #51388d;
-      background:#0e0819;
-      color:#fff;
-      outline:none;
-      font-size:14px;
-    }
+input{
+width:100%;
+padding:14px;
+border-radius:13px;
+border:1px solid #51388d;
+background:#0e0819;
+color:#fff;
+outline:none;
+font-size:14px
+}
 
-    input:focus{
-      border-color:#9c6dff;
-      box-shadow:0 0 12px rgba(122,63,255,.35);
-    }
+input:focus{
+border-color:#9c6dff;
+box-shadow:0 0 12px rgba(122,63,255,.35)
+}
 
-    button{
-      width:100%;
-      margin-top:20px;
-      padding:15px;
-      border:0;
-      border-radius:15px;
-      cursor:pointer;
-      font-size:15px;
-      font-weight:900;
-      color:#210014;
-      background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
-      box-shadow:0 0 20px rgba(255,74,143,.35);
-    }
+button{
+width:100%;
+margin-top:20px;
+padding:15px;
+border:0;
+border-radius:15px;
+cursor:pointer;
+font-size:15px;
+font-weight:900;
+color:#210014;
+background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
+box-shadow:0 0 20px rgba(255,74,143,.35)
+}
 
-    button:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
+button:disabled{
+opacity:.55;
+cursor:not-allowed
+}
 
-    #message{
-      min-height:22px;
-      margin-top:14px;
-      text-align:center;
-      font-size:12px;
-      line-height:1.4;
-      color:#ffb7db;
-    }
+#message{
+min-height:22px;
+margin-top:14px;
+text-align:center;
+font-size:12px;
+line-height:1.4;
+color:#ffb7db
+}
 
-    .login{
-      margin-top:18px;
-      text-align:center;
-      color:#9587ad;
-      font-size:12px;
-    }
+.login{
+margin-top:18px;
+text-align:center;
+color:#9587ad;
+font-size:12px
+}
 
-    .login a{
-      color:#ffd85d;
-      text-decoration:none;
-      font-weight:800;
-    }
+.login a{
+color:#ffd85d;
+text-decoration:none;
+font-weight:800
+}
 
-    .note{
-      margin-top:20px;
-      text-align:center;
-      color:#675d76;
-      font-size:9px;
-      line-height:1.5;
-    }
-  </style>
+.note{
+margin-top:20px;
+text-align:center;
+color:#675d76;
+font-size:9px;
+line-height:1.5
+}
+</style>
 </head>
 
 <body>
 
 <div class="card">
 
-  <img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
+<img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
 
-  <h1>ELITE SIGNUP</h1>
+<h1>ELITE SIGNUP</h1>
 
-  <div class="sub">
-    Create your Samrat X-Treme account
-  </div>
+<div class="sub">
+Create your Samrat X-Treme account
+</div>
 
-  <form id="signupForm">
+<form id="signupForm">
 
-    <label>Name</label>
-    <input
-      id="name"
-      type="text"
-      placeholder="Enter your name"
-      maxlength="128"
-      required
-    >
+<label>Name</label>
 
-    <label>Email</label>
-    <input
-      id="email"
-      type="email"
-      placeholder="Enter your email"
-      required
-    >
+<input
+id="name"
+type="text"
+placeholder="Enter your name"
+maxlength="128"
+autocomplete="name"
+required
+>
 
-    <label>Password</label>
-    <input
-      id="password"
-      type="password"
-      placeholder="Minimum 8 characters"
-      minlength="8"
-      required
-    >
+<label>Email</label>
 
-    <label>Confirm Password</label>
-    <input
-      id="confirmPassword"
-      type="password"
-      placeholder="Enter password again"
-      minlength="8"
-      required
-    >
+<input
+id="email"
+type="email"
+placeholder="Enter your email"
+autocomplete="email"
+required
+>
 
-    <button id="signupButton" type="submit">
-      ACTIVATE ACCOUNT
-    </button>
+<label>Password</label>
 
-  </form>
+<input
+id="password"
+type="password"
+placeholder="Minimum 8 characters"
+minlength="8"
+autocomplete="new-password"
+required
+>
 
-  <div id="message"></div>
+<label>Confirm Password</label>
 
-  <div class="login">
-    Already registered?
-    <a href="login.html">LOGIN</a>
-  </div>
+<input
+id="confirmPassword"
+type="password"
+placeholder="Enter password again"
+minlength="8"
+autocomplete="new-password"
+required
+>
 
-  <div class="note">
-    Entertainment / educational game only.<br>
-    Virtual coins have no cash value.
-  </div>
+<button id="signupButton" type="submit" disabled>
+CHECKING...
+</button>
+
+</form>
+
+<div id="message">
+Checking account...
+</div>
+
+<div class="login">
+Already registered?
+<a href="login.html">LOGIN</a>
+</div>
+
+<div class="note">
+Entertainment / educational game only.<br>
+Virtual coins have no cash value.
+</div>
 
 </div>
 
-
 <script>
+const APPWRITE_ENDPOINT="https://sgp.cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID="6a7f2add0011a7bfc21a";
 
-const APPWRITE_ENDPOINT =
-  "https://sgp.cloud.appwrite.io/v1";
-
-const APPWRITE_PROJECT_ID =
-  "6a7f2add0011a7bfc21a";
-
-const APPWRITE_DATABASE_ID =
-  "6a7f2d1d0035d9815939";
-
-const USER_PROFILES_TABLE =
-  "user_profiles";
-
-
-const client = new Appwrite.Client();
+const client=new Appwrite.Client();
 
 client
-  .setEndpoint(APPWRITE_ENDPOINT)
-  .setProject(APPWRITE_PROJECT_ID);
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
 
-const account =
-  new Appwrite.Account(client);
+const account=new Appwrite.Account(client);
 
-const tablesDB =
-  new Appwrite.TablesDB(client);
+const form=document.getElementById("signupForm");
+const button=document.getElementById("signupButton");
+const message=document.getElementById("message");
 
+async function prepareSignupPage(){
 
-const form =
-  document.getElementById("signupForm");
+try{
 
-const button =
-  document.getElementById("signupButton");
+await account.get();
 
-const message =
-  document.getElementById("message");
+/* already logged in */
 
+window.location.replace("index.html");
+return;
 
-form.addEventListener("submit", async function(event){
+}catch(error){
 
-  event.preventDefault();
+button.disabled=false;
+button.innerText="ACTIVATE ACCOUNT";
+message.innerText="";
 
-  const name =
-    document.getElementById("name").value.trim();
+}
+}
 
-  const email =
-    document.getElementById("email").value.trim();
+form.addEventListener("submit",async function(event){
 
-  const password =
-    document.getElementById("password").value;
+event.preventDefault();
 
-  const confirmPassword =
-    document.getElementById("confirmPassword").value;
+if(button.disabled) return;
 
+const name=
+document.getElementById("name").value.trim();
 
-  if(password.length < 8){
-    message.style.color = "#ff6b87";
-    message.innerText =
-      "Password kam se kam 8 characters ka hona chahiye.";
-    return;
-  }
+const email=
+document.getElementById("email").value.trim();
 
-  if(password !== confirmPassword){
-    message.style.color = "#ff6b87";
-    message.innerText =
-      "Password aur Confirm Password match nahi kar rahe.";
-    return;
-  }
+const password=
+document.getElementById("password").value;
 
+const confirmPassword=
+document.getElementById("confirmPassword").value;
 
-  button.disabled = true;
-  button.innerText = "CREATING ACCOUNT...";
+if(!name){
 
-  message.style.color = "#ffcf79";
-  message.innerText =
-    "Account create ho raha hai...";
+message.style.color="#ff6b87";
+message.innerText="Name enter karo.";
+return;
+}
 
+if(password.length<8){
 
-  try{
+message.style.color="#ff6b87";
 
-    const user = await account.create({
-      userId: Appwrite.ID.unique(),
-      email: email,
-      password: password,
-      name: name
-    });
+message.innerText=
+"Password kam se kam 8 characters ka hona chahiye.";
 
+return;
+}
 
-    await account.createEmailPasswordSession({
-      email: email,
-      password: password
-    });
+if(password!==confirmPassword){
 
+message.style.color="#ff6b87";
 
-    await tablesDB.createRow({
-      databaseId: APPWRITE_DATABASE_ID,
-      tableId: USER_PROFILES_TABLE,
-      rowId: user.$id,
+message.innerText=
+"Password aur Confirm Password match nahi kar rahe.";
 
-      data:{
-        userId: user.$id,
-        name: name,
-        email: email,
-        wallet: 10000,
-        wins: 0,
-        losses: 0,
-        rounds: 0
-      }
-    });
+return;
+}
 
+button.disabled=true;
+button.innerText="CREATING ACCOUNT...";
 
-    localStorage.removeItem("samratWallet");
-    localStorage.removeItem("samratHistory");
-    localStorage.removeItem("samratRound");
+message.style.color="#ffcf79";
+message.innerText="Account create ho raha hai...";
 
+try{
 
-    message.style.color = "#60ff9a";
-    message.innerText =
-      "Account successfully created ✅";
-
-
-    setTimeout(function(){
-      window.location.href = "index.html";
-    },1000);
-
-
-  }catch(error){
-
-    console.error("Signup error:",error);
-
-    message.style.color = "#ff6b87";
-
-    if(error && error.message){
-      message.innerText = error.message;
-    }else{
-      message.innerText =
-        "Signup failed. Please try again.";
-    }
-
-    button.disabled = false;
-    button.innerText = "ACTIVATE ACCOUNT";
-  }
-
+await account.create({
+userId:Appwrite.ID.unique(),
+email:email,
+password:password,
+name:name
 });
 
+await account.createEmailPasswordSession({
+email:email,
+password:password
+});
+
+localStorage.removeItem("samratWallet");
+localStorage.removeItem("samratHistory");
+localStorage.removeItem("samratRound");
+
+message.style.color="#60ff9a";
+message.innerText="Account successfully created ✅";
+
+window.location.replace("index.html");
+
+}catch(error){
+
+console.error("Signup error:",error);
+
+message.style.color="#ff6b87";
+
+message.innerText=
+error && error.message
+? error.message
+: "Signup failed. Please try again.";
+
+button.disabled=false;
+button.innerText="ACTIVATE ACCOUNT";
+
+}
+});
+
+prepareSignupPage();
 </script>
 
 </body>
