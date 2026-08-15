@@ -192,6 +192,16 @@ client
   .setProject(APPWRITE_PROJECT_ID);
 
 const account = new Appwrite.Account(client);
+  async function checkExistingSession(){
+  try{
+    await account.get();
+    window.location.replace("index.html");
+  }catch(error){
+    // No active session — login page yahin rahega
+  }
+}
+
+checkExistingSession();
 
 const form = document.getElementById("loginForm");
 const button = document.getElementById("loginButton");
