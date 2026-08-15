@@ -1036,6 +1036,14 @@ const tablesDB = new Appwrite.TablesDB(appwriteClient);
         playedAt: new Date().toISOString()
       }
     });
+    await tablesDB.updateRow({
+  databaseId: APPWRITE_DATABASE_ID,
+  tableId: USER_PROFILES_TABLE,
+  rowId: "6a8031600025646ad144",
+  data: {
+    wallet: Number(wallet)
+  }
+});
 
     console.log("Game history saved to Appwrite ✅");
 
