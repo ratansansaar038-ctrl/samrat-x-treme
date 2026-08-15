@@ -839,4 +839,409 @@ button.classList.remove("selected");
 
 element.classList.add("selected");
 
-document.getElementById("message").inn
+document.getElementById("message").innerText=
+"Number "+number+" selected 👑";
+}
+
+function selectCoins(amount,element){
+
+if(roundLocked) return;
+
+selectedCoins=amount;
+
+document.querySelectorAll(".coin").forEach(function(button){
+button.classList.remove("active");
+});
+
+element.classList.add("active");
+}
+
+function getDateNumber(){
+
+const now=new Date();
+
+const digits=
+String(now.getDate())+
+String(now.getMonth()+1)+
+String(now.getFullYear());
+
+let total=0;
+
+for(const digit of digits){
+total+=Number(digit);
+}
+
+while(total>9){
+
+total=String(total)
+.split("")
+.reduce(function(sum,digit){
+return sum+Number(digit);
+},0);
+
+}
+
+return total;
+}
+
+function priceCode(price){
+return Math.round(price*100)%1000;
+}
+
+async function lockPrediction(){
+
+if(roundLocked) return;
+
+if(!profileRowId){
+
+document.getElementById("message").innerText=
+"⚠️ Profile ready nahi hai.";
+
+return;
+}
+
+if(!btcReady || !goldReady){
+
+document.getElementById("message").innerText=
+"⚠️ Live market ready nahi hai.";
+
+return;
+}
+
+if(selectedNumber===null){
+
+document.getElementById("message").innerText=
+"⚠️ Pehle 1 se 9 me number choose karo.";
+
+return;
+}
+
+if(wallet<selectedCoins){
+
+document.getElementById("message").innerText=
+"⚠️ Wallet me enough coins nahi hain.";
+
+return;
+}
+
+roundLocked=true;
+document.getElementById("lockButton").disabled=true;
+
+const lockedBtc=liveBtcPrice;
+const lockedGold=liveGoldPrice;
+
+const btcCode=priceCode(lockedBtc);
+const goldCode=priceCode(lockedGold);
+const dateNumber=getDateNumber();
+
+const rawTotal=
+btcCode+
+goldCode+
+roundId+
+dateNumber;
+
+const winningNumber=(rawTotal%9)+1;
+
+const oldWallet=wallet;
+
+let won=false;
+let netChange=-selectedCoins;
+
+wallet-=selectedCoins;
+
+if(selectedNumber===winningNumber){
+
+won=true;
+
+const totalReturn=selectedCoins*9;
+
+wallet+=totalReturn;
+netChange=totalReturn-selectedCoins;
+}
+
+document.getElementById("wallet").innerText=
+wallet.toLocaleString("en-IN");
+
+document.getElementById("winningNumber").innerText=
+winningNumber;
+
+const outcome=document.getElementById("outcome");
+
+if(won){
+
+outcome.className="outcome win";
+outcome.innerText="🔥 X-TREME WIN 🔥";
+
+document.getElementById("coinChange").innerText=
+"+"+netChange.toLocaleString("en-IN")+" coins";
+
+}else{
+
+outcome.className="outcome lose";
+outcome.innerText="X-TREME MISS";
+
+document.getElementById("coinChange").innerText=
+"-"+selectedCoins.toLocaleString("en-IN")+" coins";
+}
+
+document.getElementById("lockedBtc").innerText=
+"$"+lockedBtc.toLocaleString("en-US",{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+
+document.getElementById("lockedGold").innerText=
+"$"+lockedGold.toLocaleString("en-US",{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+
+document.getElementById("formula").innerHTML=
+"YOUR PICK: <b>"+selectedNumber+"</b><br>"+
+"BTC Code: <b>"+btcCode+"</b> &nbsp;|&nbsp; "+
+"Gold Code: <b>"+goldCode+"</b><br>"+
+"Date Number: <b>"+dateNumber+"</b> &nbsp;|&nbsp; "+
+"Round: <b>"+roundId+"</b><br><br>"+
+"("+btcCode+" + "+goldCode+" + "+roundId+" + "+dateNumber+
+") % 9 + 1 = <b>"+winningNumber+"</b>";
+
+document.getElementById("result").classList.add("show");
+
+document.getElementById("message").innerText="Saving round...";
+
+const item={
+round:roundId,
+pick:selectedNumber,
+result:winningNumber,
+coins:selectedCoins,
+change:netChange,
+won:won,
+btc:lockedBtc,
+gold:lockedGold,
+playedAt:new Date().toISOString()
+};
+
+try{
+
+await saveRoundToCloud(item);
+
+document.getElementById("message").innerText=
+"Round saved ✅";
+
+}catch(error){
+
+console.error("Round save failed:",error);
+
+/* restore wallet because cloud transaction did not complete */
+
+wallet=oldWallet;
+
+document.getElementById("wallet").innerText=
+wallet.toLocaleString("en-IN");
+
+document.getElementById("message").innerText=
+"⚠️ Round cloud me save nahi hua. Wallet restore kiya gaya.";
+
+roundLocked=false;
+
+document.getElementById("lockButton").disabled=
+!(btcReady && goldReady && profileRowId);
+}
+}
+
+async function saveRoundToCloud(item){
+
+const created=await tablesDB.createRow({
+databaseId:APPWRITE_DATABASE_ID,
+tableId:GAME_HISTORY_TABLE,
+rowId:Appwrite.ID.unique(),
+data:{
+round:Number(item.round),
+userId:currentUser.$id,
+pick:Number(item.pick),
+result:Number(item.result),
+coins:Number(item.coins),
+change:Number(item.change),
+won:Boolean(item.won),
+btc:Number(item.btc),
+gold:Number(item.gold),
+playedAt:item.playedAt
+}
+});
+
+const newRounds=roundsCount+1;
+const newWins=winsCount+(item.won?1:0);
+const newLosses=lossesCount+(item.won?0:1);
+
+try{
+
+await tablesDB.updateRow({
+databaseId:APPWRITE_DATABASE_ID,
+tableId:USER_PROFILES_TABLE,
+rowId:profileRowId,
+data:{
+wallet:Number(wallet),
+wins:Number(newWins),
+losses:Number(newLosses),
+rounds:Number(newRounds)
+}
+});
+
+}catch(error){
+
+/*
+History row may already have been created.
+Report failure clearly instead of silently using wrong wallet.
+*/
+
+console.error("Profile update error:",error);
+throw error;
+}
+
+roundsCount=newRounds;
+winsCount=newWins;
+lossesCount=newLosses;
+
+profile.wallet=wallet;
+profile.wins=winsCount;
+profile.losses=lossesCount;
+profile.rounds=roundsCount;
+
+history.unshift({
+...item,
+$id:created.$id
+});
+
+history=history.slice(0,30);
+
+updateProfileUI();
+renderHistory();
+}
+
+function renderHistory(){
+
+const list=document.getElementById("historyList");
+
+if(history.length===0){
+
+list.innerHTML=
+'<div class="history-row">'+
+'<div class="history-main">No rounds played yet.</div>'+
+'</div>';
+
+return;
+}
+
+list.innerHTML=history.map(function(item){
+
+const won=Boolean(item.won);
+
+const changeClass=
+won?"history-win":"history-loss";
+
+const amount=Number(item.change);
+
+const changeText=
+amount>=0
+? "+"+amount
+: String(amount);
+
+const timeText=
+item.playedAt
+? new Date(item.playedAt).toLocaleString("en-IN")
+: "";
+
+return(
+'<div class="history-row">'+
+'<div>'+
+'<div class="history-main">'+
+'Round '+item.round+
+' • Pick '+item.pick+
+' → Result '+item.result+
+'</div>'+
+'<div class="history-sub">'+timeText+'</div>'+
+'</div>'+
+'<div class="'+changeClass+'">'+
+changeText+' 🪙'+
+'</div>'+
+'</div>'
+);
+
+}).join("");
+}
+
+function newRound(){
+
+roundId=1001+roundsCount;
+
+roundLocked=false;
+selectedNumber=null;
+
+document.getElementById("roundId").innerText=roundId;
+
+document.querySelectorAll(".number").forEach(function(button){
+button.classList.remove("selected");
+});
+
+document.getElementById("result").classList.remove("show");
+
+document.getElementById("message").innerText=
+"New X-Treme round ready ⚡ Choose your number.";
+
+document.getElementById("lockButton").disabled=
+!(btcReady && goldReady && profileRowId);
+}
+
+/* PWA */
+
+let deferredInstallPrompt=null;
+
+const installWrap=document.getElementById("installWrap");
+const installButton=document.getElementById("installButton");
+
+window.addEventListener("beforeinstallprompt",function(event){
+
+event.preventDefault();
+
+deferredInstallPrompt=event;
+installWrap.classList.add("show");
+});
+
+installButton.addEventListener("click",async function(){
+
+if(!deferredInstallPrompt) return;
+
+deferredInstallPrompt.prompt();
+
+await deferredInstallPrompt.userChoice;
+
+deferredInstallPrompt=null;
+installWrap.classList.remove("show");
+});
+
+window.addEventListener("appinstalled",function(){
+
+deferredInstallPrompt=null;
+installWrap.classList.remove("show");
+});
+
+if("serviceWorker" in navigator){
+
+window.addEventListener("load",function(){
+
+navigator.serviceWorker
+.register("service-worker.js")
+.then(function(registration){
+registration.update().catch(function(){});
+})
+.catch(function(error){
+console.error("Service worker error:",error);
+});
+
+});
+}
+
+startApp();
+</script>
+</body>
+</html>
