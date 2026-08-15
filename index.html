@@ -747,6 +747,16 @@ appwriteClient
   .setProject(APPWRITE_PROJECT_ID);
 
 const account = new Appwrite.Account(appwriteClient);
+  async function requireLogin(){
+  try{
+    await account.get();
+    console.log("User logged in ✅");
+  }catch(error){
+    window.location.href = "login.html";
+  }
+}
+
+requireLogin();
 const tablesDB = new Appwrite.TablesDB(appwriteClient);
   let wallet = Number(localStorage.getItem("samratWallet")) || 10000;
   let selectedNumber = null;
