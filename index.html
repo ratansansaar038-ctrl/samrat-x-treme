@@ -1,21 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
-<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
   <meta name="theme-color" content="#08010f" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Samrat X-Treme" />
+
+  <meta
+    name="apple-mobile-web-app-capable"
+    content="yes"
+  />
+
+  <meta
+    name="apple-mobile-web-app-status-bar-style"
+    content="black-translucent"
+  />
+
+  <meta
+    name="apple-mobile-web-app-title"
+    content="Samrat X-Treme"
+  />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link
+    rel="apple-touch-icon"
+    href="apple-touch-icon.png"
+  />
+
+  <link
+    rel="icon"
+    type="image/png"
+    sizes="192x192"
+    href="icon-192.png"
+  />
 
   <title>Samrat X-Treme</title>
 
+  <!-- APPWRITE SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
   <style>
+
     *{
       box-sizing:border-box;
       margin:0;
@@ -27,7 +56,13 @@
       min-height:100vh;
       color:#fff;
       background:
-        radial-gradient(circle at 50% -10%, #3d1265 0%, #13051f 32%, #050108 65%, #000 100%);
+        radial-gradient(
+          circle at 50% -10%,
+          #3d1265 0%,
+          #13051f 32%,
+          #050108 65%,
+          #000 100%
+        );
       overflow-x:hidden;
     }
 
@@ -36,14 +71,24 @@
       position:fixed;
       inset:0;
       pointer-events:none;
+
       background:
-        linear-gradient(transparent 95%,rgba(135,52,255,.06) 100%),
-        linear-gradient(90deg,transparent 95%,rgba(255,42,170,.035) 100%);
+        linear-gradient(
+          transparent 95%,
+          rgba(135,52,255,.06) 100%
+        ),
+        linear-gradient(
+          90deg,
+          transparent 95%,
+          rgba(255,42,170,.035) 100%
+        );
+
       background-size:30px 30px;
       opacity:.4;
     }
 
     .app{
+      display:none;
       width:100%;
       max-width:480px;
       margin:0 auto;
@@ -52,15 +97,54 @@
       z-index:2;
     }
 
+    .app.ready{
+      display:block;
+    }
+
+    .auth-loader{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      gap:12px;
+      text-align:center;
+      color:#c9b9ee;
+    }
+
+    .loader-ring{
+      width:42px;
+      height:42px;
+      border-radius:50%;
+      border:4px solid #312048;
+      border-top-color:#ffb51c;
+      animation:spin .8s linear infinite;
+    }
+
+    @keyframes spin{
+      to{
+        transform:rotate(360deg);
+      }
+    }
+
     .topbar{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:10px;
+
       padding:11px 13px;
-      background:linear-gradient(135deg,#171027,#281047);
+
+      background:
+        linear-gradient(
+          135deg,
+          #171027,
+          #281047
+        );
+
       border:1px solid #7046d8;
       border-radius:18px;
+
       box-shadow:
         0 0 18px rgba(113,54,255,.32),
         inset 0 0 15px rgba(113,54,255,.09);
@@ -77,18 +161,23 @@
       font-size:21px;
       font-weight:900;
       color:#ffd94c;
-      text-shadow:0 0 10px rgba(255,190,0,.6);
+
+      text-shadow:
+        0 0 10px rgba(255,190,0,.6);
     }
 
     .live-badge{
       display:flex;
       align-items:center;
       gap:7px;
+
       border-radius:50px;
       padding:8px 10px;
+
       font-size:10px;
       font-weight:900;
       letter-spacing:.8px;
+
       background:#180d29;
       border:1px solid #7753c7;
       color:#ded1ff;
@@ -98,6 +187,7 @@
       width:8px;
       height:8px;
       border-radius:50%;
+
       background:#3cff83;
       box-shadow:0 0 12px #00ff6a;
     }
@@ -105,6 +195,67 @@
     .live-dot.offline{
       background:#ff4c72;
       box-shadow:0 0 12px #ff164e;
+    }
+
+    .account-bar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+
+      margin:10px 0;
+      padding:10px 12px;
+
+      border-radius:14px;
+
+      background:#10091e;
+      border:1px solid #352455;
+    }
+
+    .user-info{
+      min-width:0;
+    }
+
+    .user-name{
+      color:#ffe16b;
+      font-size:12px;
+      font-weight:900;
+
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .user-email{
+      margin-top:2px;
+
+      color:#85799b;
+      font-size:9px;
+
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .logout-btn{
+      flex-shrink:0;
+
+      padding:9px 12px;
+
+      border-radius:11px;
+      border:1px solid #8d55df;
+
+      color:#fff;
+      background:
+        linear-gradient(
+          135deg,
+          #35135d,
+          #7b1f77
+        );
+
+      font-size:10px;
+      font-weight:900;
+      cursor:pointer;
     }
 
     .logo{
@@ -118,12 +269,19 @@
       width:100%;
       max-width:320px;
       height:auto;
+
       display:block;
       margin:0 auto;
+
       object-fit:contain;
+
       filter:
-        drop-shadow(0 0 12px rgba(134,57,255,.8))
-        drop-shadow(0 0 24px rgba(255,91,0,.25));
+        drop-shadow(
+          0 0 12px rgba(134,57,255,.8)
+        )
+        drop-shadow(
+          0 0 24px rgba(255,91,0,.25)
+        );
     }
 
     .install-wrap{
@@ -137,14 +295,27 @@
 
     .install-btn{
       width:100%;
+
       padding:11px 12px;
+
       border:1px solid #8a63e8;
       border-radius:14px;
+
       color:#fff;
       font-weight:900;
       letter-spacing:.5px;
-      background:linear-gradient(90deg,#3a1f7f,#6c2bd9,#a72cc6);
-      box-shadow:0 0 18px rgba(115,49,220,.4);
+
+      background:
+        linear-gradient(
+          90deg,
+          #3a1f7f,
+          #6c2bd9,
+          #a72cc6
+        );
+
+      box-shadow:
+        0 0 18px rgba(115,49,220,.4);
+
       cursor:pointer;
     }
 
@@ -158,24 +329,38 @@
     .market-card{
       min-width:0;
       position:relative;
+
       background:
-        linear-gradient(145deg,rgba(22,16,46,.97),rgba(36,17,72,.97));
+        linear-gradient(
+          145deg,
+          rgba(22,16,46,.97),
+          rgba(36,17,72,.97)
+        );
+
       border:1px solid #5540a3;
       border-radius:17px;
       padding:13px 11px;
+
       overflow:hidden;
-      box-shadow:0 0 18px rgba(72,43,155,.28);
+
+      box-shadow:
+        0 0 18px rgba(72,43,155,.28);
     }
 
     .market-card:after{
       content:"";
+
       position:absolute;
+
       width:70px;
       height:70px;
       border-radius:50%;
+
       top:-35px;
       right:-25px;
+
       background:#7e35ff;
+
       filter:blur(28px);
       opacity:.3;
     }
@@ -189,8 +374,10 @@
 
     .market-price{
       margin-top:6px;
+
       font-size:17px;
       font-weight:900;
+
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
@@ -198,12 +385,14 @@
 
     .btc{
       color:#ffb33a;
-      text-shadow:0 0 10px rgba(255,155,0,.35);
+      text-shadow:
+        0 0 10px rgba(255,155,0,.35);
     }
 
     .gold{
       color:#ffe168;
-      text-shadow:0 0 10px rgba(255,220,80,.35);
+      text-shadow:
+        0 0 10px rgba(255,220,80,.35);
     }
 
     .updated{
@@ -215,21 +404,31 @@
     .round-box{
       margin-top:11px;
       padding:9px 12px;
+
       border-radius:13px;
-      background:rgba(14,8,25,.7);
+
+      background:
+        rgba(14,8,25,.7);
+
       border:1px solid #362854;
+
       display:flex;
       justify-content:space-between;
+
       font-size:10px;
       color:#9388ac;
     }
 
     .section-title{
       text-align:center;
+
       font-size:12px;
       font-weight:800;
+
       color:#c8bbff;
+
       margin:20px 0 11px;
+
       letter-spacing:1.5px;
     }
 
@@ -241,16 +440,28 @@
 
     .number{
       height:67px;
+
       border-radius:18px;
       border:2px solid #6540b6;
+
       color:#fff;
+
       font-size:27px;
       font-weight:1000;
+
       cursor:pointer;
-      background:linear-gradient(145deg,#18102e,#331363);
+
+      background:
+        linear-gradient(
+          145deg,
+          #18102e,
+          #331363
+        );
+
       box-shadow:
         inset 0 0 15px rgba(93,43,163,.35),
         0 0 11px rgba(79,32,143,.35);
+
       transition:.15s ease;
     }
 
@@ -260,9 +471,19 @@
 
     .number.selected{
       border-color:#fff3a9;
+
       color:#230216;
+
       transform:scale(1.06);
-      background:linear-gradient(145deg,#fff050,#ff9700,#ff4c00);
+
+      background:
+        linear-gradient(
+          145deg,
+          #fff050,
+          #ff9700,
+          #ff4c00
+        );
+
       box-shadow:
         0 0 10px #ffd21c,
         0 0 26px rgba(255,87,0,.85);
@@ -275,33 +496,63 @@
 
     .coin{
       flex:1;
+
       border:1px solid #6f4cc0;
+
       padding:12px 5px;
+
       color:#fff;
+
       border-radius:14px;
+
       background:#171027;
+
       font-weight:800;
+
       cursor:pointer;
     }
 
     .coin.active{
       border-color:#f1bcff;
-      background:linear-gradient(135deg,#6332ff,#e82ebd);
-      box-shadow:0 0 17px rgba(183,39,255,.6);
+
+      background:
+        linear-gradient(
+          135deg,
+          #6332ff,
+          #e82ebd
+        );
+
+      box-shadow:
+        0 0 17px rgba(183,39,255,.6);
     }
 
     .lock{
       width:100%;
+
       margin-top:20px;
+
       padding:17px 10px;
+
       border:0;
       border-radius:18px;
+
       font-size:17px;
       font-weight:1000;
+
       letter-spacing:.9px;
+
       cursor:pointer;
+
       color:#200211;
-      background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
+
+      background:
+        linear-gradient(
+          90deg,
+          #ffe033,
+          #ff8b00,
+          #ff2b9d
+        );
+
       box-shadow:
         0 0 13px rgba(255,174,0,.8),
         0 0 30px rgba(255,37,150,.4);
@@ -315,22 +566,39 @@
 
     .message{
       min-height:25px;
+
       margin-top:13px;
+
       text-align:center;
+
       font-size:12px;
       font-weight:700;
+
       color:#ffcaf0;
     }
 
     .result{
       display:none;
+
       margin-top:18px;
+
       border-radius:22px;
+
       padding:18px;
+
       text-align:center;
-      background:linear-gradient(145deg,#131023,#271448);
+
+      background:
+        linear-gradient(
+          145deg,
+          #131023,
+          #271448
+        );
+
       border:1px solid #8053df;
-      box-shadow:0 0 28px rgba(106,54,211,.45);
+
+      box-shadow:
+        0 0 28px rgba(106,54,211,.45);
     }
 
     .result.show{
@@ -339,8 +607,15 @@
     }
 
     @keyframes resultPop{
-      from{opacity:0;transform:scale(.75);}
-      to{opacity:1;transform:scale(1);}
+      from{
+        opacity:0;
+        transform:scale(.75);
+      }
+
+      to{
+        opacity:1;
+        transform:scale(1);
+      }
     }
 
     .result-title{
@@ -352,16 +627,30 @@
     .winning-number{
       width:105px;
       height:105px;
+
       margin:14px auto 12px;
+
       border-radius:50%;
+
       display:flex;
       justify-content:center;
       align-items:center;
+
       font-size:53px;
       font-weight:1000;
+
       color:#240015;
-      background:linear-gradient(145deg,#fff452,#ffae00,#ff5b00);
+
+      background:
+        linear-gradient(
+          145deg,
+          #fff452,
+          #ffae00,
+          #ff5b00
+        );
+
       border:4px solid #fff5cb;
+
       box-shadow:
         0 0 15px #ffd100,
         0 0 42px rgba(255,64,0,.72);
@@ -375,52 +664,74 @@
 
     .win{
       color:#56ff94;
-      text-shadow:0 0 14px rgba(0,255,105,.8);
+
+      text-shadow:
+        0 0 14px rgba(0,255,105,.8);
     }
 
     .lose{
       color:#ff5876;
-      text-shadow:0 0 14px rgba(255,0,55,.7);
+
+      text-shadow:
+        0 0 14px rgba(255,0,55,.7);
     }
 
     .coin-change{
       margin-top:4px;
+
       font-weight:900;
       font-size:17px;
+
       color:#ffe48e;
     }
 
     .snapshot{
       display:grid;
       grid-template-columns:1fr 1fr;
+
       gap:8px;
+
       margin-top:14px;
     }
 
     .snap{
       padding:9px;
+
       border-radius:10px;
+
       background:#0b0713;
+
       border:1px solid #312344;
+
       font-size:10px;
       color:#a89dbd;
     }
 
     .snap strong{
       display:block;
+
       margin-top:4px;
+
       color:#fff;
+
       font-size:12px;
     }
 
     .formula{
       margin-top:11px;
+
       padding:12px 9px;
+
       background:#090611;
+
       border-radius:12px;
+
       border:1px solid #2b2038;
+
       color:#bdb2cf;
+
       line-height:1.6;
+
       font-size:11px;
     }
 
@@ -430,27 +741,40 @@
 
     .new-round{
       margin-top:14px;
+
       padding:11px 19px;
+
       border-radius:12px;
+
       border:1px solid #805fd3;
+
       background:#241449;
+
       color:#fff;
+
       font-weight:800;
+
       cursor:pointer;
     }
 
     .stats{
       display:grid;
       grid-template-columns:repeat(3,1fr);
+
       gap:8px;
+
       margin-top:19px;
     }
 
     .stat{
       background:#100a1d;
+
       border:1px solid #302443;
+
       border-radius:13px;
+
       text-align:center;
+
       padding:10px 4px;
     }
 
@@ -468,9 +792,13 @@
 
     .history-card{
       margin-top:18px;
+
       border:1px solid #35264e;
+
       border-radius:16px;
+
       background:#0d0817;
+
       padding:12px;
     }
 
@@ -478,35 +806,35 @@
       display:flex;
       justify-content:space-between;
       align-items:center;
+
       margin-bottom:8px;
     }
 
     .history-title{
       font-size:11px;
       font-weight:900;
+
       color:#cabaff;
+
       letter-spacing:1px;
     }
 
-    .clear-history{
-      border:0;
-      color:#82758f;
-      background:none;
-      font-size:10px;
-      cursor:pointer;
-    }
-
     .history-list{
-      max-height:220px;
+      max-height:260px;
       overflow-y:auto;
     }
 
     .history-row{
       display:grid;
       grid-template-columns:1fr auto;
+
       gap:8px;
+
       padding:9px 2px;
-      border-bottom:1px solid #241932;
+
+      border-bottom:
+        1px solid #241932;
+
       font-size:10px;
     }
 
@@ -520,7 +848,9 @@
 
     .history-sub{
       margin-top:3px;
+
       color:#655c74;
+
       font-size:9px;
     }
 
@@ -534,706 +864,513 @@
       font-weight:900;
     }
 
-    .reset{
-      width:100%;
-      margin-top:13px;
-      padding:10px;
-      border-radius:12px;
-      border:1px solid #3b2a4d;
-      color:#8c819a;
-      background:#0d0814;
-      cursor:pointer;
-    }
-
     .warning{
       margin-top:22px;
+
       text-align:center;
+
       color:#665e75;
+
       font-size:9px;
       line-height:1.55;
     }
 
     @media(max-width:350px){
-      .market{grid-template-columns:1fr;}
-      .main-logo{max-width:270px;}
+
+      .market{
+        grid-template-columns:1fr;
+      }
+
+      .main-logo{
+        max-width:270px;
+      }
+
     }
-    .auth-buttons{
-  display:flex;
-  gap:10px;
-  margin:10px 0;
-}
 
-.auth-btn{
-  flex:1;
-  text-align:center;
-  padding:11px 8px;
-  border-radius:13px;
-  text-decoration:none;
-  font-size:12px;
-  font-weight:900;
-  letter-spacing:.8px;
-}
-
-.login-btn{
-  color:#fff;
-  background:#19102d;
-  border:1px solid #7b55d6;
-}
-
-.signup-btn{
-  color:#210014;
-  background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
-  border:1px solid #ffd65a;
-}
   </style>
 </head>
 
 <body>
 
-<div class="app">
+<!-- AUTH CHECK SCREEN -->
+
+<div class="auth-loader" id="authLoader">
+
+  <div class="loader-ring"></div>
+
+  <div>
+    Checking Samrat X-Treme account...
+  </div>
+
+</div>
+
+
+<!-- MAIN GAME -->
+
+<div class="app" id="mainApp">
 
   <div class="topbar">
+
     <div>
-      <div class="wallet-title">X-TREME WALLET</div>
-      <div class="wallet">🪙 <span id="wallet">10,000</span></div>
+
+      <div class="wallet-title">
+        X-TREME WALLET
+      </div>
+
+      <div class="wallet">
+        🪙 <span id="wallet">0</span>
+      </div>
+
     </div>
+
 
     <div class="live-badge">
-      <span class="live-dot offline" id="liveDot"></span>
-      <span id="marketStatus">CONNECTING</span>
+
+      <span
+        class="live-dot offline"
+        id="liveDot"
+      ></span>
+
+      <span id="marketStatus">
+        CONNECTING
+      </span>
+
     </div>
-  </div>
-<div class="auth-buttons">
-  <a href="login.html" class="auth-btn login-btn">LOGIN</a>
-  <a href="signup.html" class="auth-btn signup-btn">SIGN UP</a>
-</div>
-  <div class="logo">
-    <img src="samrat-logo.png" alt="Samrat X-Treme Logo" class="main-logo">
+
   </div>
 
-  <div class="install-wrap" id="installWrap">
-    <button class="install-btn" id="installButton">
+
+  <!-- LOGGED-IN USER -->
+
+  <div class="account-bar">
+
+    <div class="user-info">
+
+      <div
+        class="user-name"
+        id="userName"
+      >
+        Player
+      </div>
+
+      <div
+        class="user-email"
+        id="userEmail"
+      >
+      </div>
+
+    </div>
+
+    <button
+      class="logout-btn"
+      onclick="logoutUser()"
+    >
+      LOGOUT
+    </button>
+
+  </div>
+
+
+  <div class="logo">
+
+    <img
+      src="samrat-logo.png"
+      alt="Samrat X-Treme Logo"
+      class="main-logo"
+    >
+
+  </div>
+
+
+  <!-- PWA INSTALL -->
+
+  <div
+    class="install-wrap"
+    id="installWrap"
+  >
+
+    <button
+      class="install-btn"
+      id="installButton"
+    >
       📲 INSTALL SAMRAT X-TREME
     </button>
+
   </div>
+
+
+  <!-- LIVE MARKET -->
 
   <div class="market">
-    <div class="market-card">
-      <div class="market-name">₿ BTC / USDT</div>
-      <div class="market-price btc" id="btcPrice">Loading...</div>
-      <div class="updated" id="btcUpdated">Connecting to market</div>
-    </div>
 
     <div class="market-card">
-      <div class="market-name">GOLD / XAU-USD</div>
-      <div class="market-price gold" id="goldPrice">Loading...</div>
-      <div class="updated" id="goldUpdated">Connecting to market</div>
+
+      <div class="market-name">
+        ₿ BTC / USDT
+      </div>
+
+      <div
+        class="market-price btc"
+        id="btcPrice"
+      >
+        Loading...
+      </div>
+
+      <div
+        class="updated"
+        id="btcUpdated"
+      >
+        Connecting to market
+      </div>
+
     </div>
+
+
+    <div class="market-card">
+
+      <div class="market-name">
+        GOLD / XAU-USD
+      </div>
+
+      <div
+        class="market-price gold"
+        id="goldPrice"
+      >
+        Loading...
+      </div>
+
+      <div
+        class="updated"
+        id="goldUpdated"
+      >
+        Connecting to market
+      </div>
+
+    </div>
+
   </div>
+
 
   <div class="round-box">
-    <span>ROUND <b id="roundId">1001</b></span>
-    <span>LIVE SNAPSHOT GAME</span>
+
+    <span>
+      ROUND
+      <b id="roundId">1001</b>
+    </span>
+
+    <span>
+      LIVE SNAPSHOT GAME
+    </span>
+
   </div>
 
-  <div class="section-title">CHOOSE YOUR NUMBER</div>
+
+  <div class="section-title">
+    CHOOSE YOUR NUMBER
+  </div>
+
 
   <div class="numbers">
-    <button class="number" onclick="selectNumber(1,this)">1</button>
-    <button class="number" onclick="selectNumber(2,this)">2</button>
-    <button class="number" onclick="selectNumber(3,this)">3</button>
-    <button class="number" onclick="selectNumber(4,this)">4</button>
-    <button class="number" onclick="selectNumber(5,this)">5</button>
-    <button class="number" onclick="selectNumber(6,this)">6</button>
-    <button class="number" onclick="selectNumber(7,this)">7</button>
-    <button class="number" onclick="selectNumber(8,this)">8</button>
-    <button class="number" onclick="selectNumber(9,this)">9</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(1,this)"
+    >1</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(2,this)"
+    >2</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(3,this)"
+    >3</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(4,this)"
+    >4</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(5,this)"
+    >5</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(6,this)"
+    >6</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(7,this)"
+    >7</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(8,this)"
+    >8</button>
+
+    <button
+      class="number"
+      onclick="selectNumber(9,this)"
+    >9</button>
+
   </div>
 
-  <div class="section-title">PLAY COINS</div>
+
+  <div class="section-title">
+    PLAY COINS
+  </div>
+
 
   <div class="coins">
-    <button class="coin active" onclick="selectCoins(100,this)">🪙 100</button>
-    <button class="coin" onclick="selectCoins(250,this)">🪙 250</button>
-    <button class="coin" onclick="selectCoins(500,this)">🪙 500</button>
+
+    <button
+      class="coin active"
+      onclick="selectCoins(100,this)"
+    >
+      🪙 100
+    </button>
+
+    <button
+      class="coin"
+      onclick="selectCoins(250,this)"
+    >
+      🪙 250
+    </button>
+
+    <button
+      class="coin"
+      onclick="selectCoins(500,this)"
+    >
+      🪙 500
+    </button>
+
   </div>
 
-  <button class="lock" id="lockButton" onclick="lockPrediction()">
+
+  <button
+    class="lock"
+    id="lockButton"
+    onclick="lockPrediction()"
+    disabled
+  >
     🔒 LOCK PREDICTION
   </button>
 
-  <div class="message" id="message">
-    Live market connect hone ka wait karo...
+
+  <div
+    class="message"
+    id="message"
+  >
+    Market connect ho raha hai...
   </div>
 
-  <div class="result" id="result">
-    <div class="result-title">X-TREME NUMBER</div>
-    <div class="winning-number" id="winningNumber">-</div>
-    <div class="outcome" id="outcome"></div>
-    <div class="coin-change" id="coinChange"></div>
+
+  <!-- RESULT -->
+
+  <div
+    class="result"
+    id="result"
+  >
+
+    <div class="result-title">
+      X-TREME NUMBER
+    </div>
+
+    <div
+      class="winning-number"
+      id="winningNumber"
+    >
+      -
+    </div>
+
+    <div
+      class="outcome"
+      id="outcome"
+    ></div>
+
+    <div
+      class="coin-change"
+      id="coinChange"
+    ></div>
+
 
     <div class="snapshot">
+
       <div class="snap">
+
         LOCKED BTC
-        <strong id="lockedBtc">-</strong>
+
+        <strong id="lockedBtc">
+          -
+        </strong>
+
       </div>
 
       <div class="snap">
+
         LOCKED GOLD
-        <strong id="lockedGold">-</strong>
+
+        <strong id="lockedGold">
+          -
+        </strong>
+
       </div>
+
     </div>
 
-    <div class="formula" id="formula"></div>
 
-    <button class="new-round" onclick="newRound()">NEXT ROUND</button>
+    <div
+      class="formula"
+      id="formula"
+    ></div>
+
+
+    <button
+      class="new-round"
+      onclick="newRound()"
+    >
+      NEXT ROUND
+    </button>
+
   </div>
+
+
+  <!-- STATS -->
 
   <div class="stats">
-    <div class="stat">
-      <div class="stat-value" id="totalGames">0</div>
-      <div class="stat-name">ROUNDS</div>
-    </div>
 
     <div class="stat">
-      <div class="stat-value" id="wins">0</div>
-      <div class="stat-name">WINS</div>
+
+      <div
+        class="stat-value"
+        id="totalGames"
+      >
+        0
+      </div>
+
+      <div class="stat-name">
+        ROUNDS
+      </div>
+
     </div>
 
+
     <div class="stat">
-      <div class="stat-value" id="losses">0</div>
-      <div class="stat-name">LOSSES</div>
+
+      <div
+        class="stat-value"
+        id="wins"
+      >
+        0
+      </div>
+
+      <div class="stat-name">
+        WINS
+      </div>
+
     </div>
+
+
+    <div class="stat">
+
+      <div
+        class="stat-value"
+        id="losses"
+      >
+        0
+      </div>
+
+      <div class="stat-name">
+        LOSSES
+      </div>
+
+    </div>
+
   </div>
+
+
+  <!-- HISTORY -->
 
   <div class="history-card">
+
     <div class="history-head">
-      <div class="history-title">X-TREME HISTORY</div>
-      <button class="clear-history" onclick="clearHistory()">CLEAR</button>
+
+      <div class="history-title">
+        X-TREME HISTORY
+      </div>
+
     </div>
 
-    <div class="history-list" id="historyList">
+    <div
+      class="history-list"
+      id="historyList"
+    >
+
       <div class="history-row">
-        <div class="history-main">No rounds played yet.</div>
+
+        <div class="history-main">
+          Loading history...
+        </div>
+
       </div>
+
     </div>
+
   </div>
 
-  <button class="reset" onclick="resetWallet()">
-    Reset Demo Wallet to 10,000
-  </button>
 
   <div class="warning">
+
     Entertainment / educational game only.<br>
-    Virtual coins have no cash value, cannot be purchased,
-    withdrawn or converted to real money.<br><br>
-    Market prices are third-party reference data and may differ slightly
-    from other exchanges or trading platforms.
+
+    Virtual coins have no cash value,
+    cannot be purchased, withdrawn or
+    converted to real money.
+
+    <br><br>
+
+    Market prices are third-party reference
+    data and may differ slightly from other
+    exchanges or trading platforms.
+
   </div>
+
 </div>
 
+
 <script>
-  const APPWRITE_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
-const APPWRITE_PROJECT_ID = "6a7f2add0011a7bfc21a";
-const APPWRITE_DATABASE_ID = "6a7f2d1d0035d9815939";
 
-const USER_PROFILES_TABLE = "user_profiles";
-const GAME_HISTORY_TABLE = "game_history";
+/* =====================================================
+   APPWRITE CONFIG
+===================================================== */
 
-const appwriteClient = new Appwrite.Client();
+const APPWRITE_ENDPOINT =
+  "https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+  "6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+  "6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE =
+  "user_profiles";
+
+const GAME_HISTORY_TABLE =
+  "game_history";
+
+
+const appwriteClient =
+  new Appwrite.Client();
 
 appwriteClient
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
 
-const account = new Appwrite.Account(appwriteClient);
- async function requireLogin(){
-  try{
-    const user = await account.get();
-    <button id="logoutBtn"
-        class="auth-btn login-btn"
-        onclick="logoutUser()"
-        style="display:none;">
-  LOGOUT
-</button>
-    console.log("LOGIN CHECK SUCCESS:", user);
-  }catch(error){
-    console.log("LOGIN CHECK FAILED:", error);
-    alert("LOGIN REQUIRED");
-    window.location.replace("login.html");
-  }
-}
 
-requireLogin();
-  async function logoutUser() {
-  try {
-    await account.deleteSession("current");
-    window.location.href = "login.html";
-  } catch (error) {
-    console.error(error);
-  }
-}
-const tablesDB = new Appwrite.TablesDB(appwriteClient);
-  let wallet = Number(localStorage.getItem("samratWallet")) || 10000;
-  let selectedNumber = null;
-  let selectedCoins = 100;
-  let roundId = Number(localStorage.getItem("samratRound")) || 1001;
-  let roundLocked = false;
-
-  let liveBtcPrice = null;
-  let liveGoldPrice = null;
-  let btcReady = false;
-  let goldReady = false;
-
-  let history = JSON.parse(localStorage.getItem("samratHistory") || "[]");
-
-  document.getElementById("wallet").innerText = wallet.toLocaleString("en-IN");
-  document.getElementById("roundId").innerText = roundId;
-
-  function updateMarketStatus(){
-    const ready = btcReady && goldReady;
-    const dot = document.getElementById("liveDot");
-    const text = document.getElementById("marketStatus");
-    const lockButton = document.getElementById("lockButton");
-
-    if(ready){
-      dot.classList.remove("offline");
-      text.innerText = "LIVE MARKET";
-      lockButton.disabled = false;
-
-      if(!roundLocked){
-        document.getElementById("message").innerText =
-          "Market ready ⚡ Apna number choose karo.";
-      }
-    }else{
-      dot.classList.add("offline");
-      text.innerText = "CONNECTING";
-      lockButton.disabled = true;
-    }
-  }
-
-  function formatTime(){
-    return new Date().toLocaleTimeString("en-IN", {
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit"
-    });
-  }
-
-  async function loadLiveBitcoin(){
-    try{
-      const response = await fetch(
-        "https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT",
-        {cache:"no-store"}
-      );
-
-      if(!response.ok) throw new Error("BTC HTTP " + response.status);
-
-      const data = await response.json();
-      const price = Number(data.price);
-
-      if(!Number.isFinite(price) || price <= 0){
-        throw new Error("Invalid BTC price");
-      }
-
-      liveBtcPrice = price;
-      btcReady = true;
-
-      document.getElementById("btcPrice").innerText =
-        "$" + price.toLocaleString("en-US", {
-          minimumFractionDigits:2,
-          maximumFractionDigits:2
-        });
-
-      document.getElementById("btcUpdated").innerText =
-        "Updated " + formatTime();
-
-    }catch(error){
-      console.log("BTC/USDT price error:", error);
-      btcReady = false;
-      document.getElementById("btcPrice").innerText = "Unavailable";
-      document.getElementById("btcUpdated").innerText = "Retrying...";
-    }
-
-    updateMarketStatus();
-  }
-
-  async function loadLiveGold(){
-    try{
-      const response = await fetch(
-        "https://xaus.com/api/v1/spot?compact=1",
-        {cache:"no-store"}
-      );
-
-      if(!response.ok) throw new Error("Gold HTTP " + response.status);
-
-      const data = await response.json();
-      const price = Number(data.spot_usd_oz);
-
-      if(!Number.isFinite(price) || price <= 0){
-        throw new Error("Invalid Gold price");
-      }
-
-      liveGoldPrice = price;
-      goldReady = true;
-
-      document.getElementById("goldPrice").innerText =
-        "$" + price.toLocaleString("en-US", {
-          minimumFractionDigits:2,
-          maximumFractionDigits:2
-        });
-
-      document.getElementById("goldUpdated").innerText =
-        "Updated " + formatTime();
-
-    }catch(error){
-      console.log("XAU/USD price error:", error);
-      goldReady = false;
-      document.getElementById("goldPrice").innerText = "Unavailable";
-      document.getElementById("goldUpdated").innerText = "Retrying...";
-    }
-
-    updateMarketStatus();
-  }
-
-  function selectNumber(number,element){
-    if(roundLocked) return;
-
-    selectedNumber = number;
-
-    document.querySelectorAll(".number")
-      .forEach(button => button.classList.remove("selected"));
-
-    element.classList.add("selected");
-
-    document.getElementById("message").innerText =
-      "Number " + number + " selected 👑";
-  }
-
-  function selectCoins(amount,element){
-    if(roundLocked) return;
-
-    selectedCoins = amount;
-
-    document.querySelectorAll(".coin")
-      .forEach(button => button.classList.remove("active"));
-
-    element.classList.add("active");
-  }
-
-  function getDateNumber(){
-    const now = new Date();
-
-    const digits =
-      String(now.getDate()) +
-      String(now.getMonth() + 1) +
-      String(now.getFullYear());
-
-    let total = 0;
-
-    for(const digit of digits){
-      total += Number(digit);
-    }
-
-    while(total > 9){
-      total = String(total)
-        .split("")
-        .reduce((sum,digit) => sum + Number(digit), 0);
-    }
-
-    return total;
-  }
-
-  function priceCode(price){
-    return Math.round(price * 100) % 1000;
-  }
-
-  function lockPrediction(){
-    if(roundLocked) return;
-
-    if(!btcReady || !goldReady){
-      document.getElementById("message").innerText =
-        "⚠️ Live market abhi ready nahi hai.";
-      return;
-    }
-
-    if(selectedNumber === null){
-      document.getElementById("message").innerText =
-        "⚠️ Pehle 1 se 9 me number choose karo.";
-      return;
-    }
-
-    if(wallet < selectedCoins){
-      document.getElementById("message").innerText =
-        "⚠️ Wallet me enough coins nahi hain.";
-      return;
-    }
-
-    roundLocked = true;
-    document.getElementById("lockButton").disabled = true;
-
-    const lockedBtc = liveBtcPrice;
-    const lockedGold = liveGoldPrice;
-
-    const btcCode = priceCode(lockedBtc);
-    const goldCode = priceCode(lockedGold);
-    const dateNumber = getDateNumber();
-
-    const rawTotal =
-      btcCode +
-      goldCode +
-      roundId +
-      dateNumber;
-
-    const winningNumber = (rawTotal % 9) + 1;
-
-    wallet -= selectedCoins;
-
-    let won = false;
-    let netChange = -selectedCoins;
-
-    if(selectedNumber === winningNumber){
-      won = true;
-      const totalReturn = selectedCoins * 9;
-      wallet += totalReturn;
-      netChange = totalReturn - selectedCoins;
-    }
-
-    localStorage.setItem("samratWallet", wallet);
-
-    document.getElementById("wallet").innerText =
-      wallet.toLocaleString("en-IN");
-
-    document.getElementById("winningNumber").innerText =
-      winningNumber;
-
-    const outcome = document.getElementById("outcome");
-
-    if(won){
-      outcome.className = "outcome win";
-      outcome.innerText = "🔥 X-TREME WIN 🔥";
-
-      document.getElementById("coinChange").innerText =
-        "+" + netChange.toLocaleString("en-IN") + " coins";
-    }else{
-      outcome.className = "outcome lose";
-      outcome.innerText = "X-TREME MISS";
-
-      document.getElementById("coinChange").innerText =
-        "-" + selectedCoins.toLocaleString("en-IN") + " coins";
-    }
-
-    document.getElementById("lockedBtc").innerText =
-      "$" + lockedBtc.toLocaleString("en-US", {
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
-      });
-
-    document.getElementById("lockedGold").innerText =
-      "$" + lockedGold.toLocaleString("en-US", {
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
-      });
-
-    document.getElementById("formula").innerHTML =
-      "YOUR PICK: <b>" + selectedNumber + "</b><br>" +
-      "BTC Code: <b>" + btcCode +
-      "</b> &nbsp;|&nbsp; Gold Code: <b>" + goldCode + "</b><br>" +
-      "Date Number: <b>" + dateNumber +
-      "</b> &nbsp;|&nbsp; Round: <b>" + roundId + "</b><br><br>" +
-      "(" + btcCode + " + " + goldCode + " + " + roundId + " + " + dateNumber +
-      ") % 9 + 1 = <b>" + winningNumber + "</b>";
-
-    document.getElementById("result").classList.add("show");
-
-    document.getElementById("message").innerText =
-      "Prediction locked 🔒 Result generated from locked market snapshot.";
-
-    saveHistory({
-      round:roundId,
-      pick:selectedNumber,
-      result:winningNumber,
-      coins:selectedCoins,
-      change:netChange,
-      won:won,
-      btc:lockedBtc,
-      gold:lockedGold,
-      time:new Date().toLocaleString("en-IN")
-    });
-  }
-
-  async function saveHistory(item){
-    console.log("saveHistory function running");
-  // Local history
-  history.unshift(item);
-  history = history.slice(0,30);
-
-  localStorage.setItem("samratHistory", JSON.stringify(history));
-  renderHistory();
-
-  // Appwrite history
-  try{
-    const user = await account.get();
-
-    await tablesDB.createRow({
-      databaseId: APPWRITE_DATABASE_ID,
-      tableId: GAME_HISTORY_TABLE,
-      rowId: Appwrite.ID.unique(),
-
-      data:{
-        round: Number(item.round),
-        userId: user.$id,
-        pick: Number(item.pick),
-        result: Number(item.result),
-        coins: Number(item.coins),
-        change: Number(item.change),
-        won: Boolean(item.won),
-        btc: Number(item.btc),
-        gold: Number(item.gold),
-        playedAt: new Date().toISOString()
-      }
-    });
-    await tablesDB.updateRow({
-  databaseId: APPWRITE_DATABASE_ID,
-  tableId: USER_PROFILES_TABLE,
-  rowId: "6a8031600025646ad144",
-  data: {
-    wallet: Number(wallet)
-  }
-});
-
-    console.log("Game history saved to Appwrite ✅");
-
-  }catch(error){
-    console.error("Game history save error:", error);
-  }
-}
-  function renderHistory(){
-    const list = document.getElementById("historyList");
-    const wins = history.filter(item => item.won).length;
-    const losses = history.filter(item => !item.won).length;
-
-    document.getElementById("totalGames").innerText = history.length;
-    document.getElementById("wins").innerText = wins;
-    document.getElementById("losses").innerText = losses;
-
-    if(history.length === 0){
-      list.innerHTML =
-        '<div class="history-row">' +
-        '<div class="history-main">No rounds played yet.</div>' +
-        '</div>';
-      return;
-    }
-
-    list.innerHTML = history.map(item => {
-      const changeClass = item.won ? "history-win" : "history-loss";
-      const changeText = item.won ? "+" + item.change : "-" + item.coins;
-
-      return (
-        '<div class="history-row">' +
-          '<div>' +
-            '<div class="history-main">' +
-              'Round ' + item.round +
-              ' • Pick ' + item.pick +
-              ' → Result ' + item.result +
-            '</div>' +
-            '<div class="history-sub">' + item.time + '</div>' +
-          '</div>' +
-          '<div class="' + changeClass + '">' +
-            changeText + ' 🪙' +
-          '</div>' +
-        '</div>'
-      );
-    }).join("");
-  }
-
-  function newRound(){
-    roundId++;
-
-    localStorage.setItem("samratRound", roundId);
-
-    roundLocked = false;
-    selectedNumber = null;
-
-    document.getElementById("roundId").innerText = roundId;
-
-    document.querySelectorAll(".number")
-      .forEach(button => button.classList.remove("selected"));
-
-    document.getElementById("result").classList.remove("show");
-
-    document.getElementById("message").innerText =
-      "New X-Treme round ready ⚡ Choose your number.";
-
-    document.getElementById("lockButton").disabled =
-      !(btcReady && goldReady);
-  }
-
-  function clearHistory(){
-    const ok = confirm("X-Treme game history clear karni hai?");
-    if(!ok) return;
-
-    history = [];
-    localStorage.removeItem("samratHistory");
-    renderHistory();
-  }
-
-  function resetWallet(){
-    const ok = confirm("Wallet ko 10,000 demo coins par reset karna hai?");
-    if(!ok) return;
-
-    wallet = 10000;
-    localStorage.setItem("samratWallet", wallet);
-
-    document.getElementById("wallet").innerText =
-      wallet.toLocaleString("en-IN");
-
-    document.getElementById("message").innerText =
-      "Wallet reset to 10,000 coins.";
-  }
-
-  // -------- PWA INSTALL --------
-  let deferredInstallPrompt = null;
-  const installWrap = document.getElementById("installWrap");
-  const installButton = document.getElementById("installButton");
-
-  window.addEventListener("beforeinstallprompt", event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    installWrap.classList.add("show");
-  });
-
-  installButton.addEventListener("click", async () => {
-    if(!deferredInstallPrompt) return;
-
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-
-    deferredInstallPrompt = null;
-    installWrap.classList.remove("show");
-  });
-
-  window.addEventListener("appinstalled", () => {
-    installWrap.classList.remove("show");
-    deferredInstallPrompt = null;
-  });
-
-  if("serviceWorker" in navigator){
-    window.addEventListener("load", () => {
-      navigator.serviceWorker
-        .register("service-worker.js")
-        .catch(error => console.log("Service worker error:", error));
-    });
-  }
-
-  renderHistory();
-  updateMarketStatus();
-  loadLiveBitcoin();
-  loadLiveGold();
-
-  setInterval(loadLiveBitcoin, 60000);
-  setInterval(loadLiveGold, 60000);
-</script>
-
-</body>
-</html>
+const account =
+  new Appwrite.Account(appwri
