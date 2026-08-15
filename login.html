@@ -1,67 +1,248 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Login | Samrat X-Treme</title>
-    <!-- Supabase Library -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #050505; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #111; padding: 35px; border-radius: 25px; border: 1px solid #ffd700; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.15); }
-        h2 { color: #ffd700; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 25px; }
-        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; outline: none; font-size: 16px; }
-        input:focus { border-color: #ffd700; }
-        .btn-login { width: 100%; padding: 15px; background: linear-gradient(90deg, #ffd700, #b8860b); color: black; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 18px; margin-top: 15px; text-transform: uppercase; }
-        .footer-link { margin-top: 20px; font-size: 13px; color: #666; }
-        .footer-link a { color: #ffd700; text-decoration: none; font-weight: bold; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08010f">
+  <title>Login | Samrat X-Treme</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
+  <style>
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:Arial,Helvetica,sans-serif;
+    }
+
+    body{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      color:#fff;
+      background:
+        radial-gradient(circle at 50% 0%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
+    }
+
+    .card{
+      width:100%;
+      max-width:420px;
+      padding:30px 22px;
+      border-radius:24px;
+      background:linear-gradient(145deg,#171027,#281047);
+      border:1px solid #7046d8;
+      box-shadow:0 0 35px rgba(111,50,255,.35);
+    }
+
+    .logo{
+      width:220px;
+      max-width:82%;
+      display:block;
+      margin:0 auto 14px;
+      filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
+    }
+
+    h1{
+      text-align:center;
+      font-size:26px;
+      margin-bottom:5px;
+    }
+
+    .sub{
+      text-align:center;
+      color:#a99bc5;
+      font-size:12px;
+      margin-bottom:24px;
+    }
+
+    label{
+      display:block;
+      margin:13px 0 6px;
+      font-size:11px;
+      color:#c9b9ee;
+    }
+
+    input{
+      width:100%;
+      padding:14px;
+      border-radius:13px;
+      border:1px solid #51388d;
+      background:#0e0819;
+      color:#fff;
+      outline:none;
+      font-size:14px;
+    }
+
+    input:focus{
+      border-color:#9c6dff;
+      box-shadow:0 0 12px rgba(122,63,255,.35);
+    }
+
+    button{
+      width:100%;
+      margin-top:20px;
+      padding:15px;
+      border:0;
+      border-radius:15px;
+      cursor:pointer;
+      font-size:15px;
+      font-weight:900;
+      color:#210014;
+      background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
+      box-shadow:0 0 20px rgba(255,74,143,.35);
+    }
+
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+
+    #message{
+      min-height:22px;
+      margin-top:14px;
+      text-align:center;
+      font-size:12px;
+      line-height:1.4;
+      color:#ffb7db;
+    }
+
+    .signup{
+      margin-top:18px;
+      text-align:center;
+      color:#9587ad;
+      font-size:12px;
+    }
+
+    .signup a{
+      color:#ffd85d;
+      text-decoration:none;
+      font-weight:800;
+    }
+
+    .note{
+      margin-top:20px;
+      text-align:center;
+      color:#675d76;
+      font-size:9px;
+      line-height:1.5;
+    }
+  </style>
 </head>
+
 <body>
 
 <div class="card">
-    <h2>Elite Login</h2>
-    <input type="text" id="loginPhone" placeholder="Mobile Number">
-    <input type="password" id="loginPass" placeholder="Access PIN">
-    <button class="btn-login" onclick="handleLogin()">Enter Portal</button>
-    
-    <div class="footer-link">
-        New Member? <a href="signup.html">Join Elite</a>
-    </div>
+
+  <img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
+
+  <h1>Welcome Back</h1>
+
+  <div class="sub">Login to Samrat X-Treme</div>
+
+  <form id="loginForm">
+
+    <label>Email</label>
+    <input
+      id="email"
+      type="email"
+      placeholder="Enter your email"
+      required
+    >
+
+    <label>Password</label>
+    <input
+      id="password"
+      type="password"
+      placeholder="Enter your password"
+      required
+    >
+
+    <button id="loginButton" type="submit">
+      LOGIN
+    </button>
+
+  </form>
+
+  <div id="message"></div>
+
+  <div class="signup">
+    New player?
+    <a href="signup.html">CREATE ACCOUNT</a>
+  </div>
+
+  <div class="note">
+    Entertainment / educational game only.<br>
+    Virtual coins have no cash value.
+  </div>
+
 </div>
 
 <script>
-    // --- APKI SUPABASE DETAILS ---
-    const SUPABASE_URL = "https://ugqcxyjrtjzgrsjnsdzz.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_Vh_h43bueeQGhN_vXeey6w_V0rnZ"; // Check karein ye pichli wali hi hai na?
-    
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    async function handleLogin() {
-        const phone = document.getElementById("loginPhone").value.trim();
-        const pass = document.getElementById("loginPass").value.trim();
+const APPWRITE_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID = "6a7f2add0011a7bfc21a";
 
-        if(!phone || !pass) return alert("Bhai details dalo!");
+const client = new Appwrite.Client();
 
-        // Supabase se user check karna
-        const { data, error } = await _supabase
-            .from('users_xtreme')
-            .select('*')
-            .eq('phone', phone)
-            .eq('password', pass)
-            .single();
+client
+  .setEndpoint(APPWRITE_ENDPOINT)
+  .setProject(APPWRITE_PROJECT_ID);
 
-        if (error || !data) {
-            alert("Galat Details! Pehle Signup karein.");
-        } else {
-            // User ki ID mobile mein save karna
-            localStorage.setItem("xtreme_user_id", data.id);
-            localStorage.setItem("xtreme_user_name", data.name);
-            
-            alert("Welcome to Elite Portal, " + data.name);
-            window.location.href = "index.html"; // Ye seedha Dashboard par le jayega
-        }
-    }
+const account = new Appwrite.Account(client);
+
+const form = document.getElementById("loginForm");
+const button = document.getElementById("loginButton");
+const message = document.getElementById("message");
+
+form.addEventListener("submit", async function(event){
+
+  event.preventDefault();
+
+  const email =
+    document.getElementById("email").value.trim();
+
+  const password =
+    document.getElementById("password").value;
+
+  button.disabled = true;
+  button.innerText = "LOGGING IN...";
+  message.innerText = "Login ho raha hai...";
+
+  try{
+
+    await account.createEmailPasswordSession({
+      email: email,
+      password: password
+    });
+
+    message.style.color = "#60ff9a";
+    message.innerText = "Login successful ✅";
+
+    setTimeout(function(){
+      window.location.href = "index.html";
+    },700);
+
+  }catch(error){
+
+    console.error("Login error:", error);
+
+    message.style.color = "#ff6b87";
+
+    message.innerText =
+      error && error.message
+        ? error.message
+        : "Login failed. Email/password check karo.";
+
+    button.disabled = false;
+    button.innerText = "LOGIN";
+  }
+
+});
+
 </script>
+
 </body>
 </html>
