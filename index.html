@@ -1005,14 +1005,43 @@ const tablesDB = new Appwrite.TablesDB(appwriteClient);
     });
   }
 
-  function saveHistory(item){
-    history.unshift(item);
-    history = history.slice(0,30);
+  async function saveHistory(item){
+  // Local history
+  history.unshift(item);
+  history = history.slice(0,30);
 
-    localStorage.setItem("samratHistory", JSON.stringify(history));
-    renderHistory();
+  localStorage.setItem("samratHistory", JSON.stringify(history));
+  renderHistory();
+
+  // Appwrite history
+  try{
+    const user = await account.get();
+
+    await tablesDB.createRow({
+      databaseId: APPWRITE_DATABASE_ID,
+      tableId: GAME_HISTORY_TABLE,
+      rowId: Appwrite.ID.unique(),
+
+      data:{
+        round: Number(item.round),
+        userId: user.$id,
+        pick: Number(item.pick),
+        result: Number(item.result),
+        coins: Number(item.coins),
+        change: Number(item.change),
+        won: Boolean(item.won),
+        btc: Number(item.btc),
+        gold: Number(item.gold),
+        playedAt: new Date().toISOString()
+      }
+    });
+
+    console.log("Game history saved to Appwrite ✅");
+
+  }catch(error){
+    console.error("Game history save error:", error);
   }
-
+}
   function renderHistory(){
     const list = document.getElementById("historyList");
     const wins = history.filter(item => item.won).length;
