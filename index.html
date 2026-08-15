@@ -747,12 +747,14 @@ appwriteClient
   .setProject(APPWRITE_PROJECT_ID);
 
 const account = new Appwrite.Account(appwriteClient);
-  async function requireLogin(){
+ async function requireLogin(){
   try{
-    await account.get();
-    console.log("User logged in ✅");
+    const user = await account.get();
+    console.log("LOGIN CHECK SUCCESS:", user);
   }catch(error){
-    window.location.href = "login.html";
+    console.log("LOGIN CHECK FAILED:", error);
+    alert("LOGIN REQUIRED");
+    window.location.replace("login.html");
   }
 }
 
