@@ -1006,6 +1006,7 @@ const tablesDB = new Appwrite.TablesDB(appwriteClient);
   }
 
   async function saveHistory(item){
+    console.log("saveHistory function running");
   // Local history
   history.unshift(item);
   history = history.slice(0,30);
