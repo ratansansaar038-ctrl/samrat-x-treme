@@ -750,6 +750,12 @@ const account = new Appwrite.Account(appwriteClient);
  async function requireLogin(){
   try{
     const user = await account.get();
+    <button id="logoutBtn"
+        class="auth-btn login-btn"
+        onclick="logoutUser()"
+        style="display:none;">
+  LOGOUT
+</button>
     console.log("LOGIN CHECK SUCCESS:", user);
   }catch(error){
     console.log("LOGIN CHECK FAILED:", error);
