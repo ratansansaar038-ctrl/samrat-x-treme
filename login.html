@@ -1,257 +1,282 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#08010f">
-  <title>Login | Samrat X-Treme</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
 
-  <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+<title>Login | Samrat X-Treme</title>
 
-  <style>
-    *{
-      box-sizing:border-box;
-      margin:0;
-      padding:0;
-      font-family:Arial,Helvetica,sans-serif;
-    }
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 
-    body{
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-      color:#fff;
-      background:
-        radial-gradient(circle at 50% 0%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
-    }
+<style>
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+font-family:Arial,Helvetica,sans-serif
+}
 
-    .card{
-      width:100%;
-      max-width:420px;
-      padding:30px 22px;
-      border-radius:24px;
-      background:linear-gradient(145deg,#171027,#281047);
-      border:1px solid #7046d8;
-      box-shadow:0 0 35px rgba(111,50,255,.35);
-    }
+body{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+color:#fff;
+background:
+radial-gradient(circle at 50% 0%,#431267 0%,#16051f 42%,#050108 76%,#000 100%)
+}
 
-    .logo{
-      width:220px;
-      max-width:82%;
-      display:block;
-      margin:0 auto 14px;
-      filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
-    }
+.card{
+width:100%;
+max-width:420px;
+padding:30px 22px;
+border-radius:24px;
+background:linear-gradient(145deg,#171027,#281047);
+border:1px solid #7046d8;
+box-shadow:0 0 35px rgba(111,50,255,.35)
+}
 
-    h1{
-      text-align:center;
-      font-size:26px;
-      margin-bottom:5px;
-    }
+.logo{
+width:220px;
+max-width:82%;
+display:block;
+margin:0 auto 14px;
+filter:drop-shadow(0 0 15px rgba(143,59,255,.7))
+}
 
-    .sub{
-      text-align:center;
-      color:#a99bc5;
-      font-size:12px;
-      margin-bottom:24px;
-    }
+h1{
+text-align:center;
+font-size:26px;
+margin-bottom:5px
+}
 
-    label{
-      display:block;
-      margin:13px 0 6px;
-      font-size:11px;
-      color:#c9b9ee;
-    }
+.sub{
+text-align:center;
+color:#a99bc5;
+font-size:12px;
+margin-bottom:24px
+}
 
-    input{
-      width:100%;
-      padding:14px;
-      border-radius:13px;
-      border:1px solid #51388d;
-      background:#0e0819;
-      color:#fff;
-      outline:none;
-      font-size:14px;
-    }
+label{
+display:block;
+margin:13px 0 6px;
+font-size:11px;
+color:#c9b9ee
+}
 
-    input:focus{
-      border-color:#9c6dff;
-      box-shadow:0 0 12px rgba(122,63,255,.35);
-    }
+input{
+width:100%;
+padding:14px;
+border-radius:13px;
+border:1px solid #51388d;
+background:#0e0819;
+color:#fff;
+outline:none;
+font-size:14px
+}
 
-    button{
-      width:100%;
-      margin-top:20px;
-      padding:15px;
-      border:0;
-      border-radius:15px;
-      cursor:pointer;
-      font-size:15px;
-      font-weight:900;
-      color:#210014;
-      background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
-      box-shadow:0 0 20px rgba(255,74,143,.35);
-    }
+input:focus{
+border-color:#9c6dff;
+box-shadow:0 0 12px rgba(122,63,255,.35)
+}
 
-    button:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
+button{
+width:100%;
+margin-top:20px;
+padding:15px;
+border:0;
+border-radius:15px;
+cursor:pointer;
+font-size:15px;
+font-weight:900;
+color:#210014;
+background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
+box-shadow:0 0 20px rgba(255,74,143,.35)
+}
 
-    #message{
-      min-height:22px;
-      margin-top:14px;
-      text-align:center;
-      font-size:12px;
-      line-height:1.4;
-      color:#ffb7db;
-    }
+button:disabled{
+opacity:.55;
+cursor:not-allowed
+}
 
-    .signup{
-      margin-top:18px;
-      text-align:center;
-      color:#9587ad;
-      font-size:12px;
-    }
+#message{
+min-height:22px;
+margin-top:14px;
+text-align:center;
+font-size:12px;
+line-height:1.4;
+color:#ffb7db
+}
 
-    .signup a{
-      color:#ffd85d;
-      text-decoration:none;
-      font-weight:800;
-    }
+.signup{
+margin-top:18px;
+text-align:center;
+color:#9587ad;
+font-size:12px
+}
 
-    .note{
-      margin-top:20px;
-      text-align:center;
-      color:#675d76;
-      font-size:9px;
-      line-height:1.5;
-    }
-  </style>
+.signup a{
+color:#ffd85d;
+text-decoration:none;
+font-weight:800
+}
+
+.note{
+margin-top:20px;
+text-align:center;
+color:#675d76;
+font-size:9px;
+line-height:1.5
+}
+</style>
 </head>
 
 <body>
 
 <div class="card">
 
-  <img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
+<img src="samrat-logo.png" class="logo" alt="Samrat X-Treme">
 
-  <h1>Welcome Back</h1>
+<h1>Welcome Back</h1>
 
-  <div class="sub">Login to Samrat X-Treme</div>
+<div class="sub">
+Login to Samrat X-Treme
+</div>
 
-  <form id="loginForm">
+<form id="loginForm">
 
-    <label>Email</label>
-    <input
-      id="email"
-      type="email"
-      placeholder="Enter your email"
-      required
-    >
+<label>Email</label>
 
-    <label>Password</label>
-    <input
-      id="password"
-      type="password"
-      placeholder="Enter your password"
-      required
-    >
+<input
+id="email"
+type="email"
+placeholder="Enter your email"
+autocomplete="email"
+required
+>
 
-    <button id="loginButton" type="submit">
-      LOGIN
-    </button>
+<label>Password</label>
 
-  </form>
+<input
+id="password"
+type="password"
+placeholder="Enter your password"
+autocomplete="current-password"
+minlength="8"
+required
+>
 
-  <div id="message"></div>
+<button id="loginButton" type="submit" disabled>
+CHECKING...
+</button>
 
-  <div class="signup">
-    New player?
-    <a href="signup.html">CREATE ACCOUNT</a>
-  </div>
+</form>
 
-  <div class="note">
-    Entertainment / educational game only.<br>
-    Virtual coins have no cash value.
-  </div>
+<div id="message">
+Checking existing login...
+</div>
+
+<div class="signup">
+New player?
+<a href="signup.html">CREATE ACCOUNT</a>
+</div>
+
+<div class="note">
+Entertainment / educational game only.<br>
+Virtual coins have no cash value.
+</div>
 
 </div>
 
 <script>
+const APPWRITE_ENDPOINT="https://sgp.cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID="6a7f2add0011a7bfc21a";
 
-const APPWRITE_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
-const APPWRITE_PROJECT_ID = "6a7f2add0011a7bfc21a";
-
-const client = new Appwrite.Client();
+const client=new Appwrite.Client();
 
 client
-  .setEndpoint(APPWRITE_ENDPOINT)
-  .setProject(APPWRITE_PROJECT_ID);
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
 
-const account = new Appwrite.Account(client);
-  async function checkExistingSession(){
-  try{
-    await account.get();
-    window.location.replace("index.html");
-  }catch(error){
-    // No active session — login page yahin rahega
-  }
+const account=new Appwrite.Account(client);
+
+const form=document.getElementById("loginForm");
+const button=document.getElementById("loginButton");
+const message=document.getElementById("message");
+
+async function prepareLoginPage(){
+
+try{
+
+await account.get();
+
+/* already logged in */
+
+window.location.replace("index.html");
+return;
+
+}catch(error){
+
+/* no active session = login allowed */
+
+button.disabled=false;
+button.innerText="LOGIN";
+
+message.innerText="";
+
+}
 }
 
-checkExistingSession();
+form.addEventListener("submit",async function(event){
 
-const form = document.getElementById("loginForm");
-const button = document.getElementById("loginButton");
-const message = document.getElementById("message");
+event.preventDefault();
 
-form.addEventListener("submit", async function(event){
+if(button.disabled) return;
 
-  event.preventDefault();
+const email=
+document.getElementById("email").value.trim();
 
-  const email =
-    document.getElementById("email").value.trim();
+const password=
+document.getElementById("password").value;
 
-  const password =
-    document.getElementById("password").value;
+button.disabled=true;
+button.innerText="LOGGING IN...";
 
-  button.disabled = true;
-  button.innerText = "LOGGING IN...";
-  message.innerText = "Login ho raha hai...";
+message.style.color="#ffcf79";
+message.innerText="Login ho raha hai...";
 
-  try{
+try{
 
-    await account.createEmailPasswordSession({
-      email: email,
-      password: password
-    });
-
-    message.style.color = "#60ff9a";
-    message.innerText = "Login successful ✅";
-
-    setTimeout(function(){
-      window.location.href = "index.html";
-    },700);
-
-  }catch(error){
-
-    console.error("Login error:", error);
-
-    message.style.color = "#ff6b87";
-
-    message.innerText =
-      error && error.message
-        ? error.message
-        : "Login failed. Email/password check karo.";
-
-    button.disabled = false;
-    button.innerText = "LOGIN";
-  }
-
+await account.createEmailPasswordSession({
+email:email,
+password:password
 });
 
+message.style.color="#60ff9a";
+message.innerText="Login successful ✅";
+
+window.location.replace("index.html");
+
+}catch(error){
+
+console.error("Login error:",error);
+
+message.style.color="#ff6b87";
+
+message.innerText=
+error && error.message
+? error.message
+: "Login failed. Email/password check karo.";
+
+button.disabled=false;
+button.innerText="LOGIN";
+
+}
+});
+
+prepareLoginPage();
 </script>
 
 </body>
