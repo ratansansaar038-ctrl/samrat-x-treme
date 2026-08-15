@@ -557,6 +557,34 @@
       .market{grid-template-columns:1fr;}
       .main-logo{max-width:270px;}
     }
+    .auth-buttons{
+  display:flex;
+  gap:10px;
+  margin:10px 0;
+}
+
+.auth-btn{
+  flex:1;
+  text-align:center;
+  padding:11px 8px;
+  border-radius:13px;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.8px;
+}
+
+.login-btn{
+  color:#fff;
+  background:#19102d;
+  border:1px solid #7b55d6;
+}
+
+.signup-btn{
+  color:#210014;
+  background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);
+  border:1px solid #ffd65a;
+}
   </style>
 </head>
 
@@ -575,7 +603,10 @@
       <span id="marketStatus">CONNECTING</span>
     </div>
   </div>
-
+<div class="auth-buttons">
+  <a href="login.html" class="auth-btn login-btn">LOGIN</a>
+  <a href="signup.html" class="auth-btn signup-btn">SIGN UP</a>
+</div>
   <div class="logo">
     <img src="samrat-logo.png" alt="Samrat X-Treme Logo" class="main-logo">
   </div>
