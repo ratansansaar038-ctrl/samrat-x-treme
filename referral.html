@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
+
+<title>Referral | Samrat X-Treme</title>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  color:#fff;
+  background:
+    radial-gradient(circle at 50% -10%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
+  padding:18px;
+}
+
+.app{
+  width:100%;
+  max-width:480px;
+  margin:auto;
+}
+
+.loader{
+  min-height:90vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:13px;
+  color:#c9b9ee;
+}
+
+.loader-ring{
+  width:44px;
+  height:44px;
+  border:4px solid #38254f;
+  border-top-color:#ffd84c;
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+
+.hidden{
+  display:none!important;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:13px;
+  border:1px solid #7046d8;
+  border-radius:17px;
+  background:linear-gradient(135deg,#171027,#281047);
+  box-shadow:0 0 20px rgba(111,50,255,.28);
+}
+
+.user-box{
+  min-width:0;
+}
+
+.user-name{
+  color:#ffe16a;
+  font-size:14px;
+  font-weight:900;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.user-email{
+  color:#8e80a7;
+  font-size:9px;
+  margin-top:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.home-btn{
+  flex-shrink:0;
+  text-decoration:none;
+  color:#fff;
+  border:1px solid #7550cd;
+  background:#21103d;
+  border-radius:11px;
+  padding:9px 12px;
+  font-size:10px;
+  font-weight:900;
+}
+
+.logo{
+  width:220px;
+  max-width:75%;
+  display:block;
+  margin:17px auto 5px;
+  filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
+}
+
+.title{
+  text-align:center;
+  font-size:25px;
+  color:#ffe16a;
+  font-weight:900;
+}
+
+.subtitle{
+  text-align:center;
+  margin-top:5px;
+  margin-bottom:18px;
+  font-size:11px;
+  color:#a99bc5;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.stat{
+  border:1px solid #543698;
+  border-radius:17px;
+  padding:17px 10px;
+  text-align:center;
+  background:linear-gradient(145deg,#171027,#291148);
+  box-shadow:0 0 15px rgba(98,41,189,.25);
+}
+
+.stat-value{
+  font-size:25px;
+  font-weight:900;
+  color:#ffe066;
+}
+
+.stat-label{
+  font-size:9px;
+  color:#9587ad;
+  margin-top:4px;
+  letter-spacing:.8px;
+}
+
+.ref-card{
+  margin-top:14px;
+  padding:17px;
+  border-radius:19px;
+  border:1px solid #7046d8;
+  background:linear-gradient(145deg,#171027,#281047);
+}
+
+.card-title{
+  color:#cabaff;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:1px;
+  margin-bottom:11px;
+}
+
+.code-box{
+  text-align:center;
+  padding:16px 10px;
+  border-radius:14px;
+  border:1px dashed #a878ff;
+  background:#0e0819;
+  font-size:24px;
+  font-weight:900;
+  color:#ffe16a;
+  letter-spacing:2px;
+}
+
+.link-box{
+  margin-top:11px;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid #432d72;
+  background:#0b0713;
+  color:#bcb0d2;
+  font-size:10px;
+  word-break:break-all;
+  line-height:1.45;
+}
+
+.actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:12px;
+}
+
+.action-btn{
+  border:0;
+  border-radius:13px;
+  padding:13px 7px;
+  cursor:pointer;
+  font-size:11px;
+  font-weight:900;
+}
+
+.copy-btn{
+  color:#210014;
+  background:linear-gradient(90deg,#ffe033,#ff9700,#ff2b9d);
+}
+
+.whatsapp-btn{
+  color:#fff;
+  background:linear-gradient(135deg,#0d8c4c,#17b864);
+}
+
+.message{
+  min-height:20px;
+  margin-top:11px;
+  text-align:center;
+  font-size:11px;
+  color:#73ffad;
+}
+
+.history-card{
+  margin-top:14px;
+  padding:14px;
+  border-radius:17px;
+  border:1px solid #35264e;
+  background:#0d0817;
+}
+
+.history-list{
+  max-height:320px;
+  overflow-y:auto;
+}
+
+.history-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  padding:11px 2px;
+  border-bottom:1px solid #271a36;
+}
+
+.history-row:last-child{
+  border-bottom:0;
+}
+
+.history-name{
+  font-size:11px;
+  color:#d2c6e4;
+}
+
+.history-date{
+  margin-top:3px;
+  font-size:9px;
+  color:#695f78;
+}
+
+.history-points{
+  font-size:11px;
+  color:#54ff91;
+  font-weight:900;
+}
+
+.info{
+  margin-top:14px;
+  border:1px solid #35264e;
+  border-radius:16px;
+  padding:14px;
+  background:#0d0817;
+  font-size:10px;
+  line-height:1.65;
+  color:#9287a3;
+}
+
+.info b{
+  color:#ffe16a;
+}
+
+.footer{
+  text-align:center;
+  margin-top:20px;
+  color:#62586f;
+  font-size:9px;
+  line-height:1.5;
+}
+
+@media(max-width:350px){
+  .stats{
+    grid-template-columns:1fr;
+  }
+
+  .actions{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="loader" id="loader">
+  <div class="loader-ring"></div>
+  <div>Loading referral account...</div>
+</div>
+
+
+<div class="app hidden" id="mainApp">
+
+  <div class="topbar">
+
+    <div class="user-box">
+      <div class="user-name" id="userName">Player</div>
+      <div class="user-email" id="userEmail"></div>
+    </div>
+
+    <a href="index.html" class="home-btn">
+      HOME
+    </a>
+
+  </div>
+
+
+  <img
+    src="samrat-logo.png"
+    class="logo"
+    alt="Samrat X-Treme"
+  >
+
+
+  <div class="title">
+    REFERRAL KINGDOM
+  </div>
+
+  <div class="subtitle">
+    Invite friends • Build your network • Earn referral points
+  </div>
+
+
+  <div class="stats">
+
+    <div class="stat">
+      <div class="stat-value" id="totalReferrals">0</div>
+      <div class="stat-label">TOTAL REFERRALS</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-value" id="referralPoints">0</div>
+      <div class="stat-label">REFERRAL POINTS</div>
+    </div>
+
+  </div>
+
+
+  <div class="ref-card">
+
+    <div class="card-title">
+      YOUR REFERRAL CODE
+    </div>
+
+    <div class="code-box" id="referralCode">
+      ------
+    </div>
+
+    <div class="link-box" id="referralLink">
+      Loading referral link...
+    </div>
+
+    <div class="actions">
+
+      <button
+        class="action-btn copy-btn"
+        onclick="copyReferralLink()"
+      >
+        📋 COPY LINK
+      </button>
+
+      <button
+        class="action-btn whatsapp-btn"
+        onclick="shareWhatsApp()"
+      >
+        💬 WHATSAPP
+      </button>
+
+    </div>
+
+    <div class="message" id="shareMessage"></div>
+
+  </div>
+
+
+  <div class="history-card">
+
+    <div class="card-title">
+      REFERRAL HISTORY
+    </div>
+
+    <div class="history-list" id="historyList">
+
+      <div class="history-row">
+        <div class="history-name">
+          Loading referrals...
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="info">
+
+    <b>How it works</b><br><br>
+
+    1. Apna referral link friend ko share karo.<br>
+
+    2. Friend isi link se Samrat X-Treme account banayega.<br>
+
+    3. Successful referral Appwrite mein record hoga.<br>
+
+    4. Referral points aapke account mein add honge.
+
+  </div>
+
+
+  <div class="footer">
+    Samrat X-Treme Referral Program<br>
+    Referral points and rewards are subject to program rules.
+  </div>
+
+</div>
+
+
+<script>
+
+/* =========================================
+   APPWRITE CONFIG
+========================================= */
+
+const APPWRITE_ENDPOINT =
+"https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+"6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+"6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE =
+"user_profiles";
+
+const REFERRALS_TABLE =
+"referrals";
+
+
+/* =========================================
+   APPWRITE CLIENT
+========================================= */
+
+const client =
+new Appwrite.Client();
+
+client
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
+
+const account =
+new Appwrite.Account(client);
+
+const tablesDB =
+new Appwrite.TablesDB(client);
+
+
+/* =========================================
+   STATE
+========================================= */
+
+let currentUser = null;
+
+let currentProfile = null;
+
+let referralRows = [];
+
+let currentReferralLink = "";
+
+
+/* =========================================
+   START PAGE
+========================================= */
+
+async function startReferralPage(){
+
+try{
+
+/* LOGIN REQUIRED */
+
+currentUser =
+await account.get();
+
+
+document.getElementById(
+"userName"
+).innerText =
+currentUser.name || "Player";
+
+
+document.getElementById(
+"userEmail"
+).innerText =
+currentUser.email || "";
+
+
+/* LOAD PROFILE */
+
+await loadProfile();
+
+
+/* LOAD REFERRALS */
+
+await loadReferrals();
+
+
+/* SHOW PAGE */
+
+document.getElementById(
+"loader"
+).classList.add(
+"hidden"
+);
+
+
+document.getElementById(
+"mainApp"
+).classList.remove(
+"hidden"
+);
+
+
+}catch(error){
+
+console.error(
+"Referral page start error:",
+error
+);
+
+window.location.replace(
+"login.html"
+);
+
+}
+
+}
+
+
+/* =========================================
+   GENERATE CODE IF OLD USER HAS NONE
+========================================= */
+
+function generateReferralCode(
+name,
+userId
+){
+
+const cleanName =
+(name || "SAMRAT")
+.replace(
+/[^a-zA-Z0-9]/g,
+""
+)
+.toUpperCase()
+.slice(
+0,
+5
+);
+
+const idPart =
+userId
+.replace(
+/[^a-zA-Z0-9]/g,
+""
+)
+.toUpperCase()
+.slice(
+-6
+);
+
+return (
+(cleanName || "SAMRAT") +
+idPart
+);
+
+}
+
+
+/* =========================================
+   LOAD USER PROFILE
+========================================= */
+
+async function loadProfile(){
+
+try{
+
+currentProfile =
+await tablesDB.getRow({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+USER_PROFILES_TABLE,
+
+rowId:
+currentUser.$id
+
+});
+
+
+}catch(error){
+
+console.error(
+"Profile load error:",
+error
+);
+
+throw error;
+
+}
+
+
+/* OLD USERS MAY NOT HAVE REF CODE */
+
+let code =
+String(
+currentProfile.referralCode || ""
+)
+.trim()
+.toUpperCase();
+
+
+if(!code){
+
+code =
+generateReferralCode(
+currentUser.name,
+currentUser.$id
+);
+
+
+try{
+
+await tablesDB.updateRow({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+USER_PROFILES_TABLE,
+
+rowId:
+currentUser.$id,
+
+data:{
+
+referralCode:
+code,
+
+referralPoints:
+Number(
+currentProfile.referralPoints
+) || 0
+
+}
+
+});
+
+
+currentProfile.referralCode =
+code;
+
+
+}catch(error){
+
+console.error(
+"Referral code save error:",
+error
+);
+
+}
+
+}
+
+
+/* CREATE REF LINK */
+
+currentReferralLink =
+"https://samratxtreme.online/signup.html?ref=" +
+encodeURIComponent(
+code
+);
+
+
+document.getElementById(
+"referralCode"
+).innerText =
+code;
+
+
+document.getElementById(
+"referralLink"
+).innerText =
+currentReferralLink;
+
+
+document.getElementById(
+"referralPoints"
+).innerText =
+(
+Number(
+currentProfile.referralPoints
+) || 0
+).toLocaleString(
+"en-IN"
+);
+
+}
+
+
+/* =========================================
+   LOAD REFERRALS
+========================================= */
+
+async function loadReferrals(){
+
+try{
+
+const response =
+await tablesDB.listRows({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+REFERRALS_TABLE,
+
+queries:[
+Appwrite.Query.limit(100)
+],
+
+total:false,
+
+ttl:0
+
+});
+
+
+const allRows =
+response.rows || [];
+
+
+/* ONLY CURRENT USER REFERRALS */
+
+referralRows =
+allRows
+.filter(
+row =>
+String(
+row.referrerUserId || ""
+) ===
+String(
+currentUser.$id
+)
+)
+.sort(
+(a,b) => {
+
+const dateA =
+new Date(
+a.createdAt ||
+a.$createdAt
+).getTime();
+
+const dateB =
+new Date(
+b.createdAt ||
+b.$createdAt
+).getTime();
+
+return dateB-dateA;
+
+}
+);
+
+
+document.getElementById(
+"totalReferrals"
+).innerText =
+referralRows.length;
+
+
+renderReferralHistory();
+
+
+}catch(error){
+
+console.error(
+"Referral history load error:",
+error
+);
+
+referralRows = [];
+
+document.getElementById(
+"totalReferrals"
+).innerText =
+"0";
+
+
+renderReferralHistory();
+
+}
+
+}
+
+
+/* =========================================
+   RENDER HISTORY
+========================================= */
+
+function renderReferralHistory(){
+
+const list =
+document.getElementById(
+"historyList"
+);
+
+
+if(
+referralRows.length === 0
+){
+
+list.innerHTML =
+
+'<div class="history-row">' +
+
+'<div>' +
+
+'<div class="history-name">' +
+'Abhi koi referral nahi hai.' +
+'</div>' +
+
+'<div class="history-date">' +
+'Apna referral link share karo.' +
+'</div>' +
+
+'</div>' +
+
+'</div>';
+
+return;
+
+}
+
+
+list.innerHTML =
+referralRows
+.map(
+item => {
+
+const date =
+new Date(
+item.createdAt ||
+item.$createdAt
+);
+
+
+const dateText =
+Number.isNaN(
+date.getTime()
+)
+? ""
+: date.toLocaleString(
+"en-IN"
+);
+
+
+const referredId =
+String(
+item.referredUserId || ""
+);
+
+
+const shortId =
+referredId.length > 10
+?
+referredId.slice(
+0,
+6
+) +
+"..." +
+referredId.slice(
+-4
+)
+:
+referredId;
+
+
+const points =
+Number(
+item.Points
+) || 0;
+
+
+return (
+
+'<div class="history-row">' +
+
+'<div>' +
+
+'<div class="history-name">' +
+
+'Player: ' +
+escapeHtml(
+shortId || "Referral"
+) +
+
+'</div>' +
+
+'<div class="history-date">' +
+escapeHtml(
+dateText
+) +
+'</div>' +
+
+'</div>' +
+
+'<div class="history-points">' +
+
+'+' +
+points.toLocaleString(
+"en-IN"
+) +
+' pts' +
+
+'</div>' +
+
+'</div>'
+
+);
+
+}
+)
+.join("");
+
+}
+
+
+/* =========================================
+   HTML SAFE
+========================================= */
+
+function escapeHtml(value){
+
+return String(
+value ?? ""
+)
+.replace(
+/&/g,
+"&amp;"
+)
+.replace(
+/</g,
+"&lt;"
+)
+.replace(
+/>/g,
+"&gt;"
+)
+.replace(
+/"/g,
+"&quot;"
+)
+.replace(
+/'/g,
+"&#039;"
+);
+
+}
+
+
+/* =========================================
+   COPY REFERRAL LINK
+========================================= */
+
+async function copyReferralLink(){
+
+const msg =
+document.getElementById(
+"shareMessage"
+);
+
+
+try{
+
+await navigator.clipboard.writeText(
+currentReferralLink
+);
+
+msg.style.color =
+"#60ff9a";
+
+msg.innerText =
+"Referral link copied ✅";
+
+
+}catch(error){
+
+console.error(
+"Copy error:",
+error
+);
+
+
+/* FALLBACK */
+
+const textArea =
+document.createElement(
+"textarea"
+);
+
+textArea.value =
+currentReferralLink;
+
+document.body.appendChild(
+textArea
+);
+
+textArea.select();
+
+document.execCommand(
+"copy"
+);
+
+textArea.remove();
+
+
+msg.style.color =
+"#60ff9a";
+
+msg.innerText =
+"Referral link copied ✅";
+
+}
+
+
+setTimeout(
+() => {
+
+msg.innerText = "";
+
+},
+2500
+);
+
+}
+
+
+/* =========================================
+   WHATSAPP SHARE
+========================================= */
+
+function shareWhatsApp(){
+
+if(
+!currentReferralLink
+){
+return;
+}
+
+
+const text =
+
+"🦁 Join Samrat X-Treme\n\n" +
+
+"Create your account using my referral link:\n" +
+
+currentReferralLink;
+
+
+const whatsappUrl =
+
+"https://wa.me/?text=" +
+
+encodeURIComponent(
+text
+);
+
+
+window.open(
+whatsappUrl,
+"_blank"
+);
+
+}
+
+
+/* =========================================
+   START
+========================================= */
+
+startReferralPage();
+
+</script>
+
+</body>
+</html>
