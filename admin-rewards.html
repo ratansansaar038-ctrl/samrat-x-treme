@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
+
+<title>Reward Admin | Samrat X-Treme</title>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  padding:18px;
+  color:#fff;
+  background:
+  radial-gradient(circle at 50% -10%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
+}
+
+.app{
+  width:100%;
+  max-width:850px;
+  margin:auto;
+}
+
+.header{
+  padding:18px;
+  border:1px solid #7046d8;
+  border-radius:18px;
+  background:linear-gradient(145deg,#171027,#281047);
+  text-align:center;
+}
+
+.logo{
+  width:190px;
+  max-width:70%;
+}
+
+h1{
+  margin-top:8px;
+  color:#ffe16a;
+  font-size:24px;
+}
+
+.sub{
+  margin-top:5px;
+  color:#9d8eb5;
+  font-size:11px;
+}
+
+.top-actions{
+  margin-top:14px;
+  display:flex;
+  justify-content:center;
+  gap:9px;
+}
+
+.top-btn{
+  text-decoration:none;
+  border:1px solid #7046d8;
+  border-radius:11px;
+  padding:10px 14px;
+  color:#fff;
+  background:#21103d;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.status{
+  margin:15px 0;
+  text-align:center;
+  min-height:22px;
+  font-size:12px;
+  color:#ffd66b;
+}
+
+.claims{
+  display:grid;
+  gap:12px;
+}
+
+.claim{
+  padding:16px;
+  border-radius:17px;
+  border:1px solid #46316b;
+  background:linear-gradient(145deg,#151020,#241039);
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  gap:15px;
+  margin-bottom:7px;
+}
+
+.label{
+  color:#9184a3;
+  font-size:10px;
+}
+
+.value{
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  text-align:right;
+  word-break:break-word;
+}
+
+.pending{
+  color:#ffd65e;
+}
+
+.approved{
+  color:#60ff9a;
+}
+
+.rejected{
+  color:#ff7088;
+}
+
+.actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:14px;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:12px;
+  font-size:11px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.approve{
+  background:linear-gradient(90deg,#35f081,#10a653);
+  color:#00180b;
+}
+
+.reject{
+  background:linear-gradient(90deg,#ff758d,#e62e55);
+  color:#fff;
+}
+
+button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.empty{
+  text-align:center;
+  color:#8e829e;
+  padding:35px 15px;
+  border:1px solid #37284b;
+  border-radius:16px;
+  background:#0c0714;
+}
+
+.loader{
+  min-height:70vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#cdbcf4;
+}
+
+.hidden{
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loader" class="loader">
+Loading admin panel...
+</div>
+
+<div id="mainApp" class="app hidden">
+
+  <div class="header">
+
+    <img src="samrat-logo.png" class="logo">
+
+    <h1>REWARD ADMIN</h1>
+
+    <div class="sub">
+      Review • Approve • Reject reward claims
+    </div>
+
+    <div class="top-actions">
+      <a href="index.html" class="top-btn">HOME</a>
+
+      <button class="top-btn" onclick="loadClaims()">
+        REFRESH
+      </button>
+    </div>
+
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="claims" id="claims"></div>
+
+</div>
+
+<script>
+
+const APPWRITE_ENDPOINT =
+"https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+"6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+"6a7f2d1d0035d9815939";
+
+const REWARD_CLAIMS_TABLE =
+"reward_claims";
+
+
+const client =
+new Appwrite.Client();
+
+client
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
+
+
+const account =
+new Appwrite.Account(client);
+
+const tablesDB =
+new Appwrite.TablesDB(client);
+
+
+let currentUser = null;
+
+let claims = [];
+
+
+/* =========================
+   START
+========================= */
+
+async function startAdmin(){
+
+  try{
+
+    currentUser =
+    await account.get();
+
+    await loadClaims();
+
+    document
+    .getElementById("loader")
+    .classList.add("hidden");
+
+    document
+    .getElementById("mainApp")
+    .classList.remove("hidden");
+
+  }catch(error){
+
+    console.error(
+      "Admin start error:",
+      error
+    );
+
+    window.location.replace(
+      "login.html"
+    );
+
+  }
+
+}
+
+
+/* =========================
+   LOAD CLAIMS
+========================= */
+
+async function loadClaims(){
+
+  const status =
+  document.getElementById("status");
+
+  status.style.color =
+  "#ffd66b";
+
+  status.innerText =
+  "Claims load ho rahe hain...";
+
+
+  try{
+
+    const result =
+    await tablesDB.listRows({
+
+      databaseId:
+      APPWRITE_DATABASE_ID,
+
+      tableId:
+      REWARD_CLAIMS_TABLE,
+
+      queries:[
+        Appwrite.Query.limit(100)
+      ],
+
+      total:false,
+
+      ttl:0
+
+    });
+
+
+    claims =
+    (result.rows || [])
+    .sort((a,b)=>{
+
+      const da =
+      new Date(
+        a.claimedAt ||
+        a.$createdAt
+      ).getTime();
+
+      const db =
+      new Date(
+        b.claimedAt ||
+        b.$createdAt
+      ).getTime();
+
+      return db-da;
+
+    });
+
+
+    renderClaims();
+
+    status.innerText =
+    claims.length +
+    " claim(s) loaded";
+
+
+  }catch(error){
+
+    console.error(
+      "Load claims error:",
+      error
+    );
+
+    status.style.color =
+    "#ff7088";
+
+    status.innerText =
+    "Claims load nahi hue. Admin permission check karo.";
+
+  }
+
+}
+
+
+/* =========================
+   RENDER
+========================= */
+
+function renderClaims(){
+
+  const box =
+  document.getElementById(
+    "claims"
+  );
+
+
+  if(claims.length === 0){
+
+    box.innerHTML =
+    '<div class="empty">' +
+    'Abhi koi reward claim nahi hai.' +
+    '</div>';
+
+    return;
+
+  }
+
+
+  box.innerHTML =
+  claims.map(claim=>{
+
+    const state =
+    String(
+      claim.status ||
+      "PENDING"
+    ).toUpperCase();
+
+
+    const date =
+    new Date(
+      claim.claimedAt ||
+      claim.$createdAt
+    );
+
+
+    const dateText =
+    Number.isNaN(
+      date.getTime()
+    )
+    ? ""
+    : date.toLocaleString(
+        "en-IN"
+      );
+
+
+    return `
+
+    <div class="claim">
+
+      <div class="row">
+        <div class="label">Reward</div>
+        <div class="value">
+          ${escapeHtml(claim.rewardName || "")}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">Points Used</div>
+        <div class="value">
+          ${Number(claim.pointUsed || 0).toLocaleString("en-IN")}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">User ID</div>
+        <div class="value">
+          ${escapeHtml(claim.userId || "")}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">Claimed</div>
+        <div class="value">
+          ${escapeHtml(dateText)}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">Status</div>
+
+        <div class="value ${state.toLowerCase()}">
+          ${escapeHtml(state)}
+        </div>
+      </div>
+
+
+      ${
+        state === "PENDING"
+        ?
+        `
+        <div class="actions">
+
+          <button
+            class="approve"
+            onclick="updateClaim('${claim.$id}','APPROVED')"
+          >
+            APPROVE
+          </button>
+
+          <button
+            class="reject"
+            onclick="updateClaim('${claim.$id}','REJECTED')"
+          >
+            REJECT
+          </button>
+
+        </div>
+        `
+        :
+        ""
+      }
+
+    </div>
+
+    `;
+
+  }).join("");
+
+}
+
+
+/* =========================
+   UPDATE CLAIM
+========================= */
+
+async function updateClaim(
+  rowId,
+  newStatus
+){
+
+  const ok =
+  confirm(
+    "Claim ko " +
+    newStatus +
+    " karna hai?"
+  );
+
+
+  if(!ok){
+    return;
+  }
+
+
+  const status =
+  document.getElementById(
+    "status"
+  );
+
+
+  status.style.color =
+  "#ffd66b";
+
+  status.innerText =
+  "Status update ho raha hai...";
+
+
+  try{
+
+    await tablesDB.updateRow({
+
+      databaseId:
+      APPWRITE_DATABASE_ID,
+
+      tableId:
+      REWARD_CLAIMS_TABLE,
+
+      rowId:
+      rowId,
+
+      data:{
+        status:newStatus
+      }
+
+    });
+
+
+    status.style.color =
+    "#60ff9a";
+
+    status.innerText =
+    "Claim " +
+    newStatus +
+    " ✅";
+
+
+    await loadClaims();
+
+
+  }catch(error){
+
+    console.error(
+      "Claim update error:",
+      error
+    );
+
+    status.style.color =
+    "#ff7088";
+
+    status.innerText =
+    "Update failed. Admin Update permission check karo.";
+
+  }
+
+}
+
+
+/* =========================
+   SAFE HTML
+========================= */
+
+function escapeHtml(value){
+
+  return String(
+    value ?? ""
+  )
+  .replace(/&/g,"&amp;")
+  .replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;")
+  .replace(/'/g,"&#039;");
+
+}
+
+
+startAdmin();
+
+</script>
+
+</body>
+</html>
