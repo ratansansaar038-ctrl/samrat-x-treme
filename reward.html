@@ -822,22 +822,37 @@ function renderRewards(){
           );
 
 
-        let buttonText =
-          "CLAIM";
+      const approved =
+  claims.some(
+    claim =>
+      String(
+        claim.rewardId || ""
+      ) === reward.id &&
+      String(
+        claim.status || ""
+      ).toUpperCase() ===
+      "APPROVED"
+  );
 
+let buttonText =
+  "CLAIM";
 
-        if(pending){
+if(approved){
 
-          buttonText =
-            "PENDING";
+  buttonText =
+    "APPROVED ✅";
 
-        }else if(!enough){
+}else if(pending){
 
-          buttonText =
-            "LOCKED";
+  buttonText =
+    "PENDING";
 
-        }
+}else if(!enough){
 
+  buttonText =
+    "LOCKED";
+
+}
 
         return (
 
@@ -872,6 +887,7 @@ function renderRewards(){
                   reward.id +
                 '\')" ' +
                 (
+                   approved ||
                   pending ||
                   !enough
                   ? 'disabled'
