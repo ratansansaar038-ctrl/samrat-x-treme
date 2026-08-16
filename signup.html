@@ -83,6 +83,13 @@ border-color:#9c6dff;
 box-shadow:0 0 12px rgba(122,63,255,.35)
 }
 
+.ref-note{
+margin-top:6px;
+font-size:9px;
+color:#807295;
+line-height:1.4
+}
+
 button{
 width:100%;
 margin-top:20px;
@@ -191,6 +198,20 @@ autocomplete="new-password"
 required
 >
 
+<label>Referral Code (Optional)</label>
+
+<input
+id="referralInput"
+type="text"
+placeholder="Enter referral code"
+maxlength="32"
+autocomplete="off"
+>
+
+<div class="ref-note">
+Agar aap referral link se aaye hain to code automatically fill ho jayega.
+</div>
+
 <button id="signupButton" type="submit" disabled>
 CHECKING...
 </button>
@@ -214,20 +235,114 @@ Virtual coins have no cash value.
 </div>
 
 <script>
-const APPWRITE_ENDPOINT="https://sgp.cloud.appwrite.io/v1";
-const APPWRITE_PROJECT_ID="6a7f2add0011a7bfc21a";
 
-const client=new Appwrite.Client();
+/* =========================
+   APPWRITE CONFIG
+========================= */
+
+const APPWRITE_ENDPOINT =
+"https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+"6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+"6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE =
+"user_profiles";
+
+const REFERRALS_TABLE =
+"referrals";
+
+const REFERRAL_REWARD_POINTS =
+100;
+
+
+/* =========================
+   APPWRITE CLIENT
+========================= */
+
+const client =
+new Appwrite.Client();
 
 client
 .setEndpoint(APPWRITE_ENDPOINT)
 .setProject(APPWRITE_PROJECT_ID);
 
-const account=new Appwrite.Account(client);
+const account =
+new Appwrite.Account(client);
 
-const form=document.getElementById("signupForm");
-const button=document.getElementById("signupButton");
-const message=document.getElementById("message");
+const tablesDB =
+new Appwrite.TablesDB(client);
+
+
+/* =========================
+   ELEMENTS
+========================= */
+
+const form =
+document.getElementById("signupForm");
+
+const button =
+document.getElementById("signupButton");
+
+const message =
+document.getElementById("message");
+
+const referralInput =
+document.getElementById("referralInput");
+
+
+/* =========================
+   GET REF CODE FROM URL
+========================= */
+
+const urlParams =
+new URLSearchParams(window.location.search);
+
+const urlReferral =
+(urlParams.get("ref") || "")
+.trim()
+.toUpperCase();
+
+if(urlReferral){
+
+referralInput.value =
+urlReferral;
+
+}
+
+
+/* =========================
+   GENERATE REFERRAL CODE
+========================= */
+
+function generateReferralCode(name,userId){
+
+const cleanName =
+(name || "SAMRAT")
+.replace(/[^a-zA-Z0-9]/g,"")
+.toUpperCase()
+.slice(0,5);
+
+const idPart =
+userId
+.replace(/[^a-zA-Z0-9]/g,"")
+.toUpperCase()
+.slice(-6);
+
+return (
+(cleanName || "SAMRAT") +
+idPart
+);
+
+}
+
+
+/* =========================
+   PREPARE SIGNUP PAGE
+========================= */
 
 async function prepareSignupPage(){
 
@@ -235,112 +350,470 @@ try{
 
 await account.get();
 
-/* already logged in */
-
 window.location.replace("index.html");
+
 return;
 
 }catch(error){
 
 button.disabled=false;
-button.innerText="ACTIVATE ACCOUNT";
+
+button.innerText=
+"ACTIVATE ACCOUNT";
+
 message.innerText="";
 
 }
+
 }
 
-form.addEventListener("submit",async function(event){
 
-event.preventDefault();
+/* =========================
+   FIND REFERRER
+========================= */
 
-if(button.disabled) return;
+async function findReferrerByCode(code){
 
-const name=
-document.getElementById("name").value.trim();
+if(!code){
+return null;
+}
 
-const email=
-document.getElementById("email").value.trim();
+try{
 
-const password=
-document.getElementById("password").value;
+const response =
+await tablesDB.listRows({
 
-const confirmPassword=
-document.getElementById("confirmPassword").value;
+databaseId:
+APPWRITE_DATABASE_ID,
 
-if(!name){
+tableId:
+USER_PROFILES_TABLE,
 
-message.style.color="#ff6b87";
-message.innerText="Name enter karo.";
+queries:[
+Appwrite.Query.limit(100)
+],
+
+total:false,
+
+ttl:0
+
+});
+
+const rows =
+response.rows || [];
+
+const wanted =
+code.trim().toUpperCase();
+
+return rows.find(row =>
+String(row.referralCode || "")
+.trim()
+.toUpperCase() === wanted
+) || null;
+
+}catch(error){
+
+console.error(
+"Referral lookup error:",
+error
+);
+
+return null;
+
+}
+
+}
+
+
+/* =========================
+   PROCESS REFERRAL
+========================= */
+
+async function processReferral(
+newUser,
+enteredReferralCode
+){
+
+const code =
+(enteredReferralCode || "")
+.trim()
+.toUpperCase();
+
+if(!code){
 return;
 }
 
+const referrer =
+await findReferrerByCode(code);
+
+if(!referrer){
+
+console.warn(
+"Invalid referral code:",
+code
+);
+
+return;
+
+}
+
+/* self referral protection */
+
+if(
+referrer.$id === newUser.$id ||
+referrer.userId === newUser.$id
+){
+
+return;
+
+}
+
+try{
+
+/* create referral history */
+
+await tablesDB.createRow({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+REFERRALS_TABLE,
+
+rowId:
+Appwrite.ID.unique(),
+
+data:{
+
+referrerUserId:
+String(
+referrer.userId ||
+referrer.$id
+),
+
+referredUserId:
+String(newUser.$id),
+
+referralCode:
+code,
+
+Points:
+Number(
+REFERRAL_REWARD_POINTS
+),
+
+createdAt:
+new Date().toISOString()
+
+}
+
+});
+
+
+/* add points to referrer */
+
+const oldReferralPoints =
+Number(
+referrer.referralPoints
+) || 0;
+
+await tablesDB.updateRow({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+USER_PROFILES_TABLE,
+
+rowId:
+referrer.$id,
+
+data:{
+
+referralPoints:
+oldReferralPoints +
+REFERRAL_REWARD_POINTS
+
+}
+
+});
+
+console.log(
+"Referral reward added ✅"
+);
+
+}catch(error){
+
+console.error(
+"Referral reward error:",
+error
+);
+
+}
+
+}
+
+
+/* =========================
+   SIGNUP
+========================= */
+
+form.addEventListener(
+"submit",
+async function(event){
+
+event.preventDefault();
+
+if(button.disabled){
+return;
+}
+
+const name =
+document
+.getElementById("name")
+.value
+.trim();
+
+const email =
+document
+.getElementById("email")
+.value
+.trim();
+
+const password =
+document
+.getElementById("password")
+.value;
+
+const confirmPassword =
+document
+.getElementById("confirmPassword")
+.value;
+
+const enteredReferralCode =
+referralInput
+.value
+.trim()
+.toUpperCase();
+
+
+if(!name){
+
+message.style.color=
+"#ff6b87";
+
+message.innerText=
+"Name enter karo.";
+
+return;
+
+}
+
+
 if(password.length<8){
 
-message.style.color="#ff6b87";
+message.style.color=
+"#ff6b87";
 
 message.innerText=
 "Password kam se kam 8 characters ka hona chahiye.";
 
 return;
+
 }
+
 
 if(password!==confirmPassword){
 
-message.style.color="#ff6b87";
+message.style.color=
+"#ff6b87";
 
 message.innerText=
 "Password aur Confirm Password match nahi kar rahe.";
 
 return;
+
 }
 
-button.disabled=true;
-button.innerText="CREATING ACCOUNT...";
 
-message.style.color="#ffcf79";
-message.innerText="Account create ho raha hai...";
+button.disabled=true;
+
+button.innerText=
+"CREATING ACCOUNT...";
+
+message.style.color=
+"#ffcf79";
+
+message.innerText=
+"Account create ho raha hai...";
+
 
 try{
 
+/* CREATE APPWRITE USER */
+
+const newUser =
 await account.create({
-userId:Appwrite.ID.unique(),
-email:email,
-password:password,
-name:name
+
+userId:
+Appwrite.ID.unique(),
+
+email:
+email,
+
+password:
+password,
+
+name:
+name
+
 });
+
+
+/* LOGIN USER */
 
 await account.createEmailPasswordSession({
-email:email,
-password:password
+
+email:
+email,
+
+password:
+password
+
 });
 
-localStorage.removeItem("samratWallet");
-localStorage.removeItem("samratHistory");
-localStorage.removeItem("samratRound");
 
-message.style.color="#60ff9a";
-message.innerText="Account successfully created ✅";
+/* GENERATE OWN REFERRAL CODE */
 
-window.location.replace("index.html");
+const ownReferralCode =
+generateReferralCode(
+name,
+newUser.$id
+);
+
+
+/* CREATE USER PROFILE */
+
+await tablesDB.createRow({
+
+databaseId:
+APPWRITE_DATABASE_ID,
+
+tableId:
+USER_PROFILES_TABLE,
+
+rowId:
+newUser.$id,
+
+data:{
+
+userId:
+newUser.$id,
+
+name:
+name,
+
+email:
+email,
+
+wallet:
+10000,
+
+wins:
+0,
+
+losses:
+0,
+
+rounds:
+0,
+
+referralCode:
+ownReferralCode,
+
+referredBy:
+enteredReferralCode || "",
+
+referralPoints:
+0
+
+}
+
+});
+
+
+/* PROCESS REFERRER REWARD */
+
+if(enteredReferralCode){
+
+await processReferral(
+newUser,
+enteredReferralCode
+);
+
+}
+
+
+/* CLEAR OLD DEVICE DATA */
+
+localStorage.removeItem(
+"samratWallet"
+);
+
+localStorage.removeItem(
+"samratHistory"
+);
+
+localStorage.removeItem(
+"samratRound"
+);
+
+
+/* SUCCESS */
+
+message.style.color=
+"#60ff9a";
+
+message.innerText=
+"Account successfully created ✅";
+
+
+setTimeout(function(){
+
+window.location.replace(
+"index.html"
+);
+
+},700);
+
 
 }catch(error){
 
-console.error("Signup error:",error);
+console.error(
+"Signup error:",
+error
+);
 
-message.style.color="#ff6b87";
+message.style.color=
+"#ff6b87";
 
-message.innerText=
+message.innerText =
 error && error.message
 ? error.message
 : "Signup failed. Please try again.";
 
 button.disabled=false;
-button.innerText="ACTIVATE ACCOUNT";
+
+button.innerText=
+"ACTIVATE ACCOUNT";
 
 }
+
 });
 
+
 prepareSignupPage();
+
 </script>
 
 </body>
