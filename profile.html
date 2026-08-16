@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
+
+<title>My Profile | Samrat X-Treme</title>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  color:#fff;
+  padding:18px;
+  background:
+  radial-gradient(circle at 50% -10%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
+}
+
+.app{
+  width:100%;
+  max-width:700px;
+  margin:auto;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  border:1px solid #7046d8;
+  border-radius:17px;
+  background:linear-gradient(145deg,#171027,#281047);
+  box-shadow:0 0 24px rgba(111,50,255,.25);
+}
+
+.user-name{
+  color:#ffe16a;
+  font-size:16px;
+  font-weight:900;
+}
+
+.user-email{
+  margin-top:3px;
+  color:#9f91b4;
+  font-size:10px;
+  word-break:break-all;
+}
+
+.home-btn{
+  flex-shrink:0;
+  padding:10px 15px;
+  border:1px solid #7956da;
+  border-radius:11px;
+  text-decoration:none;
+  color:#fff;
+  background:#21103d;
+  font-size:10px;
+  font-weight:900;
+}
+
+.logo{
+  width:220px;
+  max-width:72%;
+  display:block;
+  margin:24px auto 5px;
+  filter:drop-shadow(0 0 16px rgba(143,59,255,.65));
+}
+
+h1{
+  text-align:center;
+  color:#ffe16a;
+  font-size:27px;
+  margin-top:4px;
+}
+
+.subtitle{
+  text-align:center;
+  color:#a99bc5;
+  font-size:11px;
+  margin:6px 0 22px;
+}
+
+.wallet-card{
+  padding:21px;
+  margin-bottom:13px;
+  border:1px solid #7550d6;
+  border-radius:20px;
+  text-align:center;
+  background:
+  linear-gradient(120deg,#271252,#3f2081,#26114c);
+  box-shadow:0 0 25px rgba(108,65,255,.25);
+}
+
+.wallet-label{
+  color:#baaee0;
+  font-size:10px;
+  letter-spacing:1px;
+}
+
+.wallet-value{
+  margin-top:7px;
+  color:#ffe55f;
+  font-size:32px;
+  font-weight:900;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.stat{
+  min-height:105px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  padding:15px 8px;
+  border:1px solid #543ca0;
+  border-radius:17px;
+  background:linear-gradient(145deg,#161029,#261145);
+}
+
+.stat-value{
+  color:#fff;
+  font-size:23px;
+  font-weight:900;
+}
+
+.stat-label{
+  color:#9d90ba;
+  font-size:9px;
+  margin-top:7px;
+  text-align:center;
+  text-transform:uppercase;
+}
+
+.points{
+  color:#63ffd0;
+}
+
+.referral{
+  color:#ffe16a;
+}
+
+.section{
+  margin-top:14px;
+  padding:18px;
+  border:1px solid #4c367e;
+  border-radius:18px;
+  background:linear-gradient(145deg,#151020,#221038);
+}
+
+.section-title{
+  margin-bottom:14px;
+  color:#ffe16a;
+  font-size:13px;
+  font-weight:900;
+}
+
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  gap:15px;
+  padding:11px 0;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+
+.info-row:last-child{
+  border-bottom:0;
+}
+
+.label{
+  color:#8f829f;
+  font-size:10px;
+}
+
+.value{
+  max-width:65%;
+  text-align:right;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  word-break:break-word;
+}
+
+.code-box{
+  margin-top:14px;
+  padding:15px;
+  border:1px dashed #8f67e8;
+  border-radius:14px;
+  text-align:center;
+  background:#0d0717;
+}
+
+.code-label{
+  color:#9688aa;
+  font-size:9px;
+}
+
+.code{
+  margin-top:7px;
+  color:#ffe16a;
+  font-size:19px;
+  font-weight:900;
+  letter-spacing:1px;
+  word-break:break-all;
+}
+
+.actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+
+.action{
+  padding:14px 8px;
+  border:1px solid #6950b6;
+  border-radius:13px;
+  text-align:center;
+  text-decoration:none;
+  color:#fff;
+  background:#21103d;
+  font-size:10px;
+  font-weight:900;
+}
+
+.message{
+  padding:30px 15px;
+  text-align:center;
+  color:#c3b5db;
+}
+
+.error{
+  color:#ff7088;
+}
+
+.note{
+  margin-top:20px;
+  text-align:center;
+  color:#625972;
+  font-size:9px;
+  line-height:1.5;
+}
+
+@media(max-width:420px){
+  body{
+    padding:12px;
+  }
+
+  .wallet-value{
+    font-size:28px;
+  }
+
+  .stat-value{
+    font-size:20px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div id="loading" class="message">
+    Profile load ho raha hai...
+  </div>
+
+  <div id="profileApp" style="display:none;">
+
+    <div class="topbar">
+
+      <div>
+        <div class="user-name" id="topName">PLAYER</div>
+        <div class="user-email" id="topEmail"></div>
+      </div>
+
+      <a href="index.html" class="home-btn">
+        HOME
+      </a>
+
+    </div>
+
+    <img
+      src="samrat-logo.png"
+      class="logo"
+      alt="Samrat X-Treme"
+    >
+
+    <h1>MY PROFILE</h1>
+
+    <div class="subtitle">
+      Your Samrat X-Treme player account
+    </div>
+
+    <div class="wallet-card">
+
+      <div class="wallet-label">
+        X-TREME WALLET
+      </div>
+
+      <div class="wallet-value" id="wallet">
+        0
+      </div>
+
+    </div>
+
+    <div class="grid">
+
+      <div class="stat">
+        <div class="stat-value" id="wins">0</div>
+        <div class="stat-label">Total Wins</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value" id="losses">0</div>
+        <div class="stat-label">Total Losses</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value" id="rounds">0</div>
+        <div class="stat-label">Rounds Played</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value referral" id="referralPoints">
+          0
+        </div>
+        <div class="stat-label">Referral Points</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value points" id="rewardPoints">
+          0
+        </div>
+        <div class="stat-label">Game / Reward Points</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value" id="totalRewards">
+          0
+        </div>
+        <div class="stat-label">Rewards Claimed</div>
+      </div>
+
+    </div>
+
+    <div class="section">
+
+      <div class="section-title">
+        ACCOUNT DETAILS
+      </div>
+
+      <div class="info-row">
+        <div class="label">Name</div>
+        <div class="value" id="name">-</div>
+      </div>
+
+      <div class="info-row">
+        <div class="label">Email</div>
+        <div class="value" id="email">-</div>
+      </div>
+
+      <div class="info-row">
+        <div class="label">Player ID</div>
+        <div class="value" id="userId">-</div>
+      </div>
+
+      <div class="info-row">
+        <div class="label">Referred By</div>
+        <div class="value" id="referredBy">None</div>
+      </div>
+
+      <div class="info-row">
+        <div class="label">Account Created</div>
+        <div class="value" id="createdAt">-</div>
+      </div>
+
+      <div class="code-box">
+
+        <div class="code-label">
+          YOUR REFERRAL CODE
+        </div>
+
+        <div class="code" id="referralCode">
+          -
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="actions">
+
+      <a
+        href="referral.html"
+        class="action"
+      >
+        REFERRAL
+      </a>
+
+      <a
+        href="reward.html"
+        class="action"
+      >
+        REWARD CENTER
+      </a>
+
+    </div>
+
+    <div class="note">
+      Entertainment / educational game only.<br>
+      Virtual coins have no cash value.
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+const APPWRITE_ENDPOINT =
+"https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+"6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+"6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE =
+"user_profiles";
+
+
+const client =
+new Appwrite.Client();
+
+client
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
+
+
+const account =
+new Appwrite.Account(client);
+
+const tablesDB =
+new Appwrite.TablesDB(client);
+
+
+function number(value){
+
+  return Number(value || 0)
+  .toLocaleString("en-IN");
+
+}
+
+
+function setText(id,value){
+
+  const element =
+  document.getElementById(id);
+
+  if(element){
+    element.innerText =
+    value ?? "";
+  }
+
+}
+
+
+async function startProfile(){
+
+  const loading =
+  document.getElementById("loading");
+
+  try{
+
+    const user =
+    await account.get();
+
+
+    const result =
+    await tablesDB.listRows({
+
+      databaseId:
+      APPWRITE_DATABASE_ID,
+
+      tableId:
+      USER_PROFILES_TABLE,
+
+      queries:[
+        Appwrite.Query.limit(100)
+      ],
+
+      total:false,
+
+      ttl:0
+
+    });
+
+
+    const profile =
+    (result.rows || [])
+    .find(function(row){
+
+      return String(row.userId || "") ===
+      String(user.$id);
+
+    });
+
+
+    if(!profile){
+
+      throw new Error(
+        "User profile row nahi mili."
+      );
+
+    }
+
+
+    const name =
+    profile.name ||
+    user.name ||
+    "Player";
+
+    const email =
+    profile.email ||
+    user.email ||
+    "";
+
+
+    setText(
+      "topName",
+      name
+    );
+
+    setText(
+      "topEmail",
+      email
+    );
+
+    setText(
+      "name",
+      name
+    );
+
+    setText(
+      "email",
+      email
+    );
+
+    setText(
+      "userId",
+      user.$id
+    );
+
+    setText(
+      "wallet",
+      number(profile.wallet)
+    );
+
+    setText(
+      "wins",
+      number(profile.wins)
+    );
+
+    setText(
+      "losses",
+      number(profile.losses)
+    );
+
+    setText(
+      "rounds",
+      number(profile.rounds)
+    );
+
+    setText(
+      "referralPoints",
+      number(profile.referralPoints)
+    );
+
+    setText(
+      "rewardPoints",
+      number(profile.rewardPoints)
+    );
+
+    setText(
+      "totalRewards",
+      number(profile.totalRewardsClaimed)
+    );
+
+    setText(
+      "referralCode",
+      profile.referralCode || "-"
+    );
+
+    setText(
+      "referredBy",
+      profile.referredBy || "None"
+    );
+
+
+    const created =
+    profile.$createdAt ||
+    user.$createdAt;
+
+
+    let createdText = "-";
+
+
+    if(created){
+
+      const date =
+      new Date(created);
+
+      if(!Number.isNaN(date.getTime())){
+
+        createdText =
+        date.toLocaleString(
+          "en-IN"
+        );
+
+      }
+
+    }
+
+
+    setText(
+      "createdAt",
+      createdText
+    );
+
+
+    loading.style.display =
+    "none";
+
+    document
+    .getElementById("profileApp")
+    .style.display =
+    "block";
+
+
+  }catch(error){
+
+    console.error(
+      "Profile error:",
+      error
+    );
+
+
+    if(
+      error &&
+      (
+        error.code === 401 ||
+        error.type ===
+        "general_unauthorized_scope"
+      )
+    ){
+
+      window.location.replace(
+        "login.html"
+      );
+
+      return;
+
+    }
+
+
+    loading.classList.add(
+      "error"
+    );
+
+    loading.innerText =
+    error && error.message
+    ? error.message
+    : "Profile load nahi hua.";
+
+  }
+
+}
+
+
+startProfile();
+
+</script>
+
+</body>
+</html>
