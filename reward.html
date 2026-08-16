@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#08010f">
+
+<title>Reward Center | Samrat X-Treme</title>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  color:#fff;
+  padding:18px;
+  background:
+    radial-gradient(circle at 50% -10%,#431267 0%,#16051f 40%,#050108 75%,#000 100%);
+}
+
+.hidden{
+  display:none!important;
+}
+
+.loader{
+  min-height:90vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:13px;
+  color:#cbbbef;
+}
+
+.loader-ring{
+  width:44px;
+  height:44px;
+  border:4px solid #36264b;
+  border-top-color:#ffd84c;
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+
+.app{
+  width:100%;
+  max-width:480px;
+  margin:auto;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:12px 13px;
+  border:1px solid #7046d8;
+  border-radius:17px;
+  background:linear-gradient(135deg,#171027,#281047);
+  box-shadow:0 0 20px rgba(111,50,255,.28);
+}
+
+.user-box{
+  min-width:0;
+}
+
+.user-name{
+  color:#ffe16a;
+  font-size:14px;
+  font-weight:900;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.user-email{
+  color:#8e80a7;
+  font-size:9px;
+  margin-top:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.home-btn{
+  text-decoration:none;
+  color:#fff;
+  border:1px solid #7550cd;
+  background:#21103d;
+  border-radius:11px;
+  padding:9px 12px;
+  font-size:10px;
+  font-weight:900;
+}
+
+.logo{
+  width:220px;
+  max-width:75%;
+  display:block;
+  margin:16px auto 4px;
+  filter:drop-shadow(0 0 15px rgba(143,59,255,.7));
+}
+
+.title{
+  text-align:center;
+  color:#ffe16a;
+  font-size:25px;
+  font-weight:900;
+}
+
+.subtitle{
+  text-align:center;
+  margin:5px 0 17px;
+  color:#a99bc5;
+  font-size:11px;
+}
+
+.balance-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:9px;
+}
+
+.balance-card{
+  border:1px solid #543698;
+  border-radius:16px;
+  padding:15px 8px;
+  text-align:center;
+  background:linear-gradient(145deg,#171027,#291148);
+}
+
+.balance-card.total{
+  grid-column:1/-1;
+  background:linear-gradient(135deg,#35205d,#54227c);
+  border-color:#9a64ed;
+}
+
+.balance-value{
+  color:#ffe16a;
+  font-size:23px;
+  font-weight:900;
+}
+
+.balance-name{
+  color:#9587ad;
+  font-size:9px;
+  margin-top:4px;
+  letter-spacing:.7px;
+}
+
+.total .balance-value{
+  font-size:29px;
+  color:#65ff9a;
+}
+
+.section-title{
+  margin:21px 0 11px;
+  text-align:center;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:1.4px;
+  color:#cbbcff;
+}
+
+.rewards{
+  display:grid;
+  gap:11px;
+}
+
+.reward-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid #50357d;
+  border-radius:18px;
+  padding:16px;
+  background:linear-gradient(145deg,#151021,#271143);
+  box-shadow:0 0 17px rgba(83,40,156,.18);
+}
+
+.reward-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.reward-icon{
+  font-size:31px;
+}
+
+.reward-info{
+  flex:1;
+}
+
+.reward-name{
+  font-size:16px;
+  font-weight:900;
+  color:#fff;
+}
+
+.reward-cost{
+  margin-top:3px;
+  font-size:11px;
+  color:#ffe16a;
+  font-weight:900;
+}
+
+.claim-btn{
+  flex-shrink:0;
+  border:0;
+  border-radius:11px;
+  padding:10px 12px;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+  color:#210014;
+  background:linear-gradient(90deg,#ffe033,#ff9700,#ff2b9d);
+}
+
+.claim-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.reward-note{
+  margin-top:10px;
+  color:#887d99;
+  font-size:9px;
+  line-height:1.45;
+}
+
+.message{
+  min-height:24px;
+  margin-top:14px;
+  text-align:center;
+  color:#71ffa9;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.5;
+}
+
+.history-card{
+  margin-top:17px;
+  padding:14px;
+  border:1px solid #35264e;
+  border-radius:17px;
+  background:#0d0817;
+}
+
+.history-list{
+  max-height:350px;
+  overflow-y:auto;
+}
+
+.history-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  padding:11px 2px;
+  border-bottom:1px solid #271a36;
+}
+
+.history-row:last-child{
+  border-bottom:0;
+}
+
+.history-name{
+  font-size:11px;
+  color:#d3c7e5;
+  font-weight:800;
+}
+
+.history-date{
+  margin-top:3px;
+  font-size:9px;
+  color:#675d77;
+}
+
+.history-status{
+  font-size:10px;
+  font-weight:900;
+  text-align:right;
+}
+
+.pending{color:#ffd35c;}
+.approved{color:#57ff91;}
+.rejected{color:#ff637f;}
+
+.history-points{
+  margin-top:3px;
+  color:#a89bbb;
+  font-size:9px;
+  text-align:right;
+}
+
+.info{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid #35264e;
+  border-radius:16px;
+  background:#0d0817;
+  font-size:10px;
+  line-height:1.6;
+  color:#9287a3;
+}
+
+.info b{
+  color:#ffe16a;
+}
+
+.footer{
+  text-align:center;
+  margin-top:20px;
+  color:#62586f;
+  font-size:9px;
+  line-height:1.5;
+}
+
+@media(max-width:350px){
+  .balance-grid{
+    grid-template-columns:1fr;
+  }
+
+  .balance-card.total{
+    grid-column:auto;
+  }
+
+  .reward-head{
+    align-items:flex-start;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="loader" id="loader">
+  <div class="loader-ring"></div>
+  <div>Loading Reward Center...</div>
+</div>
+
+
+<div class="app hidden" id="mainApp">
+
+  <div class="topbar">
+
+    <div class="user-box">
+      <div class="user-name" id="userName">Player</div>
+      <div class="user-email" id="userEmail"></div>
+    </div>
+
+    <a href="index.html" class="home-btn">
+      HOME
+    </a>
+
+  </div>
+
+
+  <img
+    src="samrat-logo.png"
+    class="logo"
+    alt="Samrat X-Treme"
+  >
+
+
+  <div class="title">
+    REWARD CENTER
+  </div>
+
+  <div class="subtitle">
+    Collect points • Unlock rewards • Track your claims
+  </div>
+
+
+  <div class="balance-grid">
+
+    <div class="balance-card">
+
+      <div class="balance-value" id="referralPoints">
+        0
+      </div>
+
+      <div class="balance-name">
+        REFERRAL POINTS
+      </div>
+
+    </div>
+
+
+    <div class="balance-card">
+
+      <div class="balance-value" id="rewardPoints">
+        0
+      </div>
+
+      <div class="balance-name">
+        GAME / REWARD POINTS
+      </div>
+
+    </div>
+
+
+    <div class="balance-card total">
+
+      <div class="balance-value" id="redeemablePoints">
+        0
+      </div>
+
+      <div class="balance-name">
+        TOTAL REDEEMABLE POINTS
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="section-title">
+    AVAILABLE REWARDS
+  </div>
+
+
+  <div class="rewards" id="rewardList"></div>
+
+
+  <div class="message" id="message"></div>
+
+
+  <div class="history-card">
+
+    <div class="section-title" style="margin-top:0">
+      CLAIM HISTORY
+    </div>
+
+    <div class="history-list" id="historyList">
+
+      <div class="history-row">
+        <div class="history-name">
+          Loading claims...
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="info">
+
+    <b>Reward Rules</b><br><br>
+
+    • Referral Points aur Reward Points milkar redeemable balance banate hain.<br>
+
+    • Reward claim karne par required points balance se deduct honge.<br>
+
+    • Har claim pehle <b>PENDING</b> status me jayega.<br>
+
+    • Final approval program rules ke hisaab se hoga.<br>
+
+    • Ek hi reward ka pending claim dobara submit nahi kiya ja sakta.
+
+  </div>
+
+
+  <div class="footer">
+    Samrat X-Treme Reward Center<br>
+    Rewards are subject to eligibility and program rules.
+  </div>
+
+</div>
+
+
+<script>
+
+/* =========================================
+   APPWRITE CONFIG
+========================================= */
+
+const APPWRITE_ENDPOINT =
+"https://sgp.cloud.appwrite.io/v1";
+
+const APPWRITE_PROJECT_ID =
+"6a7f2add0011a7bfc21a";
+
+const APPWRITE_DATABASE_ID =
+"6a7f2d1d0035d9815939";
+
+const USER_PROFILES_TABLE =
+"user_profiles";
+
+const REWARD_CLAIMS_TABLE =
+"reward_claims";
+
+
+/* =========================================
+   REWARD CATALOG
+========================================= */
+
+const REWARDS = [
+
+  {
+    id:"bronze",
+    name:"Bronze Reward",
+    points:1000,
+    icon:"🥉"
+  },
+
+  {
+    id:"silver",
+    name:"Silver Reward",
+    points:3000,
+    icon:"🥈"
+  },
+
+  {
+    id:"gold",
+    name:"Gold Reward",
+    points:5000,
+    icon:"🥇"
+  },
+
+  {
+    id:"diamond",
+    name:"Diamond Reward",
+    points:10000,
+    icon:"💎"
+  }
+
+];
+
+
+/* =========================================
+   APPWRITE CLIENT
+========================================= */
+
+const client =
+new Appwrite.Client();
+
+client
+.setEndpoint(APPWRITE_ENDPOINT)
+.setProject(APPWRITE_PROJECT_ID);
+
+const account =
+new Appwrite.Account(client);
+
+const tablesDB =
+new Appwrite.TablesDB(client);
+
+
+/* =========================================
+   STATE
+========================================= */
+
+let currentUser = null;
+
+let currentProfile = null;
+
+let referralPoints = 0;
+
+let rewardPoints = 0;
+
+let redeemablePoints = 0;
+
+let claims = [];
+
+let claimRunning = false;
+
+
+/* =========================================
+   START
+========================================= */
+
+async function startRewardCenter(){
+
+  try{
+
+    currentUser =
+      await account.get();
+
+
+    document.getElementById(
+      "userName"
+    ).innerText =
+      currentUser.name || "Player";
+
+
+    document.getElementById(
+      "userEmail"
+    ).innerText =
+      currentUser.email || "";
+
+
+    await loadProfile();
+
+    await loadClaims();
+
+    renderRewards();
+
+    document.getElementById(
+      "loader"
+    ).classList.add(
+      "hidden"
+    );
+
+
+    document.getElementById(
+      "mainApp"
+    ).classList.remove(
+      "hidden"
+    );
+
+
+  }catch(error){
+
+    console.error(
+      "Reward Center start error:",
+      error
+    );
+
+    window.location.replace(
+      "login.html"
+    );
+
+  }
+
+}
+
+
+/* =========================================
+   LOAD PROFILE
+========================================= */
+
+async function loadProfile(){
+
+  currentProfile =
+    await tablesDB.getRow({
+
+      databaseId:
+        APPWRITE_DATABASE_ID,
+
+      tableId:
+        USER_PROFILES_TABLE,
+
+      rowId:
+        currentUser.$id
+
+    });
+
+
+  referralPoints =
+    Number(
+      currentProfile.referralPoints
+    ) || 0;
+
+
+  rewardPoints =
+    Number(
+      currentProfile.rewardPoints
+    ) || 0;
+
+
+  calculateBalance();
+
+}
+
+
+/* =========================================
+   BALANCE
+========================================= */
+
+function calculateBalance(){
+
+  redeemablePoints =
+    referralPoints +
+    rewardPoints;
+
+
+  document.getElementById(
+    "referralPoints"
+  ).innerText =
+    referralPoints.toLocaleString(
+      "en-IN"
+    );
+
+
+  document.getElementById(
+    "rewardPoints"
+  ).innerText =
+    rewardPoints.toLocaleString(
+      "en-IN"
+    );
+
+
+  document.getElementById(
+    "redeemablePoints"
+  ).innerText =
+    redeemablePoints.toLocaleString(
+      "en-IN"
+    );
+
+}
+
+
+/* =========================================
+   LOAD CLAIM HISTORY
+========================================= */
+
+async function loadClaims(){
+
+  try{
+
+    const response =
+      await tablesDB.listRows({
+
+        databaseId:
+          APPWRITE_DATABASE_ID,
+
+        tableId:
+          REWARD_CLAIMS_TABLE,
+
+        queries:[
+          Appwrite.Query.limit(100)
+        ],
+
+        total:false,
+
+        ttl:0
+
+      });
+
+
+    claims =
+      (response.rows || [])
+      .filter(
+        row =>
+          String(
+            row.userId || ""
+          ) ===
+          String(
+            currentUser.$id
+          )
+      )
+      .sort(
+        (a,b) => {
+
+          const dateA =
+            new Date(
+              a.claimedAt ||
+              a.$createdAt
+            ).getTime();
+
+          const dateB =
+            new Date(
+              b.claimedAt ||
+              b.$createdAt
+            ).getTime();
+
+          return dateB-dateA;
+
+        }
+      );
+
+
+  }catch(error){
+
+    console.error(
+      "Claim history load error:",
+      error
+    );
+
+    claims = [];
+
+  }
+
+
+  renderHistory();
+
+}
+
+
+/* =========================================
+   REWARD CARDS
+========================================= */
+
+function renderRewards(){
+
+  const container =
+    document.getElementById(
+      "rewardList"
+    );
+
+
+  container.innerHTML =
+    REWARDS.map(
+      reward => {
+
+        const enough =
+          redeemablePoints >=
+          reward.points;
+
+
+        const pending =
+          claims.some(
+            claim =>
+              String(
+                claim.rewardId || ""
+              ) === reward.id &&
+              String(
+                claim.status || ""
+              ).toUpperCase() ===
+              "PENDING"
+          );
+
+
+        let buttonText =
+          "CLAIM";
+
+
+        if(pending){
+
+          buttonText =
+            "PENDING";
+
+        }else if(!enough){
+
+          buttonText =
+            "LOCKED";
+
+        }
+
+
+        return (
+
+          '<div class="reward-card">' +
+
+            '<div class="reward-head">' +
+
+              '<div class="reward-icon">' +
+                reward.icon +
+              '</div>' +
+
+              '<div class="reward-info">' +
+
+                '<div class="reward-name">' +
+                  escapeHtml(
+                    reward.name
+                  ) +
+                '</div>' +
+
+                '<div class="reward-cost">' +
+                  reward.points.toLocaleString(
+                    "en-IN"
+                  ) +
+                  ' POINTS' +
+                '</div>' +
+
+              '</div>' +
+
+              '<button ' +
+                'class="claim-btn" ' +
+                'onclick="claimReward(\'' +
+                  reward.id +
+                '\')" ' +
+                (
+                  pending ||
+                  !enough
+                  ? 'disabled'
+                  : ''
+                ) +
+              '>' +
+
+                buttonText +
+
+              '</button>' +
+
+            '</div>' +
+
+            '<div class="reward-note">' +
+
+              (
+                pending
+                ? "Aapka claim approval ke liye pending hai."
+                : enough
+                  ? "Reward unlock ho gaya hai. Aap claim kar sakte hain."
+                  : (
+                    reward.points -
+                    redeemablePoints
+                  ).toLocaleString(
+                    "en-IN"
+                  ) +
+                  " aur points chahiye."
+              ) +
+
+            '</div>' +
+
+          '</div>'
+
+        );
+
+      }
+    )
+    .join("");
+
+}
+
+
+/* =========================================
+   CLAIM REWARD
+========================================= */
+
+async function claimReward(
+  rewardId
+){
+
+  if(claimRunning){
+    return;
+  }
+
+
+  const reward =
+    REWARDS.find(
+      item =>
+        item.id ===
+        rewardId
+    );
+
+
+  if(!reward){
+    return;
+  }
+
+
+  /* DUPLICATE PENDING CHECK */
+
+  const alreadyPending =
+    claims.some(
+      claim =>
+        String(
+          claim.rewardId || ""
+        ) === reward.id &&
+        String(
+          claim.status || ""
+        ).toUpperCase() ===
+        "PENDING"
+    );
+
+
+  if(alreadyPending){
+
+    showMessage(
+      "Is reward ka claim already pending hai.",
+      false
+    );
+
+    return;
+
+  }
+
+
+  /* BALANCE CHECK */
+
+  if(
+    redeemablePoints <
+    reward.points
+  ){
+
+    showMessage(
+      "Enough points nahi hain.",
+      false
+    );
+
+    return;
+
+  }
+
+
+  const ok =
+    confirm(
+      reward.name +
+      " ko " +
+      reward.points.toLocaleString(
+        "en-IN"
+      ) +
+      " points me claim karna hai?"
+    );
+
+
+  if(!ok){
+    return;
+  }
+
+
+  claimRunning =
+    true;
+
+
+  showMessage(
+    "Reward claim save ho raha hai...",
+    true
+  );
+
+
+  /*
+    DEDUCTION RULE:
+
+    Pehle rewardPoints use honge.
+    Agar wo kam hue to remaining
+    referralPoints se deduct hoga.
+  */
+
+  let newRewardPoints =
+    rewardPoints;
+
+  let newReferralPoints =
+    referralPoints;
+
+  let remaining =
+    reward.points;
+
+
+  if(
+    newRewardPoints >=
+    remaining
+  ){
+
+    newRewardPoints -=
+      remaining;
+
+    remaining = 0;
+
+  }else{
+
+    remaining -=
+      newRewardPoints;
+
+    newRewardPoints = 0;
+
+  }
+
+
+  if(remaining > 0){
+
+    newReferralPoints -=
+      remaining;
+
+  }
+
+
+  const oldRewardPoints =
+    rewardPoints;
+
+  const oldReferralPoints =
+    referralPoints;
+
+  const oldClaimed =
+    Number(
+      currentProfile.totalRewardsClaimed
+    ) || 0;
+
+
+  let createdClaim =
+    null;
+
+
+  try{
+
+    /* CREATE PENDING CLAIM */
+
+    createdClaim =
+      await tablesDB.createRow({
+
+        databaseId:
+          APPWRITE_DATABASE_ID,
+
+        tableId:
+          REWARD_CLAIMS_TABLE,
+
+        rowId:
+          Appwrite.ID.unique(),
+
+        data:{
+
+          userId:
+            currentUser.$id,
+
+          rewardId:
+            reward.id,
+
+          rewardName:
+            reward.name,
+
+          pointUsed:
+            Number(
+              reward.points
+            ),
+
+          status:
+            "PENDING",
+
+          claimedAt:
+            new Date().toISOString()
+
+        }
+
+      });
+
+
+    /* UPDATE USER BALANCE */
+
+    await tablesDB.updateRow({
+
+      databaseId:
+        APPWRITE_DATABASE_ID,
+
+      tableId:
+        USER_PROFILES_TABLE,
+
+      rowId:
+        currentUser.$id,
+
+      data:{
+
+        rewardPoints:
+          Number(
+            newRewardPoints
+          ),
+
+        referralPoints:
+          Number(
+            newReferralPoints
+          ),
+
+        totalRewardsClaimed:
+          Number(
+            oldClaimed + 1
+          )
+
+      }
+
+    });
+
+
+    rewardPoints =
+      newRewardPoints;
+
+    referralPoints =
+      newReferralPoints;
+
+    currentProfile.rewardPoints =
+      newRewardPoints;
+
+    currentProfile.referralPoints =
+      newReferralPoints;
+
+    currentProfile.totalRewardsClaimed =
+      oldClaimed + 1;
+
+
+    calculateBalance();
+
+
+    claims.unshift(
+      createdClaim
+    );
+
+
+    renderRewards();
+
+    renderHistory();
+
+
+    showMessage(
+      reward.name +
+      " claim submitted ✅",
+      true
+    );
+
+
+  }catch(error){
+
+    console.error(
+      "Reward claim error:",
+      error
+    );
+
+
+    /*
+      If profile update failed after
+      claim row creation, try to remove
+      incomplete claim.
+    */
+
+    if(
+      createdClaim &&
+      createdClaim.$id
+    ){
+
+      try{
+
+        await tablesDB.deleteRow({
+
+          databaseId:
+            APPWRITE_DATABASE_ID,
+
+          tableId:
+            REWARD_CLAIMS_TABLE,
+
+          rowId:
+            createdClaim.$id
+
+        });
+
+      }catch(deleteError){
+
+        console.error(
+          "Claim rollback error:",
+          deleteError
+        );
+
+      }
+
+    }
+
+
+    rewardPoints =
+      oldRewardPoints;
+
+    referralPoints =
+      oldReferralPoints;
+
+
+    calculateBalance();
+
+    renderRewards();
+
+
+    showMessage(
+      "Claim save nahi hua. Points deduct nahi kiye gaye.",
+      false
+    );
+
+  }
+
+
+  claimRunning =
+    false;
+
+}
+
+
+/* =========================================
+   HISTORY UI
+========================================= */
+
+function renderHistory(){
+
+  const list =
+    document.getElementById(
+      "historyList"
+    );
+
+
+  if(
+    claims.length === 0
+  ){
+
+    list.innerHTML =
+
+      '<div class="history-row">' +
+
+        '<div>' +
+
+          '<div class="history-name">' +
+            'Abhi koi reward claim nahi hai.' +
+          '</div>' +
+
+          '<div class="history-date">' +
+            'Points collect karke reward claim karo.' +
+          '</div>' +
+
+        '</div>' +
+
+      '</div>';
+
+    return;
+
+  }
+
+
+  list.innerHTML =
+    claims.map(
+      claim => {
+
+        const status =
+          String(
+            claim.status ||
+            "PENDING"
+          ).toUpperCase();
+
+
+        let statusClass =
+          "pending";
+
+
+        if(
+          status ===
+          "APPROVED"
+        ){
+
+          statusClass =
+            "approved";
+
+        }
+
+
+        if(
+          status ===
+          "REJECTED"
+        ){
+
+          statusClass =
+            "rejected";
+
+        }
+
+
+        const date =
+          new Date(
+            claim.claimedAt ||
+            claim.$createdAt
+          );
+
+
+        const dateText =
+          Number.isNaN(
+            date.getTime()
+          )
+          ? ""
+          : date.toLocaleString(
+              "en-IN"
+            );
+
+
+        return (
+
+          '<div class="history-row">' +
+
+            '<div>' +
+
+              '<div class="history-name">' +
+                escapeHtml(
+                  claim.rewardName ||
+                  "Reward"
+                ) +
+              '</div>' +
+
+              '<div class="history-date">' +
+                escapeHtml(
+                  dateText
+                ) +
+              '</div>' +
+
+            '</div>' +
+
+            '<div>' +
+
+              '<div class="history-status ' +
+                statusClass +
+              '">' +
+                escapeHtml(
+                  status
+                ) +
+              '</div>' +
+
+              '<div class="history-points">' +
+                '-' +
+                Number(
+                  claim.pointUsed
+                ).toLocaleString(
+                  "en-IN"
+                ) +
+                ' pts' +
+              '</div>' +
+
+            '</div>' +
+
+          '</div>'
+
+        );
+
+      }
+    )
+    .join("");
+
+}
+
+
+/* =========================================
+   MESSAGE
+========================================= */
+
+function showMessage(
+  text,
+  success
+){
+
+  const message =
+    document.getElementById(
+      "message"
+    );
+
+
+  message.style.color =
+    success
+    ? "#60ff9a"
+    : "#ff6b87";
+
+
+  message.innerText =
+    text;
+
+
+  setTimeout(
+    () => {
+
+      message.innerText = "";
+
+    },
+    4000
+  );
+
+}
+
+
+/* =========================================
+   ESCAPE HTML
+========================================= */
+
+function escapeHtml(value){
+
+  return String(
+    value ?? ""
+  )
+  .replace(/&/g,"&amp;")
+  .replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;")
+  .replace(/'/g,"&#039;");
+
+}
+
+
+/* =========================================
+   START
+========================================= */
+
+startRewardCenter();
+
+</script>
+
+</body>
+</html>
