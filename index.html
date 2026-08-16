@@ -987,6 +987,8 @@ if(won){
 outcome.className="outcome win";
 outcome.innerText="🔥 X-TREME WIN 🔥";
 
+addGameRewardPoints(100);  
+
 document.getElementById("coinChange").innerText=
 "+"+netChange.toLocaleString("en-IN")+" coins";
 
@@ -1255,7 +1257,38 @@ console.error("Service worker error:",error);
 
 });
 }
+async function addGameRewardPoints(points){
 
+  try{
+
+    const user = await account.get();
+
+    const profile = await tablesDB.getRow({
+      databaseId: APPWRITE_DATABASE_ID,
+      tableId: USER_PROFILES_TABLE,
+      rowId: user.$id
+    });
+
+    const oldPoints =
+      Number(profile.rewardPoints) || 0;
+
+    await tablesDB.updateRow({
+      databaseId: APPWRITE_DATABASE_ID,
+      tableId: USER_PROFILES_TABLE,
+      rowId: user.$id,
+      data:{
+        rewardPoints: oldPoints + Number(points)
+      }
+    });
+
+    console.log("Game reward +" + points + " ✅");
+
+  }catch(error){
+
+    console.error("Game reward points error:", error);
+
+  }
+}
 startApp();
 </script>
 </body>
