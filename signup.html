@@ -346,23 +346,70 @@ idPart
 
 async function prepareSignupPage(){
 
-try{
+  const hasReferral =
+    new URLSearchParams(window.location.search).has("ref");
 
-await account.get();
+  try{
 
-window.location.replace("index.html");
+    const user = await account.get();
 
-return;
+    if(hasReferral){
 
-}catch(error){
+      button.disabled = true;
+      button.innerText = "LOGOUT REQUIRED";
 
-button.disabled=false;
+      message.style.color = "#ffcf79";
+      message.innerHTML =
+        'Aap already <b>' +
+        (user.email || "logged in") +
+        '</b> account se logged in ho.<br><br>' +
+        '<button type="button" onclick="logoutForReferralSignup()" ' +
+        'style="margin-top:10px;padding:12px;border:0;border-radius:12px;font-weight:900;cursor:pointer;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);">' +
+        'LOGOUT & CREATE NEW ACCOUNT' +
+        '</button>';
 
-button.innerText=
-"ACTIVATE ACCOUNT";
+      return;
+    }
 
-message.innerText="";
+    window.location.replace("index.html");
 
+  }catch(error){
+
+    button.disabled = false;
+    button.innerText = "ACTIVATE ACCOUNT";
+    message.innerText = "";
+
+  }
+}
+
+
+async function logoutForReferralSignup(){
+
+  try{
+
+    message.style.color = "#ffcf79";
+    message.innerText = "Logging out...";
+
+    await account.deleteSession({
+      sessionId:"current"
+    });
+
+    button.disabled = false;
+    button.innerText = "ACTIVATE ACCOUNT";
+
+    message.style.color = "#60ff9a";
+    message.innerText =
+      "Logout successful ✅ Ab naya account banao.";
+
+  }catch(error){
+
+    console.error("Referral logout error:", error);
+
+    message.style.color = "#ff6b87";
+    message.innerText =
+      "Logout nahi hua. Page refresh karke dobara try karo.";
+
+  }
 }
 
 }
