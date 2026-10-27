@@ -57,7 +57,7 @@ async function startApp(){
 async function loadUserProfile(){
  const response=await tablesDB.listRows({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,queries:[Appwrite.Query.limit(100)]});
  profile=(response.rows||[]).find(row=>String(row.userId)===String(currentUser.$id))||null;
- if(!profile){profile=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:currentUser.$id,data:{userId:currentUser.$id,name:currentUser.name||'Player',email:currentUser.email||'',wallet:10000,wins:0,losses:0,rounds:0}})}
+ if(!profile){profile=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:currentUser.$id,data:{userId:currentUser.$id,name:currentUser.name||'Player',email:currentUser.email||'',wallet:0,wins:0,losses:0,rounds:0}})}
  profileRowId=profile.$id;wallet=Number(profile.wallet);if(!Number.isFinite(wallet))wallet=0;
  winsCount=Number(profile.wins)||0;lossesCount=Number(profile.losses)||0;roundsCount=Number(profile.rounds)||0;roundId=1001+roundsCount;updateProfileUI();
 }
