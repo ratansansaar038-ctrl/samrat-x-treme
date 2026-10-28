@@ -96,7 +96,12 @@ export default async ({ req, res, log, error }) => {
   }
 
   const actorId = req.headers["x-appwrite-user-id"];
-  const env = process.env;
+  
+const env = {
+  ...process.env,
+  APPWRITE_API_KEY: req.headers["x-appwrite-key"]
+};
+  
 
   if (!actorId ||
       !env.ADMIN_USER_ID ||
