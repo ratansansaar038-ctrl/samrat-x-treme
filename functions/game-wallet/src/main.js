@@ -104,6 +104,14 @@ export default async ({ req, res, error }) => {
     }, 400);
   }
 
+  if (body?.action === "play" ||
+      body?.action === "settle") {
+    return res.json({
+      ok: false,
+      error: "Secure game settlement not enabled"
+    }, 503);
+  }
+
   if (body?.action !== "get_wallet") {
     return res.json({
       ok: false,
