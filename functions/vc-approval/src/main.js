@@ -250,7 +250,8 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
-    if (claim.status !== "pending") {
+    // Accept both PENDING and pending.
+    if (String(claim.status || "").toLowerCase() !== "pending") {
       return respond(res, 409, {
         ok: false,
         error: "Claim is not pending",
@@ -267,15 +268,23 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
-    // Reward approval does not deduct wallet balance again.
+    // Preserve the status style already used by the claim.
+    const currentStatus = String(claim.status || "");
+    const nextStatus =
+      currentStatus === currentStatus.toUpperCase()
+        ? decision.toUpperCase()
+        : decision;
+
+    // Points were deducted at claim creation.
+    // Do not deduct them again here.
     const updated = await apiRequest(
       "PATCH",
       `${claimsPath}/${encodeURIComponent(claimId)}`,
-      { data: { status: decision } },
+      { data: { status: nextStatus } },
       env
     );
 
-    log(`Claim ${claimId} moved to ${decision}`);
+    log(`Claim ${claimId} moved to ${nextStatus}`);
 
     return respond(res, 200, {
       ok: true,
