@@ -3,7 +3,7 @@ import https from "node:https";
 
 const respond = (res, status, data) => res.json(data, status);
 
-const validId = (value) =>
+const validId = value =>
   typeof value === "string" &&
   /^[a-zA-Z0-9._-]{1,36}$/.test(value);
 
@@ -40,22 +40,19 @@ function apiRequest(method, path, data, env, queries = []) {
           : {})
       },
       timeout: 12000
-    }, (response) => {
+    }, response => {
       let text = "";
-
       response.setEncoding("utf8");
 
-      response.on("data", (chunk) => {
+      response.on("data", chunk => {
         text += chunk;
-
-        if (text.length > 1024 * 1024) {
+        if (text.length > 1048576) {
           response.destroy(new Error("Response too large"));
         }
       });
 
       response.on("end", () => {
         let body;
-
         try {
           body = text ? JSON.parse(text) : {};
         } catch {
@@ -64,11 +61,12 @@ function apiRequest(method, path, data, env, queries = []) {
 
         if (response.statusCode < 200 ||
             response.statusCode >= 300) {
-          return reject(new Error(
-            `Appwrite API HTTP ${response.statusCode}: ` +
-            String(body?.type || body?.message || "request failed")
+          const err = new Error(
+            String(body?.message || body?.type || "API error")
               .slice(0, 160)
-          ));
+          );
+          err.status = response.statusCode;
+          return reject(err);
         }
 
         resolve(body);
@@ -76,13 +74,11 @@ function apiRequest(method, path, data, env, queries = []) {
     });
 
     request.on("timeout", () =>
-      request.destroy(new Error("API connection timed out"))
+      request.destroy(new Error("API timeout"))
     );
 
     request.on("error", reject);
-
     if (payload) request.write(payload);
-
     request.end();
   });
 }
@@ -91,19 +87,17 @@ export default async ({ req, res, log, error }) => {
   if (req.method !== "POST") {
     return respond(res, 405, {
       ok: false,
-      error: "Method not allowed"
+      error: "POST required"
     });
   }
 
-  const actorId = req.headers["x-appwrite-user-id"];
   const env = process.env;
+  const actorId = req.headers["x-appwrite-user-id"];
 
-  if (!actorId ||
-      !env.ADMIN_USER_ID ||
-      actorId !== env.ADMIN_USER_ID) {
-    return respond(res, 403, {
+  if (!validId(actorId)) {
+    return respond(res, 401, {
       ok: false,
-      error: "Admin access required"
+      error: "Login required"
     });
   }
 
@@ -119,7 +113,6 @@ export default async ({ req, res, log, error }) => {
   }
 
   let input;
-
   try {
     input = typeof req.body === "string"
       ? JSON.parse(req.body)
@@ -131,27 +124,171 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
+  if (!input || typeof input !== "object") {
+    return respond(res, 400, {
+      ok: false,
+      error: "Invalid body"
+    });
+  }
+
   const dbPath =
     `/tablesdb/${encodeURIComponent(env.APPWRITE_DATABASE_ID)}/tables`;
 
   const profilePath =
     `${dbPath}/${encodeURIComponent(env.USERS_PROFILES_TABLE_ID)}/rows`;
 
-  const findProfile = async (userId) => {
-    const queries = [
-      { method: "equal", attribute: "userId", values: [userId] },
-      { method: "limit", values: [2] }
-    ];
-
+  const findProfile = async userId => {
     const result = await apiRequest(
-      "GET", profilePath, undefined, env, queries
+      "GET",
+      profilePath,
+      undefined,
+      env,
+      [
+        {
+          method: "equal",
+          attribute: "userId",
+          values: [userId]
+        },
+        {
+          method: "limit",
+          values: [2]
+        }
+      ]
     );
 
-    return result.rows?.length === 1 ? result.rows[0] : null;
+    return result.rows?.length === 1
+      ? result.rows[0]
+      : null;
   };
 
+  // SECURE REFERRAL REGISTRATION
+  // Referral row ID = authenticated user's ID.
+  // Reward points are not granted yet.
+
+  if (input.action === "register_referral") {
+    try {
+      const profile = await findProfile(actorId);
+
+      if (!profile || profile.userId !== actorId) {
+        return respond(res, 404, {
+          ok: false,
+          error: "Profile not found"
+        });
+      }
+
+      const code = String(
+        profile.referredBy || ""
+      ).trim().toUpperCase();
+
+      if (!/^[A-Z0-9]{2,32}$/.test(code)) {
+        return respond(res, 400, {
+          ok: false,
+          error: "No valid signup referral code"
+        });
+      }
+
+      const result = await apiRequest(
+        "GET",
+        profilePath,
+        undefined,
+        env,
+        [
+          {
+            method: "equal",
+            attribute: "referralCode",
+            values: [code]
+          },
+          {
+            method: "limit",
+            values: [2]
+          }
+        ]
+      );
+
+      if (result.rows?.length !== 1) {
+        return respond(res, 404, {
+          ok: false,
+          error: "Referrer not uniquely found"
+        });
+      }
+
+      const referrer = result.rows[0];
+
+      if (!validId(referrer.userId) ||
+          referrer.userId === actorId) {
+        return respond(res, 409, {
+          ok: false,
+          error: "Self referral or invalid referrer"
+        });
+      }
+
+      const referralsPath =
+        `${dbPath}/${encodeURIComponent(
+          env.REFERRALS_TABLE_ID || "referrals"
+        )}/rows`;
+
+      try {
+        const row = await apiRequest(
+          "POST",
+          referralsPath,
+          {
+            rowId: actorId,
+            data: {
+              refrrerUserId: referrer.userId,
+              referredUserId: actorId,
+              referralCode: code,
+              createdAt: new Date().toISOString(),
+              points: 0
+            }
+          },
+          env
+        );
+
+        log(`Referral registered for ${actorId}`);
+
+        return respond(res, 200, {
+          ok: true,
+          action: "register_referral",
+          referralId: row.$id,
+          status: "recorded",
+          rewardStatus: "paused"
+        });
+
+      } catch (err) {
+        if (err.status === 409) {
+          return respond(res, 200, {
+            ok: true,
+            action: "register_referral",
+            status: "already_recorded",
+            rewardStatus: "paused"
+          });
+        }
+        throw err;
+      }
+
+    } catch (err) {
+      error(`Referral error: ${err.message}`);
+
+      return respond(res, 500, {
+        ok: false,
+        error: "Referral registration failed"
+      });
+    }
+  }
+
+  // ADMIN AUTHORIZATION
+
+  if (!env.ADMIN_USER_ID ||
+      actorId !== env.ADMIN_USER_ID) {
+    return respond(res, 403, {
+      ok: false,
+      error: "Admin access required"
+    });
+  }
+
   // ADMIN ADD VC
-  if (input?.action === "add_vc") {
+
+  if (input.action === "add_vc") {
     const { userId, amount } = input;
 
     if (!validId(userId) ||
@@ -188,11 +325,15 @@ export default async ({ req, res, log, error }) => {
       const updated = await apiRequest(
         "PATCH",
         `${profilePath}/${encodeURIComponent(profile.$id)}`,
-        { data: { wallet: previous + amount } },
+        {
+          data: {
+            wallet: previous + amount
+          }
+        },
         env
       );
 
-      log(`Admin granted ${amount} VC to profile ${profile.$id}`);
+      log(`Admin granted ${amount} VC to ${profile.$id}`);
 
       return respond(res, 200, {
         ok: true,
@@ -202,8 +343,9 @@ export default async ({ req, res, log, error }) => {
         previous,
         balance: updated.wallet
       });
-    } catch (e) {
-      error(`VC grant error: ${e?.message || "unknown"}`);
+
+    } catch (err) {
+      error(`VC grant error: ${err.message}`);
 
       return respond(res, 500, {
         ok: false,
@@ -213,6 +355,7 @@ export default async ({ req, res, log, error }) => {
   }
 
   // REWARD APPROVAL
+
   if (!env.REWARD_CLAIMS_TABLE_ID) {
     return respond(res, 503, {
       ok: false,
@@ -220,7 +363,7 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
-  const { claimId, decision } = input || {};
+  const { claimId, decision } = input;
 
   if (!validId(claimId) ||
       !["approved", "rejected"].includes(decision)) {
@@ -250,7 +393,6 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
-    // Accept both PENDING and pending.
     if (String(claim.status || "").toLowerCase() !== "pending") {
       return respond(res, 409, {
         ok: false,
@@ -268,19 +410,21 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
-    // Preserve the status style already used by the claim.
     const currentStatus = String(claim.status || "");
+
     const nextStatus =
       currentStatus === currentStatus.toUpperCase()
         ? decision.toUpperCase()
         : decision;
 
-    // Points were deducted at claim creation.
-    // Do not deduct them again here.
     const updated = await apiRequest(
       "PATCH",
       `${claimsPath}/${encodeURIComponent(claimId)}`,
-      { data: { status: nextStatus } },
+      {
+        data: {
+          status: nextStatus
+        }
+      },
       env
     );
 
@@ -291,8 +435,9 @@ export default async ({ req, res, log, error }) => {
       claimId: updated.$id,
       status: updated.status
     });
-  } catch (e) {
-    error(`Approval error: ${e?.message || "unknown"}`);
+
+  } catch (err) {
+    error(`Approval error: ${err.message}`);
 
     return respond(res, 500, {
       ok: false,
@@ -300,3 +445,4 @@ export default async ({ req, res, log, error }) => {
     });
   }
 };
+                       
