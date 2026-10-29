@@ -1,546 +1,109 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#090713">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Samrat X-Treme">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08010f"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Samrat X-Treme">
 <meta name="google-site-verification" content="YeulG82nJTfbib13P0WZ3deouTltaCzyV_VIGgQ1wGQ">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Samrat X-Treme | Skill Gaming</title>
-<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.2"></script>
-
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<title>Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 <style>
-:root{
-  --bg:#090713;
-  --card:#171326;
-  --line:#302845;
-  --gold:#ffcc64;
-  --purple:#a16bff;
-  --text:#f7f3ff;
-  --muted:#aaa1be;
-  --green:#5be3aa;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  background:radial-gradient(ellipse at top,#271345,#090713 65%);
-  color:var(--text);
-  font-family:system-ui,-apple-system,Arial,sans-serif;
-  min-height:100vh;
-}
-button,a{-webkit-tap-highlight-color:transparent}
-a{color:inherit;text-decoration:none}
-.container{max-width:560px;margin:auto;padding:18px}
-header{
-  display:flex;align-items:center;
-  justify-content:space-between;gap:10px;
-  margin-bottom:20px;
-}
-.brand{font-weight:900;font-size:22px;letter-spacing:.5px}
-.brand span{color:var(--gold)}
-.subbrand{font-size:10px;letter-spacing:2px;color:var(--muted)}
-button{
-  cursor:pointer;border:0;font:inherit;
-}
-.logout{
-  background:#211a31;color:#ddd;
-  padding:10px 14px;border:1px solid var(--line);
-  border-radius:12px;font-size:12px;
-}
-.hero{
-  padding:26px 20px;border-radius:24px;
-  background:linear-gradient(145deg,#40206c,#1b1531 70%);
-  border:1px solid #5b3d88;text-align:center;
-  box-shadow:0 15px 40px #0005;
-}
-.hero .eyebrow{
-  color:var(--gold);font-size:11px;
-  font-weight:800;letter-spacing:2px;
-}
-.hero h1{font-size:34px;line-height:1.1;margin:12px 0}
-.hero p{font-size:13px;color:#d0c4e3;line-height:1.6}
-.pill{
-  display:inline-block;background:#36264c;
-  border:1px solid #694c91;color:#ead6ff;
-  padding:8px 12px;border-radius:30px;
-  font-size:11px;font-weight:700;
-}
-.card{
-  margin-top:16px;background:var(--card);
-  border:1px solid var(--line);
-  border-radius:20px;padding:20px;
-}
-.card-title{
-  font-size:12px;color:var(--muted);
-  font-weight:800;letter-spacing:1.4px;
-  text-transform:uppercase;
-}
-.wallet-number{
-  font-size:39px;font-weight:900;
-  color:var(--gold);margin:8px 0;
-}
-.wallet-number small{font-size:14px;color:#d9c6a0}
-.row{
-  display:flex;justify-content:space-between;
-  align-items:center;gap:10px;
-}
-.user-name{font-size:14px;font-weight:700}
-.user-email{
-  font-size:11px;color:var(--muted);
-  overflow-wrap:anywhere;margin-top:4px;
-}
-.status{
-  font-size:11px;padding:7px 10px;
-  border-radius:20px;background:#35271b;
-  color:var(--gold);font-weight:700;
-}
-.stats{
-  display:grid;grid-template-columns:repeat(3,1fr);
-  gap:10px;margin-top:14px;
-}
-.stat{
-  text-align:center;background:#100d1d;
-  border:1px solid var(--line);
-  border-radius:14px;padding:15px 8px;
-}
-.stat strong{display:block;font-size:22px}
-.stat span{font-size:11px;color:var(--muted)}
-.notice{
-  border:1px solid #72512c;
-  background:#2a201b;border-radius:16px;
-  padding:16px;line-height:1.6;
-  font-size:13px;color:#f1d4a7;
-  margin-top:16px;
-}
-.numbers{
-  display:grid;grid-template-columns:repeat(3,1fr);
-  gap:10px;margin-top:16px;
-}
-.number{
-  border:1px solid #4b385e;
-  border-radius:14px;padding:19px 8px;
-  text-align:center;background:#20172f;
-  color:#b9a8d2;font-size:24px;font-weight:900;
-  opacity:.55;
-}
-.stakes{
-  display:flex;flex-wrap:wrap;gap:8px;
-  margin-top:16px;
-}
-.stake{
-  flex:1;min-width:55px;
-  padding:12px 8px;border-radius:12px;
-  background:#241b34;color:#c2b4d4;
-  border:1px solid #49365c;
-  font-size:13px;font-weight:800;
-  opacity:.6;
-}
-.primary{
-  display:block;width:100%;
-  background:linear-gradient(90deg,#9868df,#f0b856);
-  color:#120d19;padding:16px;border-radius:14px;
-  font-size:15px;font-weight:900;margin-top:18px;
-}
-.primary:disabled{
-  opacity:.45;cursor:not-allowed;
-}
-.menu{
-  display:grid;grid-template-columns:1fr 1fr;
-  gap:10px;margin-top:16px;
-}
-.menu a{
-  padding:16px 10px;border:1px solid var(--line);
-  border-radius:15px;background:#1c172b;
-  text-align:center;font-size:13px;font-weight:700;
-}
-.menu a span{display:block;font-size:23px;margin-bottom:8px}
-.history-item{
-  padding:12px 0;border-bottom:1px solid var(--line);
-  font-size:12px;
-}
-.history-item:last-child{border:0}
-.history-main{font-weight:800}
-.history-sub{color:var(--muted);margin-top:4px}
-.history-change{font-weight:900;color:var(--gold)}
-.empty{
-  text-align:center;color:var(--muted);
-  padding:20px 5px;font-size:13px;
-}
-footer{
-  text-align:center;color:#817591;
-  padding:28px 12px;font-size:11px;
-  line-height:1.7;
-}
-.hidden{display:none}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#38115d 0,#12051f 38%,#050108 76%,#000);color:white;font-family:Arial,Helvetica,sans-serif}button,a{font:inherit}button{cursor:pointer}a{color:inherit}.app{display:none;max-width:480px;margin:auto;padding:18px 14px 42px}.app.ready{display:block}.auth-loader{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;color:#d3c1f1}.loader-ring{width:40px;height:40px;border:4px solid #3e2658;border-top-color:#ffce47;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.hero{text-align:center;padding:15px 5px 20px;background:radial-gradient(ellipse at center,#481574 0,transparent 72%)}.hero-inner{display:flex;align-items:center;justify-content:center;gap:12px}.crown{font-size:59px;color:#ffd96b;text-shadow:0 0 18px #bd65ff}.brand{text-align:left}.brand-name{font:bold clamp(30px,9vw,44px) Georgia,serif;color:#ffda70;line-height:1}.brand-sub{font-size:26px;font-style:italic;font-weight:900;letter-spacing:2px;color:#e5c5ff}.brand-tag{font-size:9px;letter-spacing:2px;color:#c9acd9;margin-top:5px}.topbar,.account-bar{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:13px;background:linear-gradient(135deg,#171027,#291049);border:1px solid #7046d8;border-radius:17px;margin-bottom:10px}.topbar{box-shadow:0 0 18px #6e34ff33}.wallet-title{font-size:10px;color:#c9b5ff;letter-spacing:1.2px}.wallet{font-size:22px;font-weight:900;color:#ffdf63;margin-top:3px}.live-badge{display:flex;align-items:center;gap:6px;padding:8px;border-radius:20px;border:1px solid #7152bd;font-size:10px;font-weight:900}.live-dot{width:8px;height:8px;background:#35ff8a;border-radius:50%;box-shadow:0 0 8px #35ff8a}.live-dot.offline{background:#ff4c72;box-shadow:0 0 8px #ff4c72}.account-bar{background:#10091e;border-color:#352455}.user-info{min-width:0}.user-name{font-size:12px;color:#ffe16b;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.user-email{font-size:9px;color:#9787ac;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logout-btn{border:1px solid #8d55df;border-radius:11px;background:#45175c;color:#fff;font-size:10px;font-weight:900;padding:10px;flex-shrink:0}.quick-menu{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:13px 0 16px}.quick-link{text-align:center;text-decoration:none;padding:13px 3px;background:linear-gradient(145deg,#2b1454,#130922);border:1px solid #753fc2;border-radius:15px;font-size:10px;font-weight:900}.quick-link span{display:block;font-size:23px;margin-bottom:6px}.install-wrap{display:none;margin:10px 0}.install-wrap.show{display:block}.install-btn{width:100%;border:1px solid #a27bf3;background:linear-gradient(90deg,#45238d,#a32ac1);color:white;border-radius:14px;padding:12px;font-weight:900}
+.market{display:grid;grid-template-columns:1fr 1fr;gap:10px}.market-card{min-width:0;background:linear-gradient(145deg,#16102e,#27134a);border:1px solid #5943a4;border-radius:17px;padding:14px 11px;box-shadow:0 0 18px #482b9b44}.market-name{font-size:10px;color:#c2b4df}.market-price{margin-top:8px;font-size:17px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.btc{color:#ffb33a}.gold{color:#ffe168}.updated{margin-top:7px;color:#8d80a0;font-size:9px}.round-box{display:flex;justify-content:space-between;margin-top:12px;padding:10px 12px;background:#10091e;border:1px solid #35264f;border-radius:13px;color:#a89bbd;font-size:10px}.section-title{text-align:center;font-size:12px;font-weight:900;color:#d3c3ff;letter-spacing:1.4px;margin:21px 0 12px}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.number{height:68px;border-radius:17px;border:2px solid #6944b8;background:linear-gradient(145deg,#18102e,#341463);color:#fff;font-size:27px;font-weight:900;box-shadow:0 0 12px #6a30aa44}.number.selected{border-color:#fff4a7;color:#2a0712;background:linear-gradient(145deg,#fff45b,#ff9c00,#ff4d00);box-shadow:0 0 21px #ffae00aa}.coins{display:flex;gap:9px}.coin{flex:1;padding:13px 4px;border:1px solid #6f4cc0;border-radius:13px;background:#171027;color:white;font-size:13px;font-weight:900}.coin.active{background:linear-gradient(135deg,#6332ff,#e82ebd);border-color:#f1bcff}.lock{width:100%;padding:17px 8px;margin-top:20px;border:0;border-radius:17px;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);color:#260617;font-size:17px;font-weight:900;box-shadow:0 0 20px #ff7d0055}.lock:disabled{opacity:.48;box-shadow:none}.message{min-height:28px;text-align:center;margin-top:14px;font-size:12px;color:#ffd2f1;font-weight:700}.result{display:none;margin-top:18px;border:1px solid #8053df;border-radius:20px;padding:18px;text-align:center;background:linear-gradient(145deg,#131023,#271448)}.result.show{display:block}.result-title{font-size:11px;letter-spacing:2px;color:#bca9ff}.winning-number{width:105px;height:105px;margin:14px auto;display:flex;align-items:center;justify-content:center;border:4px solid #fff5cb;border-radius:50%;background:linear-gradient(145deg,#fff452,#ffae00,#ff5b00);color:#240015;font-size:53px;font-weight:900;box-shadow:0 0 28px #ff8c0099}.outcome{font-size:25px;font-weight:900}.win{color:#56ff94}.lose{color:#ff5876}.coin-change{font-size:17px;font-weight:900;color:#ffe48e;margin-top:7px}.snapshot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.snap{padding:10px;background:#0b0713;border:1px solid #312344;border-radius:11px;font-size:10px;color:#a89dbd}.snap strong{display:block;margin-top:5px;color:white;font-size:12px}.formula{margin-top:12px;padding:12px 8px;background:#090611;border:1px solid #2b2038;border-radius:12px;color:#bdb2cf;font-size:11px;line-height:1.7}.formula b{color:#ffe264}.new-round{margin-top:14px;padding:12px 20px;border:1px solid #805fd3;border-radius:12px;background:#241449;color:white;font-weight:900}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:19px}.stat{text-align:center;padding:11px 3px;background:#100a1d;border:1px solid #302443;border-radius:13px}.stat-value{color:#ffe168;font-size:18px;font-weight:900}.stat-name{font-size:9px;color:#857b99;margin-top:4px}.history-card{margin-top:18px;background:#0d0817;border:1px solid #35264e;border-radius:16px;padding:13px}.history-title{font-size:11px;font-weight:900;letter-spacing:1px;color:#cabaff;margin-bottom:9px}.history-list{max-height:260px;overflow:auto}.history-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px 2px;border-bottom:1px solid #241932;font-size:10px}.history-row:last-child{border:0}.history-main{color:#bbb0cd}.history-sub{color:#756a86;font-size:9px;margin-top:4px}.history-win{color:#4fff8d;font-weight:900}.history-loss{color:#ff5779;font-weight:900}.warning{text-align:center;color:#877b93;font-size:10px;line-height:1.6;margin-top:25px}@media(max-width:350px){.market{grid-template-columns:1fr}.crown{font-size:42px}.brand-sub{font-size:20px}}
 </style>
 </head>
-
 <body>
-<div class="container">
-
-<header>
-  <div>
-    <div class="brand">SAMRAT <span>X-TREME</span></div>
-    <div class="subbrand">THE SKILL ARENA</div>
-  </div>
-  <button class="logout" id="logoutBtn">LOGOUT</button>
-</header>
-
-<section class="hero">
-  <div class="eyebrow">WELCOME TO THE ARENA</div>
-  <h1>PLAY SMART.<br>RISE HIGH.</h1>
-  <p>
-    A virtual-coin gaming experience with
-    market-inspired challenges.
-  </p>
-  <span class="pill">SECURITY UPGRADE IN PROGRESS</span>
-</section>
-
-<section class="card">
-  <div class="row">
-    <div>
-      <div class="user-name" id="userName">Loading...</div>
-      <div class="user-email" id="userEmail"></div>
-    </div>
-    <span class="status" id="accountStatus">CONNECTING</span>
-  </div>
-
-  <div style="margin-top:20px">
-    <div class="card-title">Your Virtual Coin Wallet</div>
-    <div class="wallet-number">
-      <span id="wallet">—</span>
-      <small>VC</small>
-    </div>
-    <div class="user-email" id="walletMessage">
-      Reading your existing wallet...
-    </div>
-  </div>
-
-  <div class="stats">
-    <div class="stat">
-      <strong id="totalGames">—</strong>
-      <span>ROUNDS</span>
-    </div>
-    <div class="stat">
-      <strong id="wins">—</strong>
-      <span>WINS</span>
-    </div>
-    <div class="stat">
-      <strong id="losses">—</strong>
-      <span>LOSSES</span>
-    </div>
-  </div>
-</section>
-
-<div class="notice">
-  🔒 <strong>Game temporarily paused</strong>
-  <div>
-    Secure server-side game settlement is being prepared.
-    Your existing wallet balance is not modified by this page.
-  </div>
-</div>
-
-<section class="card">
-  <div class="row">
-    <div class="card-title">X-Treme Number Challenge</div>
-    <span class="status">PAUSED</span>
-  </div>
-
-  <p style="font-size:13px;color:var(--muted)">
-    Choose a number from 1 to 9 when secure gameplay resumes.
-  </p>
-
-  <div class="numbers" id="numberGrid">
-    <div class="number">1</div>
-    <div class="number">2</div>
-    <div class="number">3</div>
-    <div class="number">4</div>
-    <div class="number">5</div>
-    <div class="number">6</div>
-    <div class="number">7</div>
-    <div class="number">8</div>
-    <div class="number">9</div>
-  </div>
-
-  <div class="card-title" style="margin-top:20px">
-    Virtual Coin Entry
-  </div>
-
-  <div class="stakes">
-    <div class="stake">20 VC</div>
-    <div class="stake">50 VC</div>
-    <div class="stake">75 VC</div>
-    <div class="stake">100 VC</div>
-    <div class="stake">150 VC</div>
-  </div>
-
-  <button class="primary" id="playButton" disabled>
-    🔒 GAME TEMPORARILY PAUSED
-  </button>
-</section>
-
-<section class="menu">
-  <a href="profile.html">
-    <span>👤</span>My Profile
-  </a>
-  <a href="referral.html">
-    <span>🤝</span>Referral
-  </a>
-  <a href="reward.html">
-    <span>🎁</span>Rewards
-  </a>
-  <a href="admin-add-vc.html">
-    <span>🪙</span>Admin VC
-  </a>
-</section>
-
-<section class="card">
-  <div class="row">
-    <div class="card-title">Recent Game History</div>
-    <span class="status">READ ONLY</span>
-  </div>
-  <div id="historyList">
-    <div class="empty">Loading history...</div>
-  </div>
-</section>
-
-<footer>
-  SAMRAT X-TREME<br>
-  Virtual coins are not cash and have no cash withdrawal value.<br>
-  © 2026 Samrat X-Treme
-</footer>
-
-</div>
-
+<div class="auth-loader" id="authLoader"><div class="loader-ring"></div><div id="loaderText">Checking Samrat X-Treme account...</div></div>
+<main class="app" id="mainApp">
+<header class="hero"><div class="hero-inner"><div class="crown" aria-hidden="true">♛</div><div class="brand"><div class="brand-name">SAMRAT</div><div class="brand-sub">X-TREME</div><div class="brand-tag">PREDICT · PLAY · WIN</div></div></div></header>
+<div class="topbar"><div><div class="wallet-title">X-TREME WALLET</div><div class="wallet">🪙 <span id="wallet">0</span></div></div><div class="live-badge"><span class="live-dot offline" id="liveDot"></span><span id="marketStatus">CONNECTING</span></div></div>
+<div class="account-bar"><div class="user-info"><div class="user-name" id="userName">Player</div><div class="user-email" id="userEmail"></div></div><button class="logout-btn" id="logoutButton" onclick="logoutUser()">LOGOUT</button></div>
+<nav class="quick-menu" aria-label="Player menu"><a class="quick-link" href="referral.html"><span>🎁</span>REFERRAL</a><a class="quick-link" href="reward.html"><span>👑</span>REWARD</a><a class="quick-link" href="profile.html"><span>👤</span>PROFILE</a></nav>
+<div class="install-wrap" id="installWrap"><button class="install-btn" id="installButton">📲 INSTALL SAMRAT X-TREME</button></div>
+<div class="market"><div class="market-card"><div class="market-name">₿ BTC / USDT</div><div class="market-price btc" id="btcPrice">Loading...</div><div class="updated" id="btcUpdated">Connecting to market</div></div><div class="market-card"><div class="market-name">GOLD / XAU-USD</div><div class="market-price gold" id="goldPrice">Loading...</div><div class="updated" id="goldUpdated">Connecting to market</div></div></div>
+<div class="round-box"><span>ROUND <b id="roundId">1001</b></span><span>LIVE SNAPSHOT GAME</span></div>
+<div class="section-title">CHOOSE YOUR NUMBER</div><div class="numbers"><button class="number" onclick="selectNumber(1,this)">1</button><button class="number" onclick="selectNumber(2,this)">2</button><button class="number" onclick="selectNumber(3,this)">3</button><button class="number" onclick="selectNumber(4,this)">4</button><button class="number" onclick="selectNumber(5,this)">5</button><button class="number" onclick="selectNumber(6,this)">6</button><button class="number" onclick="selectNumber(7,this)">7</button><button class="number" onclick="selectNumber(8,this)">8</button><button class="number" onclick="selectNumber(9,this)">9</button></div>
+<div class="section-title">PLAY COINS</div><div class="coins"><button class="coin active" onclick="selectCoins(100,this)">🪙 100</button><button class="coin" onclick="selectCoins(250,this)">🪙 250</button><button class="coin" onclick="selectCoins(500,this)">🪙 500</button></div>
+<button class="lock" id="lockButton" onclick="lockPrediction()" disabled>🔒 LOCK PREDICTION</button><div class="message" id="message">Market connect ho raha hai...</div>
+<div class="result" id="result"><div class="result-title">X-TREME NUMBER</div><div class="winning-number" id="winningNumber">-</div><div class="outcome" id="outcome"></div><div class="coin-change" id="coinChange"></div><div class="snapshot"><div class="snap">LOCKED BTC<strong id="lockedBtc">-</strong></div><div class="snap">LOCKED GOLD<strong id="lockedGold">-</strong></div></div><div class="formula" id="formula"></div><button class="new-round" onclick="newRound()">NEXT ROUND</button></div>
+<div class="stats"><div class="stat"><div class="stat-value" id="totalGames">0</div><div class="stat-name">ROUNDS</div></div><div class="stat"><div class="stat-value" id="wins">0</div><div class="stat-name">WINS</div></div><div class="stat"><div class="stat-value" id="losses">0</div><div class="stat-name">LOSSES</div></div></div>
+<div class="history-card"><div class="history-title">X-TREME HISTORY</div><div class="history-list" id="historyList"><div class="history-row"><div class="history-main">Loading history...</div></div></div></div>
+<div class="warning">Entertainment / educational game only. Virtual coins have no cash value, cannot be purchased, withdrawn or converted to real money.<p>Market prices are third-party reference data and may differ slightly from trading platforms.</p></div>
+</main>
 <script>
-const ENDPOINT = 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT_ID = '6a7f2add0011a7bfc21a';
-const DATABASE_ID = '6a7f2d1d0035d9815939';
-const PROFILES_TABLE = 'user_profiles';
-const HISTORY_TABLE = 'game_history';
-
-const client = new Appwrite.Client()
-  .setEndpoint(ENDPOINT)
-  .setProject(PROJECT_ID);
-
-const account = new Appwrite.Account(client);
-const tablesDB = new Appwrite.TablesDB(client);
-
-const el = id => document.getElementById(id);
-
-function safeNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
+const APPWRITE_ENDPOINT='https://sgp.cloud.appwrite.io/v1';
+const APPWRITE_PROJECT_ID='6a7f2add0011a7bfc21a';
+const APPWRITE_DATABASE_ID='6a7f2d1d0035d9815939';
+const USER_PROFILES_TABLE='user_profiles';
+const GAME_HISTORY_TABLE='game_history';
+const client=new Appwrite.Client().setEndpoint(APPWRITE_ENDPOINT).setProject(APPWRITE_PROJECT_ID);
+const account=new Appwrite.Account(client);
+const tablesDB=new Appwrite.TablesDB(client);
+let currentUser=null,profile=null,profileRowId=null;
+let wallet=0,winsCount=0,lossesCount=0,roundsCount=0,roundId=1001;
+let selectedNumber=null,selectedCoins=100,roundLocked=false;
+let liveBtcPrice=null,liveGoldPrice=null,btcReady=false,goldReady=false;
+let history=[];
+const el=id=>document.getElementById(id);
+function showGame(){el('authLoader').style.display='none';el('mainApp').classList.add('ready')}
+async function startApp(){
+ try{currentUser=await account.get()}catch(e){location.replace('login.html');return}
+ el('userName').textContent=currentUser.name||'Player';el('userEmail').textContent=currentUser.email||'';showGame();
+ try{await loadUserProfile()}catch(e){console.error('Profile load error',e);profileRowId=null;el('message').textContent='⚠️ Profile sync error. Game temporarily disabled.'}
+ try{await loadCloudHistory()}catch(e){console.error('History load error',e);history=[];renderHistory()}
+ updateMarketStatus();loadLiveBitcoin();loadLiveGold();setInterval(loadLiveBitcoin,60000);setInterval(loadLiveGold,60000);
 }
-
-function displayWallet(profile) {
-  const wallet = safeNumber(profile.wallet);
-
-  el('wallet').textContent =
-    wallet.toLocaleString('en-IN');
-
-  el('wins').textContent =
-    safeNumber(profile.wins).toLocaleString('en-IN');
-
-  el('losses').textContent =
-    safeNumber(profile.losses).toLocaleString('en-IN');
-
-  el('totalGames').textContent =
-    safeNumber(profile.rounds).toLocaleString('en-IN');
-
-  el('walletMessage').textContent =
-    'Existing balance • Read-only display';
-
-  el('accountStatus').textContent = 'CONNECTED';
+async function loadUserProfile(){
+ const response=await tablesDB.listRows({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,queries:[Appwrite.Query.limit(100)]});
+ profile=(response.rows||[]).find(row=>String(row.userId)===String(currentUser.$id))||null;
+ if(!profile){profile=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:currentUser.$id,data:{userId:currentUser.$id,name:currentUser.name||'Player',email:currentUser.email||'',wallet:0,wins:0,losses:0,rounds:0}})}
+ profileRowId=profile.$id;wallet=Number(profile.wallet);if(!Number.isFinite(wallet))wallet=0;
+ winsCount=Number(profile.wins)||0;lossesCount=Number(profile.losses)||0;roundsCount=Number(profile.rounds)||0;roundId=1001+roundsCount;updateProfileUI();
 }
-
-async function loadProfile(user) {
-  let profile = null;
-
-  try {
-    profile = await tablesDB.getRow({
-      databaseId: DATABASE_ID,
-      tableId: PROFILES_TABLE,
-      rowId: user.$id
-    });
-  } catch (err) {
-    console.warn('Direct profile lookup failed:', err.message);
-  }
-
-  if (!profile) {
-    const response = await tablesDB.listRows({
-      databaseId: DATABASE_ID,
-      tableId: PROFILES_TABLE,
-      queries: [
-        Appwrite.Query.equal('userId', user.$id),
-        Appwrite.Query.limit(2)
-      ]
-    });
-
-    const rows = response.rows || [];
-
-    if (rows.length !== 1) {
-      throw new Error('Profile not uniquely found');
-    }
-
-    profile = rows[0];
-  }
-
-  if (String(profile.userId) !== String(user.$id)) {
-    throw new Error('Profile ownership mismatch');
-  }
-
-  displayWallet(profile);
+async function loadCloudHistory(){
+ const response=await tablesDB.listRows({databaseId:APPWRITE_DATABASE_ID,tableId:GAME_HISTORY_TABLE,queries:[Appwrite.Query.limit(100)]});
+ history=(response.rows||[]).filter(row=>String(row.userId)===String(currentUser.$id)).sort((a,b)=>new Date(b.playedAt||b.$createdAt||0)-new Date(a.playedAt||a.$createdAt||0)).slice(0,30);renderHistory();
 }
-
-function historyRow(item) {
-  const row = document.createElement('div');
-  row.className = 'history-item';
-
-  const top = document.createElement('div');
-  top.className = 'row';
-
-  const title = document.createElement('span');
-  title.className = 'history-main';
-  title.textContent =
-    'Round ' + safeNumber(item.round) +
-    ' • Pick ' + safeNumber(item.pick);
-
-  const change = document.createElement('span');
-  change.className = 'history-change';
-
-  const amount = safeNumber(item.change);
-  change.textContent =
-    (amount >= 0 ? '+' : '') + amount + ' VC';
-
-  top.append(title, change);
-
-  const sub = document.createElement('div');
-  sub.className = 'history-sub';
-
-  const date = item.playedAt || item.$createdAt;
-  const timestamp = date ? new Date(date) : null;
-
-  sub.textContent =
-    (item.won ? 'WIN' : 'MISS') +
-    ' • Result ' + safeNumber(item.result) +
-    (timestamp && !Number.isNaN(timestamp.getTime())
-      ? ' • ' + timestamp.toLocaleString('en-IN')
-      : '');
-
-  row.append(top, sub);
-  return row;
+function updateProfileUI(){el('wallet').textContent=wallet.toLocaleString('en-IN');el('roundId').textContent=roundId;el('totalGames').textContent=roundsCount;el('wins').textContent=winsCount;el('losses').textContent=lossesCount}
+async function logoutUser(){const b=el('logoutButton');b.disabled=true;b.textContent='WAIT...';try{await account.deleteSession({sessionId:'current'});location.replace('login.html')}catch(e){console.error(e);b.disabled=false;b.textContent='LOGOUT';el('message').textContent='⚠️ Logout failed. Dobara try karo.'}}
+function updateMarketStatus(){const ready=btcReady&&goldReady&&!!profileRowId;el('liveDot').classList.toggle('offline',!ready);el('marketStatus').textContent=ready?'LIVE MARKET':profileRowId?'CONNECTING':'PROFILE ERROR';el('lockButton').disabled=!ready||roundLocked;if(ready&&!roundLocked)el('message').textContent='Market ready ⚡ Apna number choose karo.'}
+function formatTime(){return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function usd(price){return '$'+Number(price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+async function loadLiveBitcoin(){try{const r=await fetch('https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT',{cache:'no-store'});if(!r.ok)throw Error('BTC HTTP '+r.status);const data=await r.json(),p=Number(data.price);if(!Number.isFinite(p)||p<=0)throw Error('Invalid BTC price');liveBtcPrice=p;btcReady=true;el('btcPrice').textContent=usd(p);el('btcUpdated').textContent='Updated '+formatTime()}catch(e){console.error('BTC',e);btcReady=false;el('btcPrice').textContent='Unavailable';el('btcUpdated').textContent='Retrying...'}updateMarketStatus()}
+async function loadLiveGold(){try{const r=await fetch('https://xaus.com/api/v1/spot?compact=1',{cache:'no-store'});if(!r.ok)throw Error('Gold HTTP '+r.status);const data=await r.json(),p=Number(data.spot_usd_oz);if(!Number.isFinite(p)||p<=0)throw Error('Invalid Gold price');liveGoldPrice=p;goldReady=true;el('goldPrice').textContent=usd(p);el('goldUpdated').textContent='Updated '+formatTime()}catch(e){console.error('Gold',e);goldReady=false;el('goldPrice').textContent='Unavailable';el('goldUpdated').textContent='Retrying...'}updateMarketStatus()}
+function selectNumber(n,button){if(roundLocked)return;selectedNumber=n;document.querySelectorAll('.number').forEach(x=>x.classList.remove('selected'));button.classList.add('selected');el('message').textContent='Number '+n+' selected 👑'}
+function selectCoins(n,button){if(roundLocked)return;selectedCoins=n;document.querySelectorAll('.coin').forEach(x=>x.classList.remove('active'));button.classList.add('active')}
+function getDateNumber(){const d=new Date(),digits=''+d.getDate()+(d.getMonth()+1)+d.getFullYear();let total=[...digits].reduce((a,n)=>a+Number(n),0);while(total>9)total=[...String(total)].reduce((a,n)=>a+Number(n),0);return total}
+function priceCode(price){return Math.round(price*100)%1000}
+async function lockPrediction(){
+ if(roundLocked)return;
+ if(!profileRowId){el('message').textContent='⚠️ Profile ready nahi hai.';return}
+ if(!btcReady||!goldReady){el('message').textContent='⚠️ Live market ready nahi hai.';return}
+ if(selectedNumber===null){el('message').textContent='⚠️ Pehle 1 se 9 me number choose karo.';return}
+ if(wallet<selectedCoins){el('message').textContent='⚠️ Wallet me enough coins nahi hain.';return}
+ roundLocked=true;el('lockButton').disabled=true;
+ const lockedBtc=liveBtcPrice,lockedGold=liveGoldPrice,btcCode=priceCode(lockedBtc),goldCode=priceCode(lockedGold),dateNumber=getDateNumber();
+ const winningNumber=((btcCode+goldCode+roundId+dateNumber)%9)+1,won=selectedNumber===winningNumber,oldWallet=wallet,netChange=won?selectedCoins*8:-selectedCoins;
+ wallet+=netChange;el('wallet').textContent=wallet.toLocaleString('en-IN');el('winningNumber').textContent=winningNumber;
+ el('outcome').className='outcome '+(won?'win':'lose');el('outcome').textContent=won?'🔥 X-TREME WIN 🔥':'X-TREME MISS';el('coinChange').textContent=(netChange>0?'+':'')+netChange.toLocaleString('en-IN')+' coins';
+ el('lockedBtc').textContent=usd(lockedBtc);el('lockedGold').textContent=usd(lockedGold);
+ el('formula').innerHTML='YOUR PICK: <b>'+selectedNumber+'</b><br>BTC Code: <b>'+btcCode+'</b> | Gold Code: <b>'+goldCode+'</b><br>Date Number: <b>'+dateNumber+'</b> | Round: <b>'+roundId+'</b><br><br>('+btcCode+' + '+goldCode+' + '+roundId+' + '+dateNumber+') % 9 + 1 = <b>'+winningNumber+'</b>';
+ el('result').classList.add('show');el('message').textContent='Saving round...';
+ const item={round:roundId,pick:selectedNumber,result:winningNumber,coins:selectedCoins,change:netChange,won,btc:lockedBtc,gold:lockedGold,playedAt:new Date().toISOString()};
+ try{await saveRoundToCloud(item);el('message').textContent='Round saved ✅';if(won)addGameRewardPoints(100)}catch(e){console.error('Round save failed',e);wallet=oldWallet;el('wallet').textContent=wallet.toLocaleString('en-IN');el('message').textContent='⚠️ Round cloud me save nahi hua. Wallet restore kiya gaya. Refresh karke balance check karo.';roundLocked=false;el('lockButton').disabled=!(btcReady&&goldReady&&profileRowId)}
 }
-
-async function loadHistory(user) {
-  const list = el('historyList');
-
-  try {
-    const response = await tablesDB.listRows({
-      databaseId: DATABASE_ID,
-      tableId: HISTORY_TABLE,
-      queries: [
-        Appwrite.Query.equal('userId', user.$id),
-        Appwrite.Query.limit(30)
-      ]
-    });
-
-    const rows = response.rows || [];
-
-    rows.sort((a, b) => {
-      const dateA = new Date(
-        a.playedAt || a.$createdAt || 0
-      ).getTime();
-
-      const dateB = new Date(
-        b.playedAt || b.$createdAt || 0
-      ).getTime();
-
-      return dateB - dateA;
-    });
-
-    list.replaceChildren();
-
-    if (!rows.length) {
-      list.innerHTML =
-        '<div class="empty">No rounds played yet.</div>';
-      return;
-    }
-
-    rows.forEach(item => {
-      if (String(item.userId) === String(user.$id)) {
-        list.appendChild(historyRow(item));
-      }
-    });
-
-  } catch (err) {
-    console.error('History error:', err);
-    list.textContent = 'History unavailable.';
-    list.className = 'empty';
-  }
+async function saveRoundToCloud(item){
+ const created=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:GAME_HISTORY_TABLE,rowId:Appwrite.ID.unique(),data:{round:Number(item.round),userId:currentUser.$id,pick:Number(item.pick),result:Number(item.result),coins:Number(item.coins),change:Number(item.change),won:Boolean(item.won),btc:Number(item.btc),gold:Number(item.gold),playedAt:item.playedAt}});
+ const newRounds=roundsCount+1,newWins=winsCount+(item.won?1:0),newLosses=lossesCount+(item.won?0:1);
+ await tablesDB.updateRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:profileRowId,data:{wallet:Number(wallet),wins:newWins,losses:newLosses,rounds:newRounds}});
+ roundsCount=newRounds;winsCount=newWins;lossesCount=newLosses;profile.wallet=wallet;profile.wins=winsCount;profile.losses=lossesCount;profile.rounds=roundsCount;history.unshift({...item,$id:created.$id});history=history.slice(0,30);updateProfileUI();renderHistory();
 }
-
-async function startApp() {
-  let user;
-
-  try {
-    user = await account.get();
-  } catch {
-    window.location.replace('login.html');
-    return;
-  }
-
-  el('userName').textContent = user.name || 'Player';
-  el('userEmail').textContent = user.email || '';
-
-  try {
-    await loadProfile(user);
-  } catch (err) {
-    console.error('Profile error:', err);
-
-    el('wallet').textContent = '—';
-    el('walletMessage').textContent =
-      'Wallet could not be loaded. No changes were made.';
-    el('accountStatus').textContent = 'SYNC ERROR';
-  }
-
-  await loadHistory(user);
-}
-
-el('logoutBtn').addEventListener('click', async () => {
-  const button = el('logoutBtn');
-  button.disabled = true;
-
-  try {
-    await account.deleteSession({
-      sessionId: 'current'
-    });
-
-    window.location.replace('login.html');
-  } catch (err) {
-    console.error('Logout error:', err);
-    button.disabled = false;
-    alert('Logout failed. Please try again.');
-  }
-});
-
+function renderHistory(){const list=el('historyList');list.replaceChildren();if(!history.length){const row=document.createElement('div');row.className='history-row';row.textContent='No rounds played yet.';list.append(row);return}for(const item of history){const row=document.createElement('div');row.className='history-row';const left=document.createElement('div'),main=document.createElement('div'),sub=document.createElement('div'),right=document.createElement('div');main.className='history-main';main.textContent='Round '+item.round+' • Pick '+item.pick+' → Result '+item.result;sub.className='history-sub';sub.textContent=item.playedAt?new Date(item.playedAt).toLocaleString('en-IN'):'';right.className=Boolean(item.won)?'history-win':'history-loss';right.textContent=(Number(item.change)>=0?'+':'')+Number(item.change)+' 🪙';left.append(main,sub);row.append(left,right);list.append(row)}}
+function newRound(){roundId=1001+roundsCount;roundLocked=false;selectedNumber=null;el('roundId').textContent=roundId;document.querySelectorAll('.number').forEach(b=>b.classList.remove('selected'));el('result').classList.remove('show');el('message').textContent='New X-Treme round ready ⚡ Choose your number.';el('lockButton').disabled=!(btcReady&&goldReady&&profileRowId)}
+let deferredInstallPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;el('installWrap').classList.add('show')});el('installButton').addEventListener('click',async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;el('installWrap').classList.remove('show')});window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;el('installWrap').classList.remove('show')});if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update().catch(()=>{})).catch(console.error));
+async function addGameRewardPoints(points){try{const row=await tablesDB.getRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:profileRowId});await tablesDB.updateRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:profileRowId,data:{rewardPoints:(Number(row.rewardPoints)||0)+Number(points)}})}catch(e){console.error('Reward points error',e)}}
 startApp();
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('service-worker.js')
-      .then(registration => {
-        registration.update().catch(() => {});
-      })
-      .catch(console.error);
-  });
-}
 </script>
 </body>
 </html>
