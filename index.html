@@ -91,7 +91,8 @@ async function lockPrediction(){
  el('formula').innerHTML='YOUR PICK: <b>'+selectedNumber+'</b><br>BTC Code: <b>'+btcCode+'</b> | Gold Code: <b>'+goldCode+'</b><br>Date Number: <b>'+dateNumber+'</b> | Round: <b>'+roundId+'</b><br><br>('+btcCode+' + '+goldCode+' + '+roundId+' + '+dateNumber+') % 9 + 1 = <b>'+winningNumber+'</b>';
  el('result').classList.add('show');el('message').textContent='Saving round...';
  const item={round:roundId,pick:selectedNumber,result:winningNumber,coins:selectedCoins,change:netChange,won,btc:lockedBtc,gold:lockedGold,playedAt:new Date().toISOString()};
- try{await saveRoundToCloud(item);el('message').textContent='Round saved ✅';if(won)addGameRewardPoints(100)}catch(e){console.error('Round save failed',e);wallet=oldWallet;el('wallet').textContent=wallet.toLocaleString('en-IN');el('message').textContent='⚠️ Round cloud me save nahi hua. Wallet restore kiya gaya. Refresh karke balance check karo.';roundLocked=false;el('lockButton').disabled=!(btcReady&&goldReady&&profileRowId)}
+ try{await saveRoundToCloud(item);el('message').textContent='Round saved ✅';console.error('Round save failed',e);
+alert('Wallet save error: ' + (e.message || String(e)));'⚠️ Round cloud me save nahi hua. Wallet restore kiya gaya. Refresh karke balance check karo.';roundLocked=false;el('lockButton').disabled=!(btcReady&&goldReady&&profileRowId)}
 }
 async function saveRoundToCloud(item){
  const created=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:GAME_HISTORY_TABLE,rowId:Appwrite.ID.unique(),data:{round:Number(item.round),userId:currentUser.$id,pick:Number(item.pick),result:Number(item.result),coins:Number(item.coins),change:Number(item.change),won:Boolean(item.won),btc:Number(item.btc),gold:Number(item.gold),playedAt:item.playedAt}});
