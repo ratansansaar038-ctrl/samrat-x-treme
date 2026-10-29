@@ -33,7 +33,8 @@ const DATABASE="6a7f2d1d0035d9815939";
 const TABLE="user_profiles";
 const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
 const account=new Appwrite.Account(client);
-const db=new Appwrite.TablesDB(client);
+const db=new Appwrite.TablesDB(client); const functions=new Appwrite.Functions(client);
+const REFERRAL_FUNCTION="6adf3c3a003718eab6c2"; 
 const form=document.getElementById('form');
 const button=document.getElementById('submit');
 const message=document.getElementById('message');
@@ -56,6 +57,25 @@ form.addEventListener('submit',async e=>{
   const user=await account.create({userId:Appwrite.ID.unique(),email,password,name});created=true;
   await account.createEmailPasswordSession({email,password});
   await db.createRow({databaseId:DATABASE,tableId:TABLE,rowId:user.$id,data:{userId:user.$id,name,email,wallet:0,wins:0,losses:0,rounds:0,referralCode:ownCode(name,user.$id),referredBy:entered,referralPoints:0}});
+  
+if (entered) {
+  try {
+    const execution = await functions.createExecution({
+      functionId: REFERRAL_FUNCTION,
+      body: JSON.stringify({ action: "register_referral" }),
+      async: false
+    });
+
+    const result = JSON.parse(execution.responseBody || "{}");
+
+    if (!result.ok) {
+      console.warn("Referral registration failed:", result.error);
+    }
+  } catch (refErr) {
+    console.warn("Referral registration pending:", refErr);
+  }
+}
+  
   ['samratWallet','samratHistory','samratRound'].forEach(key=>localStorage.removeItem(key));
   notify('Account created! Referral reward verification abhi paused hai.',true);
   location.replace('index.html');
