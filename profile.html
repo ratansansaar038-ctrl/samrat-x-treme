@@ -1,702 +1,235 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#08010f">
-
 <title>My Profile | Samrat X-Treme</title>
-
 <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
-
 <style>
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
-  font-family:Arial,Helvetica,sans-serif;
-}
-
-body{
-  min-height:100vh;
-  color:#fff;
-  padding:18px;
-  background:
-  radial-gradient(circle at 50% -10%,#431267 0%,#16051f 42%,#050108 76%,#000 100%);
-}
-
-.app{
-  width:100%;
-  max-width:700px;
-  margin:auto;
-}
-
-.topbar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  padding:14px 16px;
-  border:1px solid #7046d8;
-  border-radius:17px;
-  background:linear-gradient(145deg,#171027,#281047);
-  box-shadow:0 0 24px rgba(111,50,255,.25);
-}
-
-.user-name{
-  color:#ffe16a;
-  font-size:16px;
-  font-weight:900;
-}
-
-.user-email{
-  margin-top:3px;
-  color:#9f91b4;
-  font-size:10px;
-  word-break:break-all;
-}
-
-.home-btn{
-  flex-shrink:0;
-  padding:10px 15px;
-  border:1px solid #7956da;
-  border-radius:11px;
-  text-decoration:none;
-  color:#fff;
-  background:#21103d;
-  font-size:10px;
-  font-weight:900;
-}
-
-.logo{
-  width:220px;
-  max-width:72%;
-  display:block;
-  margin:24px auto 5px;
-  filter:drop-shadow(0 0 16px rgba(143,59,255,.65));
-}
-
-h1{
-  text-align:center;
-  color:#ffe16a;
-  font-size:27px;
-  margin-top:4px;
-}
-
-.subtitle{
-  text-align:center;
-  color:#a99bc5;
-  font-size:11px;
-  margin:6px 0 22px;
-}
-
-.wallet-card{
-  padding:21px;
-  margin-bottom:13px;
-  border:1px solid #7550d6;
-  border-radius:20px;
-  text-align:center;
-  background:
-  linear-gradient(120deg,#271252,#3f2081,#26114c);
-  box-shadow:0 0 25px rgba(108,65,255,.25);
-}
-
-.wallet-label{
-  color:#baaee0;
-  font-size:10px;
-  letter-spacing:1px;
-}
-
-.wallet-value{
-  margin-top:7px;
-  color:#ffe55f;
-  font-size:32px;
-  font-weight:900;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-.stat{
-  min-height:105px;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  padding:15px 8px;
-  border:1px solid #543ca0;
-  border-radius:17px;
-  background:linear-gradient(145deg,#161029,#261145);
-}
-
-.stat-value{
-  color:#fff;
-  font-size:23px;
-  font-weight:900;
-}
-
-.stat-label{
-  color:#9d90ba;
-  font-size:9px;
-  margin-top:7px;
-  text-align:center;
-  text-transform:uppercase;
-}
-
-.points{
-  color:#63ffd0;
-}
-
-.referral{
-  color:#ffe16a;
-}
-
-.section{
-  margin-top:14px;
-  padding:18px;
-  border:1px solid #4c367e;
-  border-radius:18px;
-  background:linear-gradient(145deg,#151020,#221038);
-}
-
-.section-title{
-  margin-bottom:14px;
-  color:#ffe16a;
-  font-size:13px;
-  font-weight:900;
-}
-
-.info-row{
-  display:flex;
-  justify-content:space-between;
-  gap:15px;
-  padding:11px 0;
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
-
-.info-row:last-child{
-  border-bottom:0;
-}
-
-.label{
-  color:#8f829f;
-  font-size:10px;
-}
-
-.value{
-  max-width:65%;
-  text-align:right;
-  color:#fff;
-  font-size:11px;
-  font-weight:800;
-  word-break:break-word;
-}
-
-.code-box{
-  margin-top:14px;
-  padding:15px;
-  border:1px dashed #8f67e8;
-  border-radius:14px;
-  text-align:center;
-  background:#0d0717;
-}
-
-.code-label{
-  color:#9688aa;
-  font-size:9px;
-}
-
-.code{
-  margin-top:7px;
-  color:#ffe16a;
-  font-size:19px;
-  font-weight:900;
-  letter-spacing:1px;
-  word-break:break-all;
-}
-
-.actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:14px;
-}
-
-.action{
-  padding:14px 8px;
-  border:1px solid #6950b6;
-  border-radius:13px;
-  text-align:center;
-  text-decoration:none;
-  color:#fff;
-  background:#21103d;
-  font-size:10px;
-  font-weight:900;
-}
-
-.message{
-  padding:30px 15px;
-  text-align:center;
-  color:#c3b5db;
-}
-
-.error{
-  color:#ff7088;
-}
-
-.note{
-  margin-top:20px;
-  text-align:center;
-  color:#625972;
-  font-size:9px;
-  line-height:1.5;
-}
-
-@media(max-width:420px){
-  body{
-    padding:12px;
-  }
-
-  .wallet-value{
-    font-size:28px;
-  }
-
-  .stat-value{
-    font-size:20px;
-  }
-}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:14px;color:#fff;font-family:Arial,sans-serif;background:radial-gradient(circle at top,#431267,#16051f 45%,#050108 85%)}
+.app{max-width:700px;margin:auto}
+.topbar,.card,.stat{border:1px solid #7046d8;border-radius:17px;background:linear-gradient(145deg,#171027,#281047)}
+.topbar{padding:15px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.name{color:#ffe16a;font-weight:900}
+.small{color:#b5a5ca;font-size:11px;overflow-wrap:anywhere}
+a{color:#ffe16a;text-decoration:none}
+.home,.action{padding:12px;border:1px solid #7956da;border-radius:10px;background:#21103d;color:white;font-weight:bold;text-align:center}
+.logo{display:block;width:210px;max-width:75%;margin:22px auto 8px}
+h1{text-align:center;color:#ffe16a;margin:10px 0 5px}
+.subtitle{text-align:center;color:#b5a5ca;font-size:12px;margin-bottom:20px}
+.card{padding:19px;margin-bottom:14px}
+.wallet{text-align:center;background:linear-gradient(120deg,#271252,#3f2081,#26114c)}
+.wallet-value{color:#ffe55f;font-size:34px;font-weight:900;margin:10px 0}
+h2{font-size:15px;color:#ffe16a;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat{padding:20px 8px;text-align:center}
+.stat strong{display:block;font-size:24px;margin-bottom:7px}
+.stat span{color:#b5a5ca;font-size:10px;text-transform:uppercase}
+.info{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #49335f;padding:12px 0;font-size:12px}
+.info span:first-child{color:#aa9abb}
+.info span:last-child{text-align:right;overflow-wrap:anywhere;max-width:65%}
+.code{text-align:center;color:#ffe16a;font-size:21px;font-weight:bold;margin-top:15px;padding:14px;border:1px dashed #8f67e8;border-radius:12px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.action{font-size:12px}
+button{cursor:pointer;border:0;border-radius:12px;background:#ffe16a;color:#170b29;padding:13px 16px;font-weight:900}
+button:disabled{opacity:.5}
+.request-btn{width:100%;margin-top:13px}
+.request-form{display:none;margin-top:14px;text-align:left}
+.request-form label{display:block;font-size:12px;color:#ddd;margin-bottom:8px}
+.request-form input{width:100%;padding:13px;border-radius:10px;background:#130922;border:1px solid #8b67e8;color:#fff;font-size:17px}
+.request-form button{width:100%;margin-top:12px}
+#requestStatus{font-size:12px;line-height:1.5;margin-top:12px;overflow-wrap:anywhere}
+.note{text-align:center;font-size:10px;color:#8c809e;margin:20px}
+#loading{text-align:center;padding:35px}
 </style>
 </head>
-
 <body>
-
 <div class="app">
+<div id="loading">Profile load ho raha hai...</div>
+<div id="profileApp" style="display:none">
 
-  <div id="loading" class="message">
-    Profile load ho raha hai...
-  </div>
-
-  <div id="profileApp" style="display:none;">
-
-    <div class="topbar">
-
-      <div>
-        <div class="user-name" id="topName">PLAYER</div>
-        <div class="user-email" id="topEmail"></div>
-      </div>
-
-      <a href="index.html" class="home-btn">
-        HOME
-      </a>
-
-    </div>
-
-    <img
-      src="samrat-logo.png"
-      class="logo"
-      alt="Samrat X-Treme"
-    >
-
-    <h1>MY PROFILE</h1>
-
-    <div class="subtitle">
-      Your Samrat X-Treme player account
-    </div>
-
-    <div class="wallet-card">
-
-      <div class="wallet-label">
-        X-TREME WALLET
-      </div>
-
-      <div class="wallet-value" id="wallet">
-        0
-      </div>
-
-    </div>
-
-    <div class="grid">
-
-      <div class="stat">
-        <div class="stat-value" id="wins">0</div>
-        <div class="stat-label">Total Wins</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-value" id="losses">0</div>
-        <div class="stat-label">Total Losses</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-value" id="rounds">0</div>
-        <div class="stat-label">Rounds Played</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-value referral" id="referralPoints">
-          0
-        </div>
-        <div class="stat-label">Referral Points</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-value points" id="rewardPoints">
-          0
-        </div>
-        <div class="stat-label">Game / Reward Points</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-value" id="totalRewards">
-          0
-        </div>
-        <div class="stat-label">Rewards Claimed</div>
-      </div>
-
-    </div>
-
-    <div class="section">
-
-      <div class="section-title">
-        ACCOUNT DETAILS
-      </div>
-
-      <div class="info-row">
-        <div class="label">Name</div>
-        <div class="value" id="name">-</div>
-      </div>
-
-      <div class="info-row">
-        <div class="label">Email</div>
-        <div class="value" id="email">-</div>
-      </div>
-
-      <div class="info-row">
-        <div class="label">Player ID</div>
-        <div class="value" id="userId">-</div>
-      </div>
-
-      <div class="info-row">
-        <div class="label">Referred By</div>
-        <div class="value" id="referredBy">None</div>
-      </div>
-
-      <div class="info-row">
-        <div class="label">Account Created</div>
-        <div class="value" id="createdAt">-</div>
-      </div>
-
-      <div class="code-box">
-
-        <div class="code-label">
-          YOUR REFERRAL CODE
-        </div>
-
-        <div class="code" id="referralCode">
-          -
-        </div>
-
-      </div>
-
-    </div>
-
-    <div class="actions">
-
-      <a
-        href="referral.html"
-        class="action"
-      >
-        REFERRAL
-      </a>
-
-      <a
-        href="reward.html"
-        class="action"
-      >
-        REWARD CENTER
-      </a>
-
-    </div>
-
-    <div class="note">
-      Entertainment / educational game only.<br>
-      Virtual coins have no cash value.
-    </div>
-
-  </div>
-
+<div class="topbar">
+<div>
+<div class="name" id="topName">PLAYER</div>
+<div class="small" id="topEmail"></div>
+</div>
+<a class="home" href="index.html">HOME</a>
 </div>
 
+<img class="logo" src="samrat-logo.png" alt="Samrat X-Treme">
+<h1>MY PROFILE</h1>
+<p class="subtitle">Your Samrat X-Treme player account</p>
+
+<div class="card wallet">
+<div class="small">X-TREME WALLET</div>
+<div class="wallet-value"><span id="wallet">0</span> VC</div>
+
+<button type="button" class="request-btn" id="requestToggle">
++ REQUEST VC
+</button>
+
+<form class="request-form" id="requestForm">
+<label for="vcAmount">How many VC do you need?</label>
+<input id="vcAmount" type="number" inputmode="numeric"
+min="1" max="100000" step="1" required
+placeholder="Enter custom VC amount">
+<button id="requestSubmit" type="submit">SEND REQUEST TO ADMIN</button>
+</form>
+
+<div id="requestStatus" role="status"></div>
+</div>
+
+<div class="grid">
+<div class="stat"><strong id="wins">0</strong><span>Total Wins</span></div>
+<div class="stat"><strong id="losses">0</strong><span>Total Losses</span></div>
+<div class="stat"><strong id="rounds">0</strong><span>Rounds Played</span></div>
+<div class="stat"><strong id="referralPoints">0</strong><span>Referral Points</span></div>
+<div class="stat"><strong id="rewardPoints">0</strong><span>Game / Reward Points</span></div>
+<div class="stat"><strong id="totalRewards">0</strong><span>Rewards Claimed</span></div>
+</div>
+
+<div class="card">
+<h2>ACCOUNT DETAILS</h2>
+<div class="info"><span>Name</span><span id="name">-</span></div>
+<div class="info"><span>Email</span><span id="email">-</span></div>
+<div class="info"><span>Player ID</span><span id="userId">-</span></div>
+<div class="info"><span>Referred By</span><span id="referredBy">None</span></div>
+<div class="info"><span>Account Created</span><span id="createdAt">-</span></div>
+<div class="code"><div class="small">YOUR REFERRAL CODE</div><div id="referralCode">-</div></div>
+</div>
+
+<div class="actions">
+<a class="action" href="referral.html">REFERRAL</a>
+<a class="action" href="reward.html">REWARD CENTER</a>
+</div>
+
+<p class="note">Entertainment / educational game only. Virtual coins have no cash value.</p>
+</div>
+</div>
 
 <script>
+const ENDPOINT="https://sgp.cloud.appwrite.io/v1";
+const PROJECT="6a7f2add0011a7bfc21a";
+const DATABASE="6a7f2d1d0035d9815939";
+const FUNCTION_ID="6adf3c3a003718eab6c2";
 
-const APPWRITE_ENDPOINT =
-"https://sgp.cloud.appwrite.io/v1";
+const client=new Appwrite.Client()
+.setEndpoint(ENDPOINT).setProject(PROJECT);
 
-const APPWRITE_PROJECT_ID =
-"6a7f2add0011a7bfc21a";
+const account=new Appwrite.Account(client);
+const tablesDB=new Appwrite.TablesDB(client);
+const functions=new Appwrite.Functions(client);
 
-const APPWRITE_DATABASE_ID =
-"6a7f2d1d0035d9815939";
+const el=id=>document.getElementById(id);
+const set=(id,value)=>{el(id).textContent=value??""};
+const num=value=>Number(value||0).toLocaleString("en-IN");
 
-const USER_PROFILES_TABLE =
-"user_profiles";
+let currentUser=null;
+let sending=false;
 
+async function loadProfile(){
+try{
+const user=await account.get();
+currentUser=user;
 
-const client =
-new Appwrite.Client();
+const result=await tablesDB.listRows({
+databaseId:DATABASE,
+tableId:"user_profiles",
+queries:[Appwrite.Query.equal("userId",user.$id),Appwrite.Query.limit(2)],
+total:false,
+ttl:0
+});
 
-client
-.setEndpoint(APPWRITE_ENDPOINT)
-.setProject(APPWRITE_PROJECT_ID);
+const profile=(result.rows||[]).find(r=>r.userId===user.$id);
+if(!profile)throw Error("User profile row nahi mili.");
 
+const name=profile.name||user.name||"Player";
+const email=profile.email||user.email||"";
 
-const account =
-new Appwrite.Account(client);
+set("topName",name);
+set("topEmail",email);
+set("name",name);
+set("email",email);
+set("userId",user.$id);
+set("wallet",num(profile.wallet));
+set("wins",num(profile.wins));
+set("losses",num(profile.losses));
+set("rounds",num(profile.rounds));
+set("referralPoints",num(profile.referralPoints));
+set("rewardPoints",num(profile.rewardPoints));
+set("totalRewards",num(profile.totalRewardsClaimed));
+set("referralCode",profile.referralCode||"-");
+set("referredBy",profile.referredBy||"None");
 
-const tablesDB =
-new Appwrite.TablesDB(client);
+const created=profile.$createdAt||user.$createdAt;
+set("createdAt",created?new Date(created).toLocaleString("en-IN"):"-");
 
-
-function number(value){
-
-  return Number(value || 0)
-  .toLocaleString("en-IN");
-
+el("loading").style.display="none";
+el("profileApp").style.display="block";
+}catch(err){
+if(err.code===401){
+location.replace("login.html");
+return;
+}
+el("loading").textContent=err.message||"Profile load nahi hua.";
+}
 }
 
+el("requestToggle").addEventListener("click",()=>{
+const form=el("requestForm");
+form.style.display=form.style.display==="block"?"none":"block";
+});
 
-function setText(id,value){
+el("requestForm").addEventListener("submit",async event=>{
+event.preventDefault();
+if(sending||!currentUser)return;
 
-  const element =
-  document.getElementById(id);
+const amount=Number(el("vcAmount").value);
 
-  if(element){
-    element.innerText =
-    value ?? "";
-  }
-
+if(!Number.isSafeInteger(amount)||amount<1||amount>100000){
+set("requestStatus","Enter an amount from 1 to 100000 VC.");
+return;
 }
 
-
-async function startProfile(){
-
-  const loading =
-  document.getElementById("loading");
-
-  try{
-
-    const user =
-    await account.get();
-
-
-    const result =
-    await tablesDB.listRows({
-
-      databaseId:
-      APPWRITE_DATABASE_ID,
-
-      tableId:
-      USER_PROFILES_TABLE,
-
-      queries:[
-        Appwrite.Query.limit(100)
-      ],
-
-      total:false,
-
-      ttl:0
-
-    });
-
-
-    const profile =
-    (result.rows || [])
-    .find(function(row){
-
-      return String(row.userId || "") ===
-      String(user.$id);
-
-    });
-
-
-    if(!profile){
-
-      throw new Error(
-        "User profile row nahi mili."
-      );
-
-    }
-
-
-    const name =
-    profile.name ||
-    user.name ||
-    "Player";
-
-    const email =
-    profile.email ||
-    user.email ||
-    "";
-
-
-    setText(
-      "topName",
-      name
-    );
-
-    setText(
-      "topEmail",
-      email
-    );
-
-    setText(
-      "name",
-      name
-    );
-
-    setText(
-      "email",
-      email
-    );
-
-    setText(
-      "userId",
-      user.$id
-    );
-
-    setText(
-      "wallet",
-      number(profile.wallet)
-    );
-
-    setText(
-      "wins",
-      number(profile.wins)
-    );
-
-    setText(
-      "losses",
-      number(profile.losses)
-    );
-
-    setText(
-      "rounds",
-      number(profile.rounds)
-    );
-
-    setText(
-      "referralPoints",
-      number(profile.referralPoints)
-    );
-
-    setText(
-      "rewardPoints",
-      number(profile.rewardPoints)
-    );
-
-    setText(
-      "totalRewards",
-      number(profile.totalRewardsClaimed)
-    );
-
-    setText(
-      "referralCode",
-      profile.referralCode || "-"
-    );
-
-    setText(
-      "referredBy",
-      profile.referredBy || "None"
-    );
-
-
-    const created =
-    profile.$createdAt ||
-    user.$createdAt;
-
-
-    let createdText = "-";
-
-
-    if(created){
-
-      const date =
-      new Date(created);
-
-      if(!Number.isNaN(date.getTime())){
-
-        createdText =
-        date.toLocaleString(
-          "en-IN"
-        );
-
-      }
-
-    }
-
-
-    setText(
-      "createdAt",
-      createdText
-    );
-
-
-    loading.style.display =
-    "none";
-
-    document
-    .getElementById("profileApp")
-    .style.display =
-    "block";
-
-
-  }catch(error){
-
-    console.error(
-      "Profile error:",
-      error
-    );
-
-
-    if(
-      error &&
-      (
-        error.code === 401 ||
-        error.type ===
-        "general_unauthorized_scope"
-      )
-    ){
-
-      window.location.replace(
-        "login.html"
-      );
-
-      return;
-
-    }
-
-
-    loading.classList.add(
-      "error"
-    );
-
-    loading.innerText =
-    error && error.message
-    ? error.message
-    : "Profile load nahi hua.";
-
-  }
-
+sending=true;
+el("requestSubmit").disabled=true;
+set("requestStatus","Sending request...");
+
+try{
+const execution=await functions.createExecution({
+functionId:FUNCTION_ID,
+body:JSON.stringify({action:"request_vc",amount}),
+async:false,
+method:"POST",
+path:"/"
+});
+
+let result={};
+try{result=JSON.parse(execution.responseBody||"{}")}catch{}
+
+if(execution.status==="completed" &&
+execution.responseStatusCode===200 && result.ok){
+set("requestStatus",
+"Request sent successfully! "+amount+
+" VC pending admin approval. Wallet balance has not changed.");
+el("requestForm").reset();
+el("requestForm").style.display="none";
+}else{
+set("requestStatus",
+result.error||execution.errors||"Request failed. Please try again.");
 }
+}catch(err){
+set("requestStatus",err.message||"Unable to send request.");
+}finally{
+sending=false;
+el("requestSubmit").disabled=false;
+}
+});
 
-
-startProfile();
-
+loadProfile();
 </script>
-
 </body>
 </html>
