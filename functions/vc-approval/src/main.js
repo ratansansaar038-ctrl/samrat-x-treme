@@ -1,5 +1,6 @@
 
 import https from "node:https";
+import { randomUUID } from "node:crypto";
 
 const respond = (res, status, data) => res.json(data, status);
 
@@ -137,6 +138,10 @@ export default async ({ req, res, log, error }) => {
   const profilePath =
     `${dbPath}/${encodeURIComponent(env.USERS_PROFILES_TABLE_ID)}/rows`;
 
+  const requestsPath = env.VC_REQUESTS_TABLE_ID
+    ? `${dbPath}/${encodeURIComponent(env.VC_REQUESTS_TABLE_ID)}/rows`
+    : null;
+
   const findProfile = async userId => {
     const result = await apiRequest(
       "GET",
@@ -161,9 +166,73 @@ export default async ({ req, res, log, error }) => {
       : null;
   };
 
-  // SECURE REFERRAL REGISTRATION
-  // Referral row ID = authenticated user's ID.
-  // Reward points are not granted yet.
+  // USER VC REQUEST
+  // A request does not change the wallet.
+
+  if (input.action === "request_vc") {
+    if (!requestsPath) {
+      return respond(res, 503, {
+        ok: false,
+        error: "VC requests not configured"
+      });
+    }
+
+    const amount = input.amount;
+
+    if (!Number.isSafeInteger(amount) ||
+        amount < 1 ||
+        amount > 100000) {
+      return respond(res, 400, {
+        ok: false,
+        error: "Enter 1 to 100000 VC"
+      });
+    }
+
+    try {
+      const profile = await findProfile(actorId);
+
+      if (!profile || profile.userId !== actorId) {
+        return respond(res, 404, {
+          ok: false,
+          error: "Profile not found"
+        });
+      }
+
+      const row = await apiRequest(
+        "POST",
+        requestsPath,
+        {
+          rowId: randomUUID(),
+          data: {
+            userId: actorId,
+            amount,
+            status: "pending"
+          }
+        },
+        env
+      );
+
+      log(`VC request created: ${row.$id}`);
+
+      return respond(res, 200, {
+        ok: true,
+        requestId: row.$id,
+        amount,
+        status: "pending",
+        message: "Request sent to admin"
+      });
+
+    } catch (err) {
+      error(`VC request error: ${err.message}`);
+
+      return respond(res, 500, {
+        ok: false,
+        error: "VC request failed"
+      });
+    }
+  }
+
+  // EXISTING REFERRAL REGISTRATION
 
   if (input.action === "register_referral") {
     try {
@@ -277,6 +346,7 @@ export default async ({ req, res, log, error }) => {
   }
 
   // ADMIN AUTHORIZATION
+  // All actions below require admin identity.
 
   if (!env.ADMIN_USER_ID ||
       actorId !== env.ADMIN_USER_ID) {
@@ -286,7 +356,191 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
-  // ADMIN ADD VC
+  // ADMIN: LIST VC REQUESTS
+
+  if (input.action === "list_vc_requests") {
+    if (!requestsPath) {
+      return respond(res, 503, {
+        ok: false,
+        error: "VC requests not configured"
+      });
+    }
+
+    try {
+      const result = await apiRequest(
+        "GET",
+        requestsPath,
+        undefined,
+        env,
+        [
+          {
+            method: "limit",
+            values: [100]
+          }
+        ]
+      );
+
+      const requests = (result.rows || []).map(row => ({
+        id: row.$id,
+        userId: row.userId,
+        amount: row.amount,
+        status: row.status,
+        createdAt: row.$createdAt
+      }));
+
+      return respond(res, 200, {
+        ok: true,
+        requests
+      });
+
+    } catch (err) {
+      error(`VC request list error: ${err.message}`);
+
+      return respond(res, 500, {
+        ok: false,
+        error: "Could not load VC requests"
+      });
+    }
+  }
+
+  // ADMIN: APPROVE OR REJECT VC REQUEST
+
+  if (input.action === "decide_vc_request") {
+    if (!requestsPath) {
+      return respond(res, 503, {
+        ok: false,
+        error: "VC requests not configured"
+      });
+    }
+
+    const { requestId, decision } = input;
+
+    if (!validId(requestId) ||
+        !["approved", "rejected"].includes(decision)) {
+      return respond(res, 400, {
+        ok: false,
+        error: "Invalid request or decision"
+      });
+    }
+
+    try {
+      const rowPath =
+        `${requestsPath}/${encodeURIComponent(requestId)}`;
+
+      const request = await apiRequest(
+        "GET",
+        rowPath,
+        undefined,
+        env
+      );
+
+      if (request.status !== "pending") {
+        return respond(res, 409, {
+          ok: false,
+          error: "Request already handled",
+          status: request.status
+        });
+      }
+
+      if (!validId(request.userId) ||
+          !Number.isSafeInteger(request.amount) ||
+          request.amount < 1 ||
+          request.amount > 100000) {
+        return respond(res, 409, {
+          ok: false,
+          error: "Invalid VC request data"
+        });
+      }
+
+      if (decision === "rejected") {
+        await apiRequest(
+          "PATCH",
+          rowPath,
+          {
+            data: {
+              status: "rejected"
+            }
+          },
+          env
+        );
+
+        return respond(res, 200, {
+          ok: true,
+          requestId,
+          status: "rejected"
+        });
+      }
+
+      const profile = await findProfile(request.userId);
+
+      if (!profile ||
+          !Number.isSafeInteger(profile.wallet) ||
+          profile.wallet < 0 ||
+          !Number.isSafeInteger(
+            profile.wallet + request.amount
+          )) {
+        return respond(res, 409, {
+          ok: false,
+          error: "Invalid or missing user wallet"
+        });
+      }
+
+      // Processing status prevents ordinary repeat approval.
+      // A failed operation needs log-based reconciliation.
+      await apiRequest(
+        "PATCH",
+        rowPath,
+        {
+          data: {
+            status: "processing"
+          }
+        },
+        env
+      );
+
+      const updated = await apiRequest(
+        "PATCH",
+        `${profilePath}/${encodeURIComponent(profile.$id)}`,
+        {
+          data: {
+            wallet: profile.wallet + request.amount
+          }
+        },
+        env
+      );
+
+      await apiRequest(
+        "PATCH",
+        rowPath,
+        {
+          data: {
+            status: "approved"
+          }
+        },
+        env
+      );
+
+      log(`VC request approved: ${requestId}`);
+
+      return respond(res, 200, {
+        ok: true,
+        requestId,
+        status: "approved",
+        added: request.amount,
+        balance: updated.wallet
+      });
+
+    } catch (err) {
+      error(`VC approval error: ${err.message}`);
+
+      return respond(res, 500, {
+        ok: false,
+        error: "Approval failed. Check logs before retrying."
+      });
+    }
+  }
+
+  // EXISTING ADMIN ADD VC
 
   if (input.action === "add_vc") {
     const { userId, amount } = input;
@@ -354,7 +608,7 @@ export default async ({ req, res, log, error }) => {
     }
   }
 
-  // REWARD APPROVAL
+  // EXISTING REWARD APPROVAL
 
   if (!env.REWARD_CLAIMS_TABLE_ID) {
     return respond(res, 503, {
@@ -445,4 +699,4 @@ export default async ({ req, res, log, error }) => {
     });
   }
 };
-                       
+        
