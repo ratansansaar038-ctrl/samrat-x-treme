@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08010f">
+<title>Elite Signup | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:18px;background:radial-gradient(circle at top,#431267,#14051f 50%,#030106);color:white;font-family:Arial,sans-serif}.card{width:100%;max-width:420px;padding:26px 20px;background:linear-gradient(145deg,#171027,#281047);border:1px solid #7046d8;border-radius:22px;box-shadow:0 0 32px #6f32ff55}.logo{display:block;width:210px;max-width:80%;margin:0 auto 15px}h1{text-align:center;color:#ffe16a;margin:0 0 6px}.sub{text-align:center;color:#a99bc5;font-size:12px;margin-bottom:20px}label{display:block;margin:14px 0 6px;color:#d2c4f0;font-size:12px}input{width:100%;padding:13px;background:#0e0819;color:#fff;border:1px solid #51388d;border-radius:12px;font-size:14px}button{width:100%;margin-top:20px;padding:15px;border:0;border-radius:14px;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);color:#210014;font-weight:900;font-size:15px}button:disabled{opacity:.5}.note{color:#a99bc5;text-align:center;font-size:11px;line-height:1.6;margin-top:14px}a{color:#ffe16a}#message{min-height:30px;color:#ffb7db;text-align:center;font-size:12px;margin-top:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<main class="card">
+<img src="samrat-logo.png" alt="Samrat X-Treme" class="logo">
+<h1>ELITE SIGNUP</h1><div class="sub">Create your Samrat X-Treme account</div>
+<form id="form">
+<label for="name">Name</label><input id="name" required maxlength="128" autocomplete="name">
+<label for="email">Email</label><input id="email" type="email" required autocomplete="email">
+<label for="password">Password</label><input id="password" type="password" required minlength="8" autocomplete="new-password">
+<label for="confirm">Confirm Password</label><input id="confirm" type="password" required minlength="8" autocomplete="new-password">
+<label for="ref">Referral Code (Optional)</label><input id="ref" maxlength="32" autocomplete="off" placeholder="Referral code">
+<button id="submit" disabled>CHECKING...</button>
+</form>
+<div id="message">Checking login...</div>
+<div class="note">Already registered? <a href="login.html">LOGIN</a></div>
+<div class="note">Referral rewards are temporarily paused while secure verification is being built. Virtual coins have no cash value.</div>
+</main>
+<script>
+const ENDPOINT="https://sgp.cloud.appwrite.io/v1";
+const PROJECT="6a7f2add0011a7bfc21a";
+const DATABASE="6a7f2d1d0035d9815939";
+const TABLE="user_profiles";
+const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
+const account=new Appwrite.Account(client);
+const db=new Appwrite.TablesDB(client);
+const form=document.getElementById('form');
+const button=document.getElementById('submit');
+const message=document.getElementById('message');
+const referralInput=document.getElementById('ref');
+referralInput.value=(new URLSearchParams(location.search).get('ref')||'').trim().toUpperCase().slice(0,32);
+function notify(text,good=false){message.textContent=text;message.style.color=good?'#60ff9a':'#ffb7db'}
+function ownCode(name,id){const prefix=(name||'SAMRAT').replace(/[^a-z0-9]/gi,'').toUpperCase().slice(0,5)||'SAMRAT';return prefix+id.replace(/[^a-z0-9]/gi,'').toUpperCase().slice(-6)}
+async function prepare(){try{await account.get();location.replace('index.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
+form.addEventListener('submit',async e=>{
+ e.preventDefault();if(button.disabled)return;
+ const name=document.getElementById('name').value.trim();
+ const email=document.getElementById('email').value.trim();
+ const password=document.getElementById('password').value;
+ const confirm=document.getElementById('confirm').value;
+ const entered=referralInput.value.trim().toUpperCase();
+ if(!name||password.length<8||password!==confirm){notify('Name, password aur confirm password check karo.');return}
+ button.disabled=true;button.textContent='CREATING ACCOUNT...';notify('Account create ho raha hai...');
+ let created=false;
+ try{
+  const user=await account.create({userId:Appwrite.ID.unique(),email,password,name});created=true;
+  await account.createEmailPasswordSession({email,password});
+  await db.createRow({databaseId:DATABASE,tableId:TABLE,rowId:user.$id,data:{userId:user.$id,name,email,wallet:0,wins:0,losses:0,rounds:0,referralCode:ownCode(name,user.$id),referredBy:entered,referralPoints:0}});
+  ['samratWallet','samratHistory','samratRound'].forEach(key=>localStorage.removeItem(key));
+  notify('Account created! Referral reward verification abhi paused hai.',true);
+  location.replace('index.html');
+ }catch(err){console.error('Signup failed',err);notify(created?'Account bana hai, lekin profile setup fail hua. Dobara signup mat karo; support se contact karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
+});
+prepare();
+</script>
+</body>
+</html>
