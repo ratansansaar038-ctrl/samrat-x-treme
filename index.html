@@ -4,575 +4,543 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#08010f">
+<meta name="theme-color" content="#090713">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Samrat X-Treme">
 <meta name="google-site-verification" content="YeulG82nJTfbib13P0WZ3deouTltaCzyV_VIGgQ1wGQ">
-
-<title>Samrat X-Treme</title>
-
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-
-<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.2"></script>
+<title>Samrat X-Treme | Skill Gaming</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
 
 <style>
-*{box-sizing:border-box}
 :root{
- --bg:#08010f;
- --panel:#180b2c;
- --panel2:#211039;
- --gold:#ffd56a;
- --pink:#f14bb8;
- --text:#fff;
- --muted:#b9a9cf;
- --border:#493067
+  --bg:#090713;
+  --card:#171326;
+  --line:#302845;
+  --gold:#ffcc64;
+  --purple:#a16bff;
+  --text:#f7f3ff;
+  --muted:#aaa1be;
+  --green:#5be3aa;
 }
+*{box-sizing:border-box}
 body{
- margin:0;
- background:radial-gradient(circle at top,#30114c,#08010f 65%);
- color:var(--text);
- font-family:Arial,Helvetica,sans-serif;
- min-height:100vh
+  margin:0;
+  background:radial-gradient(ellipse at top,#271345,#090713 65%);
+  color:var(--text);
+  font-family:system-ui,-apple-system,Arial,sans-serif;
+  min-height:100vh;
 }
+button,a{-webkit-tap-highlight-color:transparent}
+a{color:inherit;text-decoration:none}
+.container{max-width:560px;margin:auto;padding:18px}
 header{
- display:flex;
- justify-content:space-between;
- align-items:center;
- padding:18px 16px;
- border-bottom:1px solid var(--border)
+  display:flex;align-items:center;
+  justify-content:space-between;gap:10px;
+  margin-bottom:20px;
 }
-.brand{
- color:var(--gold);
- font-weight:900;
- font-size:21px;
- letter-spacing:1px
-}
-.brand span{color:#fff}
-button,a{font-family:inherit}
+.brand{font-weight:900;font-size:22px;letter-spacing:.5px}
+.brand span{color:var(--gold)}
+.subbrand{font-size:10px;letter-spacing:2px;color:var(--muted)}
 button{
- cursor:pointer;
- border:0;
- font-weight:700
+  cursor:pointer;border:0;font:inherit;
 }
 .logout{
- background:#342044;
- color:#fff;
- padding:10px 14px;
- border-radius:10px
+  background:#211a31;color:#ddd;
+  padding:10px 14px;border:1px solid var(--line);
+  border-radius:12px;font-size:12px;
 }
-main{
- width:min(100%,650px);
- margin:auto;
- padding:18px 14px 70px
+.hero{
+  padding:26px 20px;border-radius:24px;
+  background:linear-gradient(145deg,#40206c,#1b1531 70%);
+  border:1px solid #5b3d88;text-align:center;
+  box-shadow:0 15px 40px #0005;
+}
+.hero .eyebrow{
+  color:var(--gold);font-size:11px;
+  font-weight:800;letter-spacing:2px;
+}
+.hero h1{font-size:34px;line-height:1.1;margin:12px 0}
+.hero p{font-size:13px;color:#d0c4e3;line-height:1.6}
+.pill{
+  display:inline-block;background:#36264c;
+  border:1px solid #694c91;color:#ead6ff;
+  padding:8px 12px;border-radius:30px;
+  font-size:11px;font-weight:700;
 }
 .card{
- background:linear-gradient(145deg,var(--panel2),var(--panel));
- border:1px solid var(--border);
- border-radius:19px;
- padding:19px;
- margin-bottom:17px;
- box-shadow:0 12px 30px #0004
+  margin-top:16px;background:var(--card);
+  border:1px solid var(--line);
+  border-radius:20px;padding:20px;
 }
-.center{text-align:center}
-h1{
- font-size:27px;
- margin:6px 0 10px
+.card-title{
+  font-size:12px;color:var(--muted);
+  font-weight:800;letter-spacing:1.4px;
+  text-transform:uppercase;
 }
-h2{
- font-size:19px;
- margin:0 0 14px
+.wallet-number{
+  font-size:39px;font-weight:900;
+  color:var(--gold);margin:8px 0;
 }
-p{
- color:var(--muted);
- line-height:1.6
+.wallet-number small{font-size:14px;color:#d9c6a0}
+.row{
+  display:flex;justify-content:space-between;
+  align-items:center;gap:10px;
 }
-.small{font-size:12px;color:var(--muted)}
-.gold{color:var(--gold)}
-.wallet{
- font-size:43px;
- color:var(--gold);
- font-weight:900;
- margin:13px 0
+.user-name{font-size:14px;font-weight:700}
+.user-email{
+  font-size:11px;color:var(--muted);
+  overflow-wrap:anywhere;margin-top:4px;
 }
-.pill{
- display:inline-block;
- padding:7px 11px;
- border-radius:20px;
- background:#39204e;
- color:var(--gold);
- font-size:12px
+.status{
+  font-size:11px;padding:7px 10px;
+  border-radius:20px;background:#35271b;
+  color:var(--gold);font-weight:700;
 }
-.grid{
- display:grid;
- grid-template-columns:repeat(3,1fr);
- gap:9px
+.stats{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;margin-top:14px;
 }
 .stat{
- background:#10091d;
- border:1px solid var(--border);
- border-radius:13px;
- padding:15px 7px;
- text-align:center
+  text-align:center;background:#100d1d;
+  border:1px solid var(--line);
+  border-radius:14px;padding:15px 8px;
 }
-.stat strong{
- display:block;
- font-size:23px;
- color:var(--gold);
- margin-bottom:5px
-}
-.market{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:10px
-}
-.market-item{
- background:#10091d;
- border-radius:13px;
- padding:14px;
- border:1px solid var(--border)
-}
-.market-item strong{
- display:block;
- margin-top:10px;
- color:#fff;
- font-size:19px
+.stat strong{display:block;font-size:22px}
+.stat span{font-size:11px;color:var(--muted)}
+.notice{
+  border:1px solid #72512c;
+  background:#2a201b;border-radius:16px;
+  padding:16px;line-height:1.6;
+  font-size:13px;color:#f1d4a7;
+  margin-top:16px;
 }
 .numbers{
- display:grid;
- grid-template-columns:repeat(3,1fr);
- gap:10px;
- margin:15px 0
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;margin-top:16px;
 }
 .number{
- padding:18px;
- font-size:24px;
- background:#27143e;
- color:#fff;
- border:1px solid var(--border);
- border-radius:13px;
- opacity:.55
+  border:1px solid #4b385e;
+  border-radius:14px;padding:19px 8px;
+  text-align:center;background:#20172f;
+  color:#b9a8d2;font-size:24px;font-weight:900;
+  opacity:.55;
+}
+.stakes{
+  display:flex;flex-wrap:wrap;gap:8px;
+  margin-top:16px;
+}
+.stake{
+  flex:1;min-width:55px;
+  padding:12px 8px;border-radius:12px;
+  background:#241b34;color:#c2b4d4;
+  border:1px solid #49365c;
+  font-size:13px;font-weight:800;
+  opacity:.6;
 }
 .primary{
- display:block;
- width:100%;
- padding:17px;
- border-radius:13px;
- color:#211027;
- background:linear-gradient(90deg,#ffdb7d,#f2a742);
- font-size:16px
+  display:block;width:100%;
+  background:linear-gradient(90deg,#9868df,#f0b856);
+  color:#120d19;padding:16px;border-radius:14px;
+  font-size:15px;font-weight:900;margin-top:18px;
 }
 .primary:disabled{
- opacity:.55;
- cursor:not-allowed
+  opacity:.45;cursor:not-allowed;
 }
-.notice{
- background:#291a39;
- border:1px solid #74537e;
- padding:14px;
- border-radius:12px;
- color:#f4d8ff;
- font-size:14px;
- line-height:1.6
+.menu{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;margin-top:16px;
 }
-.links{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:10px
+.menu a{
+  padding:16px 10px;border:1px solid var(--line);
+  border-radius:15px;background:#1c172b;
+  text-align:center;font-size:13px;font-weight:700;
 }
-.links a{
- text-decoration:none;
- background:#301a49;
- color:#fff;
- border:1px solid var(--border);
- padding:15px 8px;
- border-radius:12px;
- text-align:center;
- font-size:14px
+.menu a span{display:block;font-size:23px;margin-bottom:8px}
+.history-item{
+  padding:12px 0;border-bottom:1px solid var(--line);
+  font-size:12px;
 }
-.history-row{
- padding:13px 0;
- border-bottom:1px solid var(--border);
- font-size:13px
-}
-.history-row:last-child{border-bottom:0}
-.history-row strong{
- display:block;
- margin-bottom:6px
+.history-item:last-child{border:0}
+.history-main{font-weight:800}
+.history-sub{color:var(--muted);margin-top:4px}
+.history-change{font-weight:900;color:var(--gold)}
+.empty{
+  text-align:center;color:var(--muted);
+  padding:20px 5px;font-size:13px;
 }
 footer{
- text-align:center;
- padding:15px;
- color:var(--muted);
- font-size:12px
+  text-align:center;color:#817591;
+  padding:28px 12px;font-size:11px;
+  line-height:1.7;
 }
-#mainApp{display:none}
-#mainApp.ready{display:block}
-#authLoader{
- text-align:center;
- padding:70px 20px;
- color:var(--gold)
-}
-@media(max-width:360px){
- .brand{font-size:17px}
- .wallet{font-size:35px}
- .market-item strong{font-size:16px}
-}
+.hidden{display:none}
 </style>
 </head>
 
 <body>
-
-<div id="authLoader">
- <h2>Samrat X-Treme</h2>
- <p>Checking your account...</p>
-</div>
-
-<div id="mainApp">
+<div class="container">
 
 <header>
- <div class="brand">SAMRAT <span>X-TREME</span></div>
- <button id="logoutButton" class="logout">Logout</button>
+  <div>
+    <div class="brand">SAMRAT <span>X-TREME</span></div>
+    <div class="subbrand">THE SKILL ARENA</div>
+  </div>
+  <button class="logout" id="logoutBtn">LOGOUT</button>
 </header>
 
-<main>
-
-<section class="card center">
- <span class="pill">PLAYER DASHBOARD</span>
- <h1>Welcome, <span id="userName">Player</span></h1>
- <div class="small" id="userEmail"></div>
-</section>
-
-<section class="card center">
- <div class="small">YOUR VIRTUAL COIN WALLET</div>
- <div class="wallet">
-  <span id="wallet">—</span> VC
- </div>
- <span class="pill" id="walletStatus">Connecting...</span>
+<section class="hero">
+  <div class="eyebrow">WELCOME TO THE ARENA</div>
+  <h1>PLAY SMART.<br>RISE HIGH.</h1>
+  <p>
+    A virtual-coin gaming experience with
+    market-inspired challenges.
+  </p>
+  <span class="pill">SECURITY UPGRADE IN PROGRESS</span>
 </section>
 
 <section class="card">
- <h2>Game Statistics</h2>
- <div class="grid">
-  <div class="stat">
-   <strong id="totalGames">0</strong>
-   <span class="small">Games</span>
+  <div class="row">
+    <div>
+      <div class="user-name" id="userName">Loading...</div>
+      <div class="user-email" id="userEmail"></div>
+    </div>
+    <span class="status" id="accountStatus">CONNECTING</span>
   </div>
-  <div class="stat">
-   <strong id="wins">0</strong>
-   <span class="small">Wins</span>
+
+  <div style="margin-top:20px">
+    <div class="card-title">Your Virtual Coin Wallet</div>
+    <div class="wallet-number">
+      <span id="wallet">—</span>
+      <small>VC</small>
+    </div>
+    <div class="user-email" id="walletMessage">
+      Reading your existing wallet...
+    </div>
   </div>
-  <div class="stat">
-   <strong id="losses">0</strong>
-   <span class="small">Losses</span>
+
+  <div class="stats">
+    <div class="stat">
+      <strong id="totalGames">—</strong>
+      <span>ROUNDS</span>
+    </div>
+    <div class="stat">
+      <strong id="wins">—</strong>
+      <span>WINS</span>
+    </div>
+    <div class="stat">
+      <strong id="losses">—</strong>
+      <span>LOSSES</span>
+    </div>
   </div>
- </div>
+</section>
+
+<div class="notice">
+  🔒 <strong>Game temporarily paused</strong>
+  <div>
+    Secure server-side game settlement is being prepared.
+    Your existing wallet balance is not modified by this page.
+  </div>
+</div>
+
+<section class="card">
+  <div class="row">
+    <div class="card-title">X-Treme Number Challenge</div>
+    <span class="status">PAUSED</span>
+  </div>
+
+  <p style="font-size:13px;color:var(--muted)">
+    Choose a number from 1 to 9 when secure gameplay resumes.
+  </p>
+
+  <div class="numbers" id="numberGrid">
+    <div class="number">1</div>
+    <div class="number">2</div>
+    <div class="number">3</div>
+    <div class="number">4</div>
+    <div class="number">5</div>
+    <div class="number">6</div>
+    <div class="number">7</div>
+    <div class="number">8</div>
+    <div class="number">9</div>
+  </div>
+
+  <div class="card-title" style="margin-top:20px">
+    Virtual Coin Entry
+  </div>
+
+  <div class="stakes">
+    <div class="stake">20 VC</div>
+    <div class="stake">50 VC</div>
+    <div class="stake">75 VC</div>
+    <div class="stake">100 VC</div>
+    <div class="stake">150 VC</div>
+  </div>
+
+  <button class="primary" id="playButton" disabled>
+    🔒 GAME TEMPORARILY PAUSED
+  </button>
+</section>
+
+<section class="menu">
+  <a href="profile.html">
+    <span>👤</span>My Profile
+  </a>
+  <a href="referral.html">
+    <span>🤝</span>Referral
+  </a>
+  <a href="reward.html">
+    <span>🎁</span>Rewards
+  </a>
+  <a href="admin-add-vc.html">
+    <span>🪙</span>Admin VC
+  </a>
 </section>
 
 <section class="card">
- <h2>Live Market Reference</h2>
- <div class="market">
-  <div class="market-item">
-   <span class="small">Bitcoin / USDT</span>
-   <strong id="btcPrice">Loading...</strong>
+  <div class="row">
+    <div class="card-title">Recent Game History</div>
+    <span class="status">READ ONLY</span>
   </div>
-  <div class="market-item">
-   <span class="small">Gold / USD</span>
-   <strong id="goldPrice">Loading...</strong>
+  <div id="historyList">
+    <div class="empty">Loading history...</div>
   </div>
- </div>
- <p class="small">
-  Market data is informational only.
-  It is not being used to settle games.
- </p>
 </section>
-
-<section class="card">
- <h2 class="gold">X-Treme Number Game</h2>
- <p>Choose your number from 1 to 9.</p>
-
- <div class="numbers">
-  <button class="number" disabled>1</button>
-  <button class="number" disabled>2</button>
-  <button class="number" disabled>3</button>
-  <button class="number" disabled>4</button>
-  <button class="number" disabled>5</button>
-  <button class="number" disabled>6</button>
-  <button class="number" disabled>7</button>
-  <button class="number" disabled>8</button>
-  <button class="number" disabled>9</button>
- </div>
-
- <button id="lockButton" class="primary" disabled>
-  GAME TEMPORARILY PAUSED
- </button>
-
- <p id="message" class="notice">
-  Game is temporarily paused while secure
-  server-side wallet settlement is prepared.
-  Your existing VC balance will not be changed
-  by this page.
- </p>
-</section>
-
-<section class="card">
- <h2>Recent Game History</h2>
- <div id="historyList">
-  <p>Loading history...</p>
- </div>
-</section>
-
-<section class="card">
- <h2>Explore Samrat X-Treme</h2>
- <div class="links">
-  <a href="profile.html">My Profile</a>
-  <a href="referral.html">Referrals</a>
-  <a href="reward.html">Rewards</a>
-  <a href="admin-add-vc.html">Admin VC</a>
- </div>
-</section>
-
-</main>
 
 <footer>
- Samrat X-Treme • Virtual Coins Only
+  SAMRAT X-TREME<br>
+  Virtual coins are not cash and have no cash withdrawal value.<br>
+  © 2026 Samrat X-Treme
 </footer>
 
 </div>
 
 <script>
-const ENDPOINT =
- 'https://sgp.cloud.appwrite.io/v1';
-
-const PROJECT_ID =
- '6a7f2add0011a7bfc21a';
-
-const DATABASE_ID =
- '6a7f2d1d0035d9815939';
-
-const USER_PROFILES_TABLE = 'user_profiles';
-const GAME_HISTORY_TABLE = 'game_history';
+const ENDPOINT = 'https://sgp.cloud.appwrite.io/v1';
+const PROJECT_ID = '6a7f2add0011a7bfc21a';
+const DATABASE_ID = '6a7f2d1d0035d9815939';
+const PROFILES_TABLE = 'user_profiles';
+const HISTORY_TABLE = 'game_history';
 
 const client = new Appwrite.Client()
- .setEndpoint(ENDPOINT)
- .setProject(PROJECT_ID);
+  .setEndpoint(ENDPOINT)
+  .setProject(PROJECT_ID);
 
 const account = new Appwrite.Account(client);
 const tablesDB = new Appwrite.TablesDB(client);
 
 const el = id => document.getElementById(id);
 
-let currentUser = null;
-
 function safeNumber(value) {
- const n = Number(value);
- return Number.isFinite(n) ? n : 0;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
-function showApp() {
- el('authLoader').style.display = 'none';
- el('mainApp').classList.add('ready');
+function displayWallet(profile) {
+  const wallet = safeNumber(profile.wallet);
+
+  el('wallet').textContent =
+    wallet.toLocaleString('en-IN');
+
+  el('wins').textContent =
+    safeNumber(profile.wins).toLocaleString('en-IN');
+
+  el('losses').textContent =
+    safeNumber(profile.losses).toLocaleString('en-IN');
+
+  el('totalGames').textContent =
+    safeNumber(profile.rounds).toLocaleString('en-IN');
+
+  el('walletMessage').textContent =
+    'Existing balance • Read-only display';
+
+  el('accountStatus').textContent = 'CONNECTED';
 }
 
-function showWalletError(message) {
- el('wallet').textContent = '—';
- el('walletStatus').textContent = message;
-}
+async function loadProfile(user) {
+  let profile = null;
 
-async function loadProfile() {
- const result = await tablesDB.listRows({
-  databaseId: DATABASE_ID,
-  tableId: USER_PROFILES_TABLE,
-  queries: [
-   Appwrite.Query.equal('userId', currentUser.$id),
-   Appwrite.Query.limit(2)
-  ]
- });
-
- const rows = result.rows || [];
-
- if (rows.length !== 1) {
-  showWalletError('Profile unavailable');
-  return;
- }
-
- const profile = rows[0];
-
- const wallet = safeNumber(profile.wallet);
-
- if (!Number.isSafeInteger(wallet) || wallet < 0) {
-  showWalletError('Invalid balance');
-  return;
- }
-
- el('wallet').textContent =
-  wallet.toLocaleString('en-IN');
-
- el('walletStatus').textContent = 'Balance loaded';
-
- el('totalGames').textContent =
-  safeNumber(profile.rounds);
-
- el('wins').textContent =
-  safeNumber(profile.wins);
-
- el('losses').textContent =
-  safeNumber(profile.losses);
-}
-
-async function loadHistory() {
- const list = el('historyList');
-
- try {
-  const result = await tablesDB.listRows({
-   databaseId: DATABASE_ID,
-   tableId: GAME_HISTORY_TABLE,
-   queries: [
-    Appwrite.Query.equal('userId', currentUser.$id),
-    Appwrite.Query.limit(30)
-   ]
-  });
-
-  const rows = (result.rows || []).sort(
-   (a,b) => new Date(b.playedAt || b.$createdAt || 0) -
-            new Date(a.playedAt || a.$createdAt || 0)
-  );
-
-  list.replaceChildren();
-
-  if (!rows.length) {
-   list.textContent = 'No game history available.';
-   return;
+  try {
+    profile = await tablesDB.getRow({
+      databaseId: DATABASE_ID,
+      tableId: PROFILES_TABLE,
+      rowId: user.$id
+    });
+  } catch (err) {
+    console.warn('Direct profile lookup failed:', err.message);
   }
 
-  for (const item of rows) {
-   const div = document.createElement('div');
-   div.className = 'history-row';
+  if (!profile) {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: PROFILES_TABLE,
+      queries: [
+        Appwrite.Query.equal('userId', user.$id),
+        Appwrite.Query.limit(2)
+      ]
+    });
 
-   const heading = document.createElement('strong');
-   heading.textContent =
-    `Round ${item.round} • Pick ${item.pick}`;
+    const rows = response.rows || [];
 
-   const details = document.createElement('span');
-   const change = safeNumber(item.change);
-   details.textContent =
-    `Result ${item.result} • ${change >= 0 ? '+' : ''}${change} VC`;
+    if (rows.length !== 1) {
+      throw new Error('Profile not uniquely found');
+    }
 
-   div.append(heading,details);
-   list.appendChild(div);
+    profile = rows[0];
   }
 
- } catch (err) {
-  console.error('History error:',err);
-  list.textContent = 'History currently unavailable.';
- }
+  if (String(profile.userId) !== String(user.$id)) {
+    throw new Error('Profile ownership mismatch');
+  }
+
+  displayWallet(profile);
 }
 
-async function loadBitcoin() {
- try {
-  const response = await fetch(
-   'https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT',
-   {cache:'no-store'}
-  );
+function historyRow(item) {
+  const row = document.createElement('div');
+  row.className = 'history-item';
 
-  if (!response.ok) throw new Error('BTC unavailable');
+  const top = document.createElement('div');
+  top.className = 'row';
 
-  const data = await response.json();
-  const price = Number(data.price);
+  const title = document.createElement('span');
+  title.className = 'history-main';
+  title.textContent =
+    'Round ' + safeNumber(item.round) +
+    ' • Pick ' + safeNumber(item.pick);
 
-  if (!Number.isFinite(price)) throw new Error('Invalid BTC');
+  const change = document.createElement('span');
+  change.className = 'history-change';
 
-  el('btcPrice').textContent =
-   '$' + price.toLocaleString('en-US',{
-    maximumFractionDigits:2
-   });
+  const amount = safeNumber(item.change);
+  change.textContent =
+    (amount >= 0 ? '+' : '') + amount + ' VC';
 
- } catch (err) {
-  el('btcPrice').textContent = 'Unavailable';
- }
+  top.append(title, change);
+
+  const sub = document.createElement('div');
+  sub.className = 'history-sub';
+
+  const date = item.playedAt || item.$createdAt;
+  const timestamp = date ? new Date(date) : null;
+
+  sub.textContent =
+    (item.won ? 'WIN' : 'MISS') +
+    ' • Result ' + safeNumber(item.result) +
+    (timestamp && !Number.isNaN(timestamp.getTime())
+      ? ' • ' + timestamp.toLocaleString('en-IN')
+      : '');
+
+  row.append(top, sub);
+  return row;
 }
 
-async function loadGold() {
- try {
-  const response = await fetch(
-   'https://api.gold-api.com/price/XAU',
-   {cache:'no-store'}
-  );
+async function loadHistory(user) {
+  const list = el('historyList');
 
-  if (!response.ok) throw new Error('Gold unavailable');
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: DATABASE_ID,
+      tableId: HISTORY_TABLE,
+      queries: [
+        Appwrite.Query.equal('userId', user.$id),
+        Appwrite.Query.limit(30)
+      ]
+    });
 
-  const data = await response.json();
-  const price = Number(data.price);
+    const rows = response.rows || [];
 
-  if (!Number.isFinite(price)) throw new Error('Invalid gold');
+    rows.sort((a, b) => {
+      const dateA = new Date(
+        a.playedAt || a.$createdAt || 0
+      ).getTime();
 
-  el('goldPrice').textContent =
-   '$' + price.toLocaleString('en-US',{
-    maximumFractionDigits:2
-   });
+      const dateB = new Date(
+        b.playedAt || b.$createdAt || 0
+      ).getTime();
 
- } catch (err) {
-  el('goldPrice').textContent = 'Unavailable';
- }
-}
+      return dateB - dateA;
+    });
 
-async function logout() {
- const button = el('logoutButton');
- button.disabled = true;
+    list.replaceChildren();
 
- try {
-  await account.deleteSession({
-   sessionId:'current'
-  });
+    if (!rows.length) {
+      list.innerHTML =
+        '<div class="empty">No rounds played yet.</div>';
+      return;
+    }
 
-  location.replace('login.html');
+    rows.forEach(item => {
+      if (String(item.userId) === String(user.$id)) {
+        list.appendChild(historyRow(item));
+      }
+    });
 
- } catch (err) {
-  console.error('Logout failed:',err);
-  button.disabled = false;
-  el('message').textContent =
-   'Logout failed. Please try again.';
- }
+  } catch (err) {
+    console.error('History error:', err);
+    list.textContent = 'History unavailable.';
+    list.className = 'empty';
+  }
 }
 
 async function startApp() {
- try {
-  currentUser = await account.get();
- } catch (err) {
-  location.replace('login.html');
-  return;
- }
+  let user;
 
- el('userName').textContent =
-  currentUser.name || 'Player';
+  try {
+    user = await account.get();
+  } catch {
+    window.location.replace('login.html');
+    return;
+  }
 
- el('userEmail').textContent =
-  currentUser.email || '';
+  el('userName').textContent = user.name || 'Player';
+  el('userEmail').textContent = user.email || '';
 
- showApp();
+  try {
+    await loadProfile(user);
+  } catch (err) {
+    console.error('Profile error:', err);
 
- try {
-  await loadProfile();
- } catch (err) {
-  console.error('Profile error:',err);
-  showWalletError('Wallet temporarily unavailable');
- }
+    el('wallet').textContent = '—';
+    el('walletMessage').textContent =
+      'Wallet could not be loaded. No changes were made.';
+    el('accountStatus').textContent = 'SYNC ERROR';
+  }
 
- await Promise.allSettled([
-  loadHistory(),
-  loadBitcoin(),
-  loadGold()
- ]);
-
- setInterval(loadBitcoin,60000);
- setInterval(loadGold,60000);
+  await loadHistory(user);
 }
 
-el('logoutButton').addEventListener('click',logout);
+el('logoutBtn').addEventListener('click', async () => {
+  const button = el('logoutBtn');
+  button.disabled = true;
+
+  try {
+    await account.deleteSession({
+      sessionId: 'current'
+    });
+
+    window.location.replace('login.html');
+  } catch (err) {
+    console.error('Logout error:', err);
+    button.disabled = false;
+    alert('Logout failed. Please try again.');
+  }
+});
 
 startApp();
-</script>
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('service-worker.js')
+      .then(registration => {
+        registration.update().catch(() => {});
+      })
+      .catch(console.error);
+  });
+}
+</script>
 </body>
 </html>
