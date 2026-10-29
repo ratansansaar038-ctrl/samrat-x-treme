@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08010f">
+<title>VC Requests | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+<style>
+*{box-sizing:border-box}
+body{
+margin:0;padding:16px;color:white;
+font-family:Arial,sans-serif;
+background:radial-gradient(circle at top,#431267,#08010f 75%);
+min-height:100vh
+}
+.wrap{max-width:720px;margin:auto}
+h1{color:#ffe16a;font-size:26px}
+a{color:#ffe16a;text-decoration:none}
+.card{
+background:#211033;border:1px solid #7046d8;
+border-radius:16px;padding:17px;margin:14px 0
+}
+.small{font-size:12px;color:#b9a9d1;overflow-wrap:anywhere}
+.amount{font-size:27px;font-weight:bold;color:#ffe16a;margin:10px 0}
+.status{font-size:12px;color:#b9a9d1;margin-top:10px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}
+button{
+padding:13px;border:0;border-radius:10px;
+font-size:13px;font-weight:bold;cursor:pointer
+}
+button:disabled{opacity:.45;cursor:default}
+.approve{background:#43e5a4;color:#061d14}
+.reject{background:#ff7488;color:#2b0710}
+.refresh{background:#ffe16a;color:#211033;margin:12px 0}
+#message{margin:15px 0;color:#d6c6eb;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<a href="admin-add-vc.html">← BACK TO VC ADMIN</a>
+<h1>VC REQUESTS</h1>
+<p class="small">Approve or reject player virtual coin requests.</p>
+<div id="who" class="small">Checking admin login...</div>
+<button class="refresh" id="refresh" disabled>REFRESH REQUESTS</button>
+<div id="message" role="status"></div>
+<div id="requests"></div>
+</div>
+
+<script>
+const PROJECT="6a7f2add0011a7bfc21a";
+const FUNCTION_ID="6adf3c3a003718eab6c2";
+const ADMIN_USER_ID="6a8031600025646ad144";
+
+const client=new Appwrite.Client()
+.setEndpoint("https://sgp.cloud.appwrite.io/v1")
+.setProject(PROJECT);
+
+const account=new Appwrite.Account(client);
+const functions=new Appwrite.Functions(client);
+
+const el=id=>document.getElementById(id);
+let isAdmin=false;
+let busy=false;
+
+async function callFunction(payload){
+const execution=await functions.createExecution({
+functionId:FUNCTION_ID,
+body:JSON.stringify(payload),
+async:false,
+method:"POST",
+path:"/"
+});
+
+let data={};
+try{
+data=JSON.parse(execution.responseBody||"{}");
+}catch{}
+
+if(execution.status!=="completed" ||
+execution.responseStatusCode!==200 ||
+!data.ok){
+throw new Error(
+data.error||execution.errors||
+"Function failed (HTTP "+execution.responseStatusCode+")"
+);
+}
+return data;
+}
+
+function text(parent,tag,value,className){
+const node=document.createElement(tag);
+node.textContent=String(value??"");
+if(className)node.className=className;
+parent.appendChild(node);
+return node;
+}
+
+async function loadRequests(){
+if(!isAdmin||busy)return;
+el("refresh").disabled=true;
+el("message").textContent="Loading requests...";
+el("requests").replaceChildren();
+
+try{
+const data=await callFunction({action:"list_vc_requests"});
+const pending=(data.requests||[]).filter(r=>r.status==="pending");
+
+el("message").textContent=pending.length+
+" pending VC request(s)";
+
+for(const request of pending){
+const card=document.createElement("div");
+card.className="card";
+
+text(card,"div","PLAYER ID: "+request.userId,"small");
+text(card,"div",Number(request.amount).toLocaleString("en-IN")+" VC","amount");
+text(card,"div","Status: "+request.status,"small");
+
+if(request.createdAt){
+text(card,"div",
+"Requested: "+new Date(request.createdAt).toLocaleString("en-IN"),
+"small");
+}
+
+const actions=document.createElement("div");
+actions.className="actions";
+
+const approve=document.createElement("button");
+approve.className="approve";
+approve.textContent="APPROVE";
+
+const reject=document.createElement("button");
+reject.className="reject";
+reject.textContent="REJECT";
+
+approve.onclick=()=>decide(request,"approved",approve,reject);
+reject.onclick=()=>decide(request,"rejected",approve,reject);
+
+actions.append(approve,reject);
+card.appendChild(actions);
+el("requests").appendChild(card);
+}
+}catch(err){
+el("message").textContent="Error: "+err.message;
+}finally{
+el("refresh").disabled=false;
+}
+}
+
+async function decide(request,decision,approve,reject){
+if(!isAdmin||busy)return;
+
+const verb=decision==="approved"?"APPROVE":"REJECT";
+
+if(!confirm(
+verb+" "+request.amount+" VC for user "+request.userId+"?"
+))return;
+
+busy=true;
+approve.disabled=true;
+reject.disabled=true;
+el("refresh").disabled=true;
+el("message").textContent="Processing "+decision+"...";
+
+try{
+const result=await callFunction({
+action:"decide_vc_request",
+requestId:request.id,
+decision
+});
+
+el("message").textContent=
+result.status==="approved"
+? "Approved! "+result.added+" VC credited. New wallet: "+result.balance
+: "VC request rejected.";
+
+busy=false;
+await loadRequests();
+}catch(err){
+el("message").textContent=
+"Action failed: "+err.message+
+". Check request status and function logs before retrying.";
+}finally{
+busy=false;
+el("refresh").disabled=false;
+}
+}
+
+el("refresh").onclick=loadRequests;
+
+(async()=>{
+try{
+const user=await account.get();
+
+if(user.$id!==ADMIN_USER_ID){
+el("who").textContent="Access denied: not an admin account.";
+return;
+}
+
+isAdmin=true;
+el("who").textContent="Admin: "+(user.email||user.name);
+el("refresh").disabled=false;
+await loadRequests();
+
+}catch(err){
+el("who").textContent="Admin login required: "+err.message;
+}
+})();
+</script>
+</body>
+</html>
