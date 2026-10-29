@@ -371,7 +371,7 @@ async function loadProfile() {
   if (code) {
     el("referralCode").textContent = code;
 
-    const url = new URL("register.html", window.location.href);
+    const url = new URL("signup.html", window.location.href);
     url.searchParams.set("ref", code);
 
     referralLink = url.href;
