@@ -101,19 +101,21 @@ export default async ({ req, res, log, error }) => {
       error: "Login required"
     });
   }
-const missingEnv = [
-  "APPWRITE_API_KEY",
-  "APPWRITE_DATABASE_ID",
-  "USERS_PROFILES_TABLE_ID"
-].filter(name => !String(env[name] || "").trim());
 
-if (missingEnv.length) {
-  error("Missing variables: " + missingEnv.join(", "));
-  return respond(res, 503, {
-    ok: false,
-    error: "Backend configuration incomplete. Missing: " + missingEnv.join(", ")
-  });
-}
+  const missingEnv = [
+    "APPWRITE_API_KEY",
+    "APPWRITE_DATABASE_ID",
+    "USERS_PROFILES_TABLE_ID"
+  ].filter(name => !String(env[name] || "").trim());
+
+  if (missingEnv.length) {
+    error("Missing variables: " + missingEnv.join(", "));
+    return respond(res, 503, {
+      ok: false,
+      error: "Backend configuration incomplete. Missing: " +
+        missingEnv.join(", ")
+    });
+  }
 
   let input;
   try {
@@ -169,7 +171,6 @@ if (missingEnv.length) {
   };
 
   // USER VC REQUEST
-  // A request does not change the wallet.
 
   if (input.action === "request_vc") {
     if (!requestsPath) {
@@ -234,7 +235,7 @@ if (missingEnv.length) {
     }
   }
 
-  // EXISTING REFERRAL REGISTRATION
+  // REFERRAL REGISTRATION
 
   if (input.action === "register_referral") {
     try {
@@ -348,7 +349,6 @@ if (missingEnv.length) {
   }
 
   // ADMIN AUTHORIZATION
-  // All actions below require admin identity.
 
   if (!env.ADMIN_USER_ID ||
       actorId !== env.ADMIN_USER_ID) {
@@ -358,7 +358,7 @@ if (missingEnv.length) {
     });
   }
 
-  // ADMIN: LIST VC REQUESTS
+  // LIST VC REQUESTS
 
   if (input.action === "list_vc_requests") {
     if (!requestsPath) {
@@ -406,7 +406,7 @@ if (missingEnv.length) {
     }
   }
 
-  // ADMIN: APPROVE OR REJECT VC REQUEST
+  // APPROVE OR REJECT VC REQUEST
 
   if (input.action === "decide_vc_request") {
     if (!requestsPath) {
@@ -455,101 +455,84 @@ if (missingEnv.length) {
         });
       }
 
-    
-      // Atomic VC decision: request and wallet update together.
-      const profile = decision === "approved"
-        ? await findProfile(request.userId)
-        : null;
+      if (decision === "rejected") {
+        await apiRequest(
+          "PATCH",
+          rowPath,
+          { data: { status: "rejected" } },
+          env
+        );
 
-      if (decision === "approved" &&
-          (!profile ||
-           !Number.isSafeInteger(profile.wallet) ||
-           profile.wallet < 0 ||
-           !Number.isSafeInteger(
-             profile.wallet + request.amount
-           ))) {
+        return respond(res, 200, {
+          ok: true,
+          requestId,
+          status: "rejected"
+        });
+      }
+
+      const profile = await findProfile(request.userId);
+
+      if (!profile ||
+          !Number.isSafeInteger(profile.wallet) ||
+          profile.wallet < 0 ||
+          !Number.isSafeInteger(
+            profile.wallet + request.amount
+          )) {
         return respond(res, 409, {
           ok: false,
           error: "Invalid or missing user wallet"
         });
       }
 
-      const tx = await apiRequest(
-        "POST",
-        "/tablesdb/transactions",
-        {},
+      await apiRequest(
+        "PATCH",
+        rowPath,
+        { data: { status: "processing" } },
         env
       );
 
-      const txPath =
-        `/tablesdb/transactions/${encodeURIComponent(tx.$id)}`;
-
-      let committed = false;
-
-      try {
-        const operations = [
-          {
-            action: "update",
-            databaseId: env.APPWRITE_DATABASE_ID,
-            tableId: env.VC_REQUESTS_TABLE_ID,
-            rowId: requestId,
-            data: { status: decision }
+      const updated = await apiRequest(
+        "PATCH",
+        `${profilePath}/${encodeURIComponent(profile.$id)}`,
+        {
+          data: {
+            wallet: profile.wallet + request.amount
           }
-        ];
+        },
+        env
+      );
 
-        if (decision === "approved") {
-          operations.push({
-            action: "increment",
-            databaseId: env.APPWRITE_DATABASE_ID,
-            tableId: env.USERS_PROFILES_TABLE_ID,
-            rowId: profile.$id,
-            data: {
-              column: "wallet",
-              value: request.amount,
-              min: 0
-            }
-          });
-        }
+      await apiRequest(
+        "PATCH",
+        rowPath,
+        { data: { status: "approved" } },
+        env
+      );
 
-        await apiRequest(
-          "POST",
-          `${txPath}/operations`,
-          { operations },
-          env
-        );
-
-        await apiRequest(
-          "PATCH",
-          txPath,
-          { commit: true },
-          env
-        );
-
-        committed = true;
-
-      } finally {
-        if (!committed) {
-          try {
-            await apiRequest(
-              "PATCH",
-              txPath,
-              { rollback: true },
-              env
-            );
-          } catch (rollbackError) {
-            error(`Rollback error: ${rollbackError.message}`);
-          }
-        }
-      }
+      log(`VC request approved: ${requestId}`);
 
       return respond(res, 200, {
         ok: true,
         requestId,
-        status: decision,
-        added: decision === "approved" ? request.amount : 0
+        status: "approved",
+        added: request.amount,
+        balance: updated.wallet
       });
-      
-          
+
+    } catch (err) {
+      error(`VC approval error: ${err.message}`);
+
+      return respond(res, 500, {
+        ok: false,
+        error: "Approval failed. Check logs before retrying."
+      });
+    }
+  }
+
+  // ADMIN ADD VC
+
+  if (input.action === "add_vc") {
+    const { userId, amount } = input;
 
     if (!validId(userId) ||
         !Number.isSafeInteger(amount) ||
@@ -614,7 +597,7 @@ if (missingEnv.length) {
     }
   }
 
-  // EXISTING REWARD APPROVAL
+  // REWARD APPROVAL
 
   if (!env.REWARD_CLAIMS_TABLE_ID) {
     return respond(res, 503, {
@@ -705,4 +688,3 @@ if (missingEnv.length) {
     });
   }
 };
-        
