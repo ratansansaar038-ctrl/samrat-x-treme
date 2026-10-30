@@ -20,7 +20,7 @@
 <div class="topbar"><div><div class="wallet-title">X-TREME WALLET</div><div class="wallet">🪙 <span id="wallet">0</span></div></div><div class="live-badge"><span class="live-dot offline" id="liveDot"></span><span id="marketStatus">CONNECTING</span></div></div>
 <div class="account-bar"><div class="user-info"><div class="user-name" id="userName">Player</div><div class="user-email" id="userEmail"></div></div><button class="logout-btn" id="logoutButton" onclick="logoutUser()">LOGOUT</button></div>
 <nav class="quick-menu" aria-label="Player menu"><a class="quick-link" href="referral.html"><span>🎁</span>REFERRAL</a><a class="quick-link" href="reward.html"><span>👑</span>REWARD</a><a class="quick-link" href="profile.html"><span>👤</span>PROFILE</a></nav>
-<div class="install-wrap" id="installWrap"><button class="install-btn" id="installButton">📲 INSTALL SAMRAT X-TREME</button></div>
+<div class="install-wrap show" id="installWrap"><button class="install-btn" id="installButton" type="button">📲 INSTALL SAMRAT X-TREME</button><div id="installHelp" role="status" aria-live="polite" style="font-size:11px;color:#d8c9ef;margin:7px 4px 0;text-align:center">Free app installation — no APK required.</div></div>
 <div class="market"><div class="market-card"><div class="market-name">₿ BITCOIN / INR</div><div class="market-price btc" id="btcPrice">Loading...</div><div class="updated" id="btcUpdated">Connecting to market</div></div><div class="market-card"><div class="market-name">GOLD SPOT / INR (10g)</div><div class="market-price gold" id="goldPrice">Loading...</div><div class="updated" id="goldUpdated">Connecting to market</div></div></div>
 <div class="round-box"><span>ROUND <b id="roundId">1001</b></span><span>LIVE SNAPSHOT GAME</span></div>
 <div class="section-title">CHOOSE YOUR NUMBER</div><div class="numbers"><button class="number" onclick="selectNumber(1,this)">1</button><button class="number" onclick="selectNumber(2,this)">2</button><button class="number" onclick="selectNumber(3,this)">3</button><button class="number" onclick="selectNumber(4,this)">4</button><button class="number" onclick="selectNumber(5,this)">5</button><button class="number" onclick="selectNumber(6,this)">6</button><button class="number" onclick="selectNumber(7,this)">7</button><button class="number" onclick="selectNumber(8,this)">8</button><button class="number" onclick="selectNumber(9,this)">9</button></div>
@@ -105,7 +105,26 @@ async function saveRoundToCloud(item){
 }
 function renderHistory(){const list=el('historyList');list.replaceChildren();if(!history.length){const row=document.createElement('div');row.className='history-row';row.textContent='No rounds played yet.';list.append(row);return}for(const item of history){const row=document.createElement('div');row.className='history-row';const left=document.createElement('div'),main=document.createElement('div'),sub=document.createElement('div'),right=document.createElement('div');main.className='history-main';main.textContent='Round '+item.round+' • Pick '+item.pick+' → Result '+item.result;sub.className='history-sub';sub.textContent=item.playedAt?new Date(item.playedAt).toLocaleString('en-IN'):'';right.className=Boolean(item.won)?'history-win':'history-loss';right.textContent=(Number(item.change)>=0?'+':'')+Number(item.change)+' 🪙';left.append(main,sub);row.append(left,right);list.append(row)}}
 function newRound(){roundId=1001+roundsCount;roundLocked=false;selectedNumber=null;el('roundId').textContent=roundId;document.querySelectorAll('.number').forEach(b=>b.classList.remove('selected'));el('result').classList.remove('show');el('message').textContent='New X-Treme round ready ⚡ Choose your number.';el('lockButton').disabled=!(btcReady&&goldReady&&profileRowId)}
-let deferredInstallPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;el('installWrap').classList.add('show')});el('installButton').addEventListener('click',async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;el('installWrap').classList.remove('show')});window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;el('installWrap').classList.remove('show')});if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update().catch(()=>{})).catch(console.error));
+let deferredInstallPrompt=null;
+const installButton=el('installButton'),installHelp=el('installHelp');
+const isInstalled=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+function updateInstallUI(){
+  el('installWrap').style.display=isInstalled()?'none':'block';
+  installHelp.textContent=deferredInstallPrompt?'Tap the button to install the app.':'Android Chrome: tap Install, or use menu ⋮ → Add to Home screen / Install app.';
+}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallUI()});
+installButton.addEventListener('click',async()=>{
+  if(isInstalled())return;
+  if(deferredInstallPrompt){
+    const prompt=deferredInstallPrompt;deferredInstallPrompt=null;
+    try{await prompt.prompt();await prompt.userChoice}catch(e){console.error('Install prompt error',e)}
+    updateInstallUI();return;
+  }
+  installHelp.textContent=/iPhone|iPad|iPod/i.test(navigator.userAgent)?'iPhone Safari: Share → Add to Home Screen.':'Open this site in Android Chrome, tap menu ⋮ → Add to Home screen / Install app. If using WhatsApp, open in Chrome first.';
+});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI()});
+updateInstallUI();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update().catch(()=>{})).catch(console.error));
 async function addGameRewardPoints(points){try{const row=await tablesDB.getRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:profileRowId});await tablesDB.updateRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:profileRowId,data:{rewardPoints:(Number(row.rewardPoints)||0)+Number(points)}})}catch(e){console.error('Reward points error',e)}}
 startApp();
 </script>
