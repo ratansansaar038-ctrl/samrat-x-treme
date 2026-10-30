@@ -101,17 +101,19 @@ export default async ({ req, res, log, error }) => {
       error: "Login required"
     });
   }
+const missingEnv = [
+  "APPWRITE_API_KEY",
+  "APPWRITE_DATABASE_ID",
+  "USERS_PROFILES_TABLE_ID"
+].filter(name => !String(env[name] || "").trim());
 
-  if (![
-    env.APPWRITE_API_KEY,
-    env.APPWRITE_DATABASE_ID,
-    env.USERS_PROFILES_TABLE_ID
-  ].every(Boolean)) {
-    return respond(res, 503, {
-      ok: false,
-      error: "Backend configuration incomplete"
-    });
-  }
+if (missingEnv.length) {
+  error("Missing variables: " + missingEnv.join(", "));
+  return respond(res, 503, {
+    ok: false,
+    error: "Backend configuration incomplete. Missing: " + missingEnv.join(", ")
+  });
+}
 
   let input;
   try {
