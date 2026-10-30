@@ -616,7 +616,7 @@ if (missingEnv.length) {
   if (!env.REWARD_CLAIMS_TABLE_ID) {
     return respond(res, 503, {
       ok: false,
-      error: "Backend configuration incomplete"
+      error: "Reward claims table ID missing"
     });
   }
 
