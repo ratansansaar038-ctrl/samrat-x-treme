@@ -382,6 +382,7 @@ export default async ({ req, res, log, error }) => {
 
       const requests = (result.rows || []).map(row => ({
         id: row.$id,
+        requestId: row.$id,
         userId: row.userId,
         amount: row.amount,
         status: row.status,
