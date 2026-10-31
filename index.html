@@ -148,7 +148,7 @@ a{color:inherit}
   </button>
   <div id="installHelp" role="status" aria-live="polite"
        style="font-size:11px;color:#d8c9ef;margin:7px 4px 0;text-align:center">
-    Download Android APK (2.68 MB)
+    Download Android APK (2.23 MB)
   </div>
 </div>
 
@@ -785,13 +785,13 @@ function newRound(){
 /* DIRECT ANDROID APK DOWNLOAD */
 
 const apkDownloadUrl=
-  'https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/download/v1.0.0/app-debug.apk';
+  'https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/download/v1.0.1/app-release.apk';
 
 const installButton=el('installButton');
 const installHelp=el('installHelp');
 
 installButton.disabled=false;
-installHelp.textContent='Download Android APK (2.68 MB)';
+installHelp.textContent='Download Android APK (2.23 MB)';
 
 installButton.addEventListener('click',()=>{
   window.location.href=apkDownloadUrl;
