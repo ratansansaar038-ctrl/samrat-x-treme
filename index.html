@@ -1,40 +1,138 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08010f"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><title>Samrat X-Treme</title><script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08010f">
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png">
+<title>Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#3a155f,#12051f 45%,#050108);color:#fff;font-family:Arial,sans-serif}.app{max-width:480px;margin:auto;padding:18px 14px 40px}.hero{text-align:center;padding:22px 0}.brand{font:900 42px Georgia;color:#ffdb75}.sub{font-size:25px;font-style:italic;letter-spacing:4px;color:#e9c7ff;font-weight:bold}.panel{background:linear-gradient(135deg,#181027,#291049);border:1px solid #7046d8;border-radius:17px;padding:15px;margin-bottom:13px}.flex{display:flex;justify-content:space-between;align-items:center;gap:8px}.muted{font-size:12px;color:#c9b5ff}.wallet{font-size:25px;color:#ffdc68;font-weight:900}.goal{text-align:center;color:#ffdb75;font-size:27px;font-weight:bold}.goal small{display:block;color:#cbb9dd;font-size:11px;margin-top:6px}.links{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:13px 0}.links a{color:#fff;text-decoration:none;text-align:center;border:1px solid #753fc2;border-radius:13px;padding:13px 2px;background:#261245;font-size:12px;font-weight:bold}.btn{background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);border:0;border-radius:14px;padding:14px;font-weight:900;width:100%;color:#260617;margin:8px 0;cursor:pointer}.btn:disabled{opacity:.55}.secondary{background:#45175c;color:#fff;border:1px solid #8d55df}.section{text-align:center;font-size:12px;color:#d3c3ff;font-weight:900;margin:22px 0 12px;letter-spacing:1px}.timer{text-align:center;color:#ffe168;font-size:40px;font-weight:900}.center{text-align:center}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.number{height:65px;background:#24113f;color:#fff;border:2px solid #6944b8;border-radius:15px;font-size:27px;font-weight:bold}.number.active{background:linear-gradient(135deg,#ffe45c,#ff8a00);color:#260617}.coins{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.coin{background:#201332;color:white;border:1px solid #6f4cc0;border-radius:12px;padding:14px 4px}.coin.active{background:linear-gradient(135deg,#6332ff,#e82ebd)}.row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #45315d}.remove{background:none;color:#ff9db7;border:0}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{text-align:center;background:#100a1d;padding:14px 3px;border-radius:12px}.stat strong{display:block;color:#ffe168;font-size:20px}.stat span{font-size:11px;color:#b1a4c6}.input{width:100%;padding:12px;border-radius:10px;background:#0d081a;border:1px solid #6f4cc0;color:#fff;margin-top:9px}.status{font-size:12px;overflow-wrap:anywhere;line-height:1.7;color:#f7d2ee}.small{font-size:11px;color:#bcaed0;line-height:1.6}.badge{font-size:10px;color:#d3c3ff}.name{font-size:13px;color:#ffe16b;overflow-wrap:anywhere}
-</style></head><body><main class="app">
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#3a155f,#12051f 45%,#050108);color:white;font-family:Arial,sans-serif}.app{max-width:480px;margin:auto;padding:18px 14px 40px}.hero{text-align:center;padding:22px 0}.brand{font:900 42px Georgia;color:#ffdb75}.sub{font-size:25px;font-style:italic;letter-spacing:4px;color:#e9c7ff;font-weight:bold}.panel{background:linear-gradient(135deg,#181027,#291049);border:1px solid #7046d8;border-radius:17px;padding:15px;margin-bottom:13px}.flex{display:flex;justify-content:space-between;align-items:center;gap:8px}.muted{font-size:12px;color:#c9b5ff}.wallet{font-size:25px;color:#ffdc68;font-weight:900}.goal{text-align:center;color:#ffdb75;font-size:27px;font-weight:bold}.goal small{display:block;color:#cbb9dd;font-size:11px;margin-top:6px}.links{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:13px 0}.links a{color:white;text-decoration:none;text-align:center;border:1px solid #753fc2;border-radius:13px;padding:13px 2px;background:#261245;font-size:12px;font-weight:bold}.btn{background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);border:0;border-radius:14px;padding:14px;font-weight:900;width:100%;color:#260617;margin:8px 0;cursor:pointer}.btn:disabled{opacity:.55}.secondary{background:#45175c;color:white;border:1px solid #8d55df}.section{text-align:center;font-size:12px;color:#d3c3ff;font-weight:900;margin:22px 0 12px;letter-spacing:1px}.timer{text-align:center;color:#ffe168;font-size:40px;font-weight:900}.center{text-align:center}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.number{height:65px;background:#24113f;color:white;border:2px solid #6944b8;border-radius:15px;font-size:27px;font-weight:bold}.number.active{background:linear-gradient(135deg,#ffe45c,#ff8a00);color:#260617}.coins{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.coin{background:#201332;color:white;border:1px solid #6f4cc0;border-radius:12px;padding:14px 4px}.coin.active{background:linear-gradient(135deg,#6332ff,#e82ebd)}.row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #45315d}.remove{background:none;color:#ff9db7;border:0}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{text-align:center;background:#100a1d;padding:14px 3px;border-radius:12px}.stat strong{display:block;color:#ffe168;font-size:20px}.stat span{font-size:11px;color:#b1a4c6}.status{font-size:12px;overflow-wrap:anywhere;line-height:1.7;color:#f7d2ee}.small{font-size:11px;color:#bcaed0;line-height:1.6}.badge{font-size:10px;color:#d3c3ff}.name{font-size:13px;color:#ffe16b;overflow-wrap:anywhere}
+</style>
+</head>
+<body><main class="app">
 <header class="hero"><div style="font-size:42px">♛</div><div class="brand">SAMRAT</div><div class="sub">X-TREME</div><div class="small">PREDICT · PLAY · WIN</div></header>
 <div class="panel flex"><div><div class="muted">X-TREME WALLET</div><div class="wallet">🪙 <span id="wallet">—</span></div></div><span class="badge" id="accountStatus">CONNECTING</span></div>
 <div class="panel goal">🎯 50,000<small>PLAYERS GOAL</small></div>
 <div class="panel flex"><div><div class="name" id="userName">Player</div><div class="small" id="userEmail">Checking account...</div></div><button class="btn secondary" style="width:auto" id="logoutButton">LOGOUT</button></div>
 <nav class="links"><a href="referral.html">🎁 REFERRAL</a><a href="reward.html">👑 REWARD</a><a href="profile.html">👤 PROFILE</a></nav>
 <button class="btn secondary" id="installButton">📲 DOWNLOAD ANDROID APK</button>
-<div class="panel center"><div class="muted">NEXT 20-MINUTE DRAW · IST</div><div class="timer" id="countdown">--:--</div><div class="small">Round <span id="roundId">—</span> · Result <span id="resultTime">—</span></div><div class="small">Entries close one minute before result</div></div>
+<div class="panel center"><div class="muted">NEXT 20-MINUTE DRAW · IST</div><div class="timer" id="countdown">--:--</div><div class="small">Round <span id="roundId">—</span> · Result <span id="resultTime">—</span></div><div class="small">Entries close one minute before result</div><div class="status" id="roundStatus">Checking server round...</div></div>
 <div class="section">CHOOSE NUMBERS (1–9)</div><div class="numbers" id="numberGrid"></div>
 <div class="section">SELECT VC FOR EACH NUMBER</div><div class="coins" id="coinGrid"></div>
 <button class="btn" id="addButton">+ ADD NUMBER TO SELECTION</button>
 <div class="panel"><strong>YOUR SELECTIONS (PREVIEW)</strong><div id="betRows" class="small">No numbers selected</div><div class="row"><strong>Total VC</strong><strong id="totalStake">0 VC</strong></div><div class="row"><span>Potential payout per correct number</span><strong>8× stake</strong></div></div>
-<button class="btn" disabled>🔒 SERVER ROUND SETUP PENDING</button><div class="status center" id="message">Preview only. No VC deducted.</div>
+<button class="btn secondary" id="previewButton">🔎 CHECK ENTRY WITH SERVER (NO DEDUCTION)</button>
+<button class="btn" disabled>🔒 REAL ENTRY DISABLED UNTIL SECURE SETTLEMENT</button>
+<div class="status center" id="message">Choose numbers, then check server preview. No VC deducted.</div>
 <div class="section">PLAYER STATS</div><div class="stats"><div class="stat"><strong id="totalGames">—</strong><span>ROUNDS</span></div><div class="stat"><strong id="wins">—</strong><span>WINS</span></div><div class="stat"><strong id="losses">—</strong><span>LOSSES</span></div></div>
-<div class="panel" style="margin-top:16px"><strong>🔍 BACKEND WALLET TEST</strong><p class="small">This checks your logged-in wallet using the Appwrite Function. It does not deduct VC.</p><input class="input" id="functionId" placeholder="game-wallet Function ID (optional)"><button class="btn secondary" id="testButton">TEST BACKEND WALLET</button><div class="status" id="testResult">Not tested yet.</div></div>
+<div class="panel" style="margin-top:16px"><strong>🔍 BACKEND WALLET TEST</strong><p class="small">Reads your logged-in wallet from the server. No VC deducted.</p><button class="btn secondary" id="testButton">TEST BACKEND WALLET</button><div class="status" id="testResult">Not tested yet.</div></div>
 <div class="small center">Virtual coins have no cash value. No purchases, withdrawals or real-money rewards. Actual game entries remain disabled until secure settlement is ready.</div>
-</main><script>
+</main>
+<script>
 'use strict';
-const ENDPOINT='https://sgp.cloud.appwrite.io/v1',PROJECT='6a7f2add0011a7bfc21a',DB='6a7f2d1d0035d9815939',TABLE='user_profiles';
+const ENDPOINT='https://sgp.cloud.appwrite.io/v1';
+const PROJECT='6a7f2add0011a7bfc21a';
+const DB='6a7f2d1d0035d9815939';
+const TABLE='user_profiles';
+const GAME_FUNCTION='6ae1bcc500208a5a7efb';
 const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
 const account=new Appwrite.Account(client),tables=new Appwrite.TablesDB(client),functions=new Appwrite.Functions(client);
 const el=id=>document.getElementById(id);
-let number=null,stake=20;const picks=new Map();
-for(let i=1;i<=9;i++){const b=document.createElement('button');b.className='number';b.textContent=i;b.onclick=()=>{number=i;document.querySelectorAll('.number').forEach(x=>x.classList.remove('active'));b.classList.add('active')};el('numberGrid').append(b)}
-for(const v of [20,50,100]){const b=document.createElement('button');b.className='coin'+(v===20?' active':'');b.textContent='🪙 '+v;b.onclick=()=>{stake=v;document.querySelectorAll('.coin').forEach(x=>x.classList.remove('active'));b.classList.add('active')};el('coinGrid').append(b)}
-function render(){const root=el('betRows');root.replaceChildren();if(!picks.size)root.textContent='No numbers selected';for(const [n,v] of picks){const r=document.createElement('div');r.className='row';const t=document.createElement('span');t.textContent=`Number ${n} · ${v} VC → ${v*8} VC if correct`;const b=document.createElement('button');b.className='remove';b.textContent='✕';b.onclick=()=>{picks.delete(n);render()};r.append(t,b);root.append(r)}el('totalStake').textContent=[...picks.values()].reduce((a,b)=>a+b,0).toLocaleString('en-IN')+' VC'}
-el('addButton').onclick=()=>{if(number===null){el('message').textContent='Choose a number first.';return}picks.set(number,stake);render();el('message').textContent='Selection saved as preview. No VC deducted.'};
-function countdown(){const now=Date.now(),interval=1200000,offset=19800000,start=Math.floor((now+offset)/interval)*interval-offset,next=start+interval,remain=Math.max(0,Math.ceil((next-now)/1000));el('countdown').textContent=String(Math.floor(remain/60)).padStart(2,'0')+':'+String(remain%60).padStart(2,'0');el('resultTime').textContent=new Date(next).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});el('roundId').textContent='r_'+new Date(start).toISOString().replace(/[-:.TZ]/g,'');if(remain<=60)el('message').textContent='Entries closed for this round.'}
+let number=null,stake=20,serverRound=null;
+const picks=new Map();
+for(let i=1;i<=9;i++){
+ const b=document.createElement('button');b.className='number';b.textContent=i;
+ b.onclick=()=>{number=i;document.querySelectorAll('.number').forEach(x=>x.classList.remove('active'));b.classList.add('active')};
+ el('numberGrid').append(b);
+}
+for(const v of [20,50,100]){
+ const b=document.createElement('button');b.className='coin'+(v===20?' active':'');b.textContent='🪙 '+v;
+ b.onclick=()=>{stake=v;document.querySelectorAll('.coin').forEach(x=>x.classList.remove('active'));b.classList.add('active')};
+ el('coinGrid').append(b);
+}
+function render(){
+ const root=el('betRows');root.replaceChildren();
+ if(!picks.size)root.textContent='No numbers selected';
+ for(const [n,v] of picks){
+  const r=document.createElement('div');r.className='row';
+  const t=document.createElement('span');t.textContent=`Number ${n} · ${v} VC → ${v*8} VC if correct`;
+  const b=document.createElement('button');b.className='remove';b.textContent='✕';
+  b.onclick=()=>{picks.delete(n);render()};r.append(t,b);root.append(r);
+ }
+ el('totalStake').textContent=[...picks.values()].reduce((a,b)=>a+b,0).toLocaleString('en-IN')+' VC';
+}
+el('addButton').onclick=()=>{
+ if(number===null){el('message').textContent='Choose a number first.';return}
+ picks.set(number,stake);render();el('message').textContent='Selection saved locally. Check with server before playing.';
+};
+function countdown(){
+ const now=Date.now(),interval=1200000,offset=19800000;
+ const start=Math.floor((now+offset)/interval)*interval-offset,next=start+interval;
+ const remain=Math.max(0,Math.ceil((next-now)/1000));
+ el('countdown').textContent=String(Math.floor(remain/60)).padStart(2,'0')+':'+String(remain%60).padStart(2,'0');
+ el('resultTime').textContent=new Date(next).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});
+ el('roundId').textContent='r_'+new Date(start).toISOString().replace(/[-:.TZ]/g,'');
+}
 countdown();setInterval(countdown,1000);
+async function callGame(action,extra={}){
+ const result=await functions.createExecution({
+  functionId:GAME_FUNCTION,body:JSON.stringify({action,...extra}),async:false,method:'POST',path:'/'
+ });
+ let data;
+ try{data=JSON.parse(result.responseBody||'{}')}catch{throw Error('Invalid server response')}
+ if(!data.ok)throw Error((data.code?data.code+': ':'')+(data.error||'Request failed'));
+ return data;
+}
+async function refreshRound(){
+ try{
+  const r=await callGame('get_round');serverRound=r;
+  el('roundStatus').textContent='SERVER · '+r.status.toUpperCase()+' · Entries disabled (preview only)';
+ }catch(e){serverRound=null;el('roundStatus').textContent='Server round unavailable: '+e.message}
+}
+el('previewButton').onclick=async()=>{
+ const b=el('previewButton');
+ if(!picks.size){el('message').textContent='Select at least one number.';return}
+ b.disabled=true;el('message').textContent='Checking selections with server...';
+ try{
+  const r=await callGame('get_round');
+  serverRound=r;
+  if(r.status!=='open'){throw Error('Round is locked. Wait for next round.')}
+  const selections=[...picks].map(([number,stakeVC])=>({number,stakeVC}));
+  const result=await callGame('preview_entries',{roundId:r.roundId,selections});
+  el('message').textContent=result.sufficientBalance
+   ?`SERVER VERIFIED · ${result.totalStakeVC} VC selected · Wallet ${result.walletVC} VC · After hypothetical entry ${result.walletAfterVC} VC. No VC deducted.`
+   :`INSUFFICIENT VC · Need ${result.totalStakeVC} VC · Wallet ${result.walletVC} VC. No VC deducted.`;
+ }catch(e){el('message').textContent='Preview failed: '+e.message}
+ finally{b.disabled=false}
+};
+el('testButton').onclick=async()=>{
+ const b=el('testButton');b.disabled=true;el('testResult').textContent='Testing...';
+ try{const d=await callGame('get_wallet');el('wallet').textContent=Number(d.wallet).toLocaleString('en-IN');el('testResult').textContent='SUCCESS · Backend wallet: '+d.wallet+' VC'}
+ catch(e){el('testResult').textContent='Test failed: '+e.message}
+ finally{b.disabled=false}
+};
 el('installButton').onclick=()=>location.href='https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/download/v1.0.4/app-release.apk';
-el('logoutButton').onclick=async()=>{try{await account.deleteSession({sessionId:'current'});location.replace('login.html')}catch(e){el('message').textContent='Logout failed: '+e.message}};
-async function init(){try{const u=await account.get();el('userName').textContent=u.name||'Player';el('userEmail').textContent=u.email||'';el('accountStatus').textContent='SIGNED IN';try{const p=await tables.getRow({databaseId:DB,tableId:TABLE,rowId:u.$id});el('wallet').textContent=Number(p.wallet||0).toLocaleString('en-IN');el('totalGames').textContent=Number(p.rounds||0);el('wins').textContent=Number(p.wins||0);el('losses').textContent=Number(p.losses||0)}catch(e){if(e.code!==404)throw e;el('wallet').textContent='Profile missing';el('testResult').textContent='Profile missing. No new wallet was created.'}}catch(e){if(e.code===401){location.replace('login.html');return}el('accountStatus').textContent='SYNC ERROR';el('testResult').textContent=e.message}}
-async function discoverFunction(){const typed=el('functionId').value.trim();if(typed)return typed;const listing=await functions.list();const found=(listing.functions||[]).find(f=>f.name==='game-wallet');if(!found)throw Error('Function not found or not visible. Enter game-wallet Function ID above.');return found.$id}
-el('testButton').onclick=async()=>{const b=el('testButton');b.disabled=true;el('testResult').textContent='Testing...';try{await account.get();const id=await discoverFunction();const result=await functions.createExecution({functionId:id,body:JSON.stringify({action:'get_wallet'}),async:false,method:'POST',path:'/'});let data;try{data=JSON.parse(result.responseBody||'{}')}catch{data={raw:result.responseBody}}if(data.ok&&Number.isFinite(data.wallet)){el('wallet').textContent=Number(data.wallet).toLocaleString('en-IN');el('testResult').textContent='SUCCESS · Backend wallet: '+data.wallet+' VC'}else{el('testResult').textContent='Backend response ('+result.responseStatusCode+'): '+JSON.stringify(data)}}catch(e){el('testResult').textContent='Test failed: '+e.message+' (Function ID may be required.)'}finally{b.disabled=false}};
-init();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update()).catch(console.error));
+el('logoutButton').onclick=async()=>{
+ try{await account.deleteSession({sessionId:'current'});location.replace('login.html')}
+ catch(e){el('message').textContent='Logout failed: '+e.message}
+};
+async function init(){
+ try{
+  const u=await account.get();
+  el('userName').textContent=u.name||'Player';el('userEmail').textContent=u.email||'';el('accountStatus').textContent='SIGNED IN';
+  const p=await tables.getRow({databaseId:DB,tableId:TABLE,rowId:u.$id});
+  el('wallet').textContent=Number(p.wallet||0).toLocaleString('en-IN');
+  el('totalGames').textContent=Number(p.rounds||0);
+  el('wins').textContent=Number(p.wins||0);
+  el('losses').textContent=Number(p.losses||0);
+  await refreshRound();
+ }catch(e){
+  if(e.code===401){location.replace('login.html');return}
+  el('accountStatus').textContent='SYNC ERROR';el('testResult').textContent='Account/profile error: '+e.message;
+ }
+}
+init();
+setInterval(()=>{if(el('accountStatus').textContent==='SIGNED IN')refreshRound()},60000);
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update()).catch(console.error));
 </script></body></html>
