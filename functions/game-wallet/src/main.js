@@ -10,7 +10,6 @@ const ROUNDS_TABLE = "game_rounds";
 const ROUND_MS = 20 * 60 * 1000;
 const IST_OFFSET_MS = 330 * 60 * 1000;
 const ENTRY_CUTOFF_MS = 60 * 1000;
-
 const ALLOWED_STAKES = [20, 50, 100];
 
 function reply(res, status, data) {
@@ -68,7 +67,6 @@ function getRows(table, queries, apiKey) {
 
         response.on("data", chunk => {
           raw += chunk;
-
           if (raw.length > 1000000) {
             response.destroy(
               new Error("Response too large")
@@ -79,7 +77,6 @@ function getRows(table, queries, apiKey) {
         response.on("end", () => {
           try {
             const parsed = JSON.parse(raw);
-
             if (response.statusCode !== 200) {
               return reject(
                 new Error(
@@ -87,7 +84,6 @@ function getRows(table, queries, apiKey) {
                 )
               );
             }
-
             resolve(parsed.rows || []);
           } catch (err) {
             reject(err);
@@ -97,9 +93,7 @@ function getRows(table, queries, apiKey) {
     );
 
     request.on("timeout", () => {
-      request.destroy(
-        new Error("Database timeout")
-      );
+      request.destroy(new Error("Database timeout"));
     });
 
     request.on("error", reject);
@@ -216,7 +210,7 @@ async function findProfile(userId, apiKey) {
     throw new GameError(
       409,
       "DUPLICATE_PROFILES",
-      "Multiple wallet profiles found. Admin review required."
+      "Multiple wallet profiles found"
     );
   }
 
@@ -234,6 +228,64 @@ async function findProfile(userId, apiKey) {
   }
 
   return profile;
+}
+
+async function getLastResult(apiKey) {
+  const rows = await getRows(
+    ROUNDS_TABLE,
+    [
+      queryEqual("status", "settled"),
+      queryLimit(100)
+    ],
+    apiKey
+  );
+
+  const now = Date.now();
+
+  const completed = rows.filter(row => {
+    if (!/^r_\d{17}$/.test(row.roundId || "")) {
+      return false;
+    }
+
+    if (
+      !Number.isInteger(row.winningNumber) ||
+      row.winningNumber < 1 ||
+      row.winningNumber > 9
+    ) {
+      return false;
+    }
+
+    const digits = row.roundId.slice(2);
+    const timestamp =
+      digits.slice(0, 4) + "-" +
+      digits.slice(4, 6) + "-" +
+      digits.slice(6, 8) + "T" +
+      digits.slice(8, 10) + ":" +
+      digits.slice(10, 12) + ":" +
+      digits.slice(12, 14) + "." +
+      digits.slice(14, 17) + "Z";
+
+    const start = Date.parse(timestamp);
+
+    return Number.isFinite(start) &&
+      start + ROUND_MS <= now;
+  });
+
+  completed.sort((a, b) =>
+    b.roundId.localeCompare(a.roundId)
+  );
+
+  const latest = completed[0];
+
+  return {
+    ok: true,
+    available: Boolean(latest),
+    roundId: latest?.roundId ?? null,
+    winningNumber: latest?.winningNumber ?? null,
+    message: latest
+      ? "Verified stored result"
+      : "No verified result recorded yet"
+  };
 }
 
 export default async ({ req, res, error }) => {
@@ -287,6 +339,7 @@ export default async ({ req, res, error }) => {
     ![
       "get_wallet",
       "get_round",
+      "get_last_result",
       "preview_entries"
     ].includes(action)
   ) {
@@ -296,11 +349,8 @@ export default async ({ req, res, error }) => {
     });
   }
 
-  const userId =
-    req.headers["x-appwrite-user-id"];
-
-  const apiKey =
-    req.headers["x-appwrite-key"];
+  const userId = req.headers["x-appwrite-user-id"];
+  const apiKey = req.headers["x-appwrite-key"];
 
   if (!userId) {
     return reply(res, 401, {
@@ -330,6 +380,14 @@ export default async ({ req, res, error }) => {
         userId,
         wallet: profile.wallet
       });
+    }
+
+    if (action === "get_last_result") {
+      return reply(
+        res,
+        200,
+        await getLastResult(apiKey)
+      );
     }
 
     const round = getCurrentRound();
