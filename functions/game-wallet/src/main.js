@@ -12,10 +12,17 @@ const IST_OFFSET_MS = 330 * 60 * 1000;
 const ENTRY_CUTOFF_MS = 60 * 1000;
 
 const ALLOWED_STAKES = [20, 50, 100];
-const MAX_SELECTIONS = 9;
 
 function reply(res, status, data) {
   return res.json(data, status);
+}
+
+class GameError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
 }
 
 function queryEqual(attribute, value) {
@@ -115,20 +122,13 @@ function getCurrentRound(now = Date.now()) {
       .toISOString()
       .replace(/[-:.TZ]/g, "");
 
-  const status =
-    now >= end
-      ? "closed"
-      : now >= closesAt
-        ? "locked"
-        : "open";
-
   return {
     roundId,
     startsAt: new Date(start).toISOString(),
     endsAt: new Date(end).toISOString(),
     entryClosesAt: new Date(closesAt).toISOString(),
     serverTime: new Date(now).toISOString(),
-    status
+    status: now >= closesAt ? "locked" : "open"
   };
 }
 
@@ -136,9 +136,11 @@ function validateSelections(selections) {
   if (
     !Array.isArray(selections) ||
     selections.length < 1 ||
-    selections.length > MAX_SELECTIONS
+    selections.length > 9
   ) {
-    throw new Error(
+    throw new GameError(
+      400,
+      "INVALID_SELECTIONS",
       "Select between 1 and 9 numbers"
     );
   }
@@ -153,20 +155,26 @@ function validateSelections(selections) {
       item.number < 1 ||
       item.number > 9
     ) {
-      throw new Error(
-        "Each number must be from 1 to 9"
+      throw new GameError(
+        400,
+        "INVALID_NUMBER",
+        "Number must be from 1 to 9"
       );
     }
 
     if (seen.has(item.number)) {
-      throw new Error(
-        "Duplicate selected number"
+      throw new GameError(
+        400,
+        "DUPLICATE_NUMBER",
+        "Same number selected twice"
       );
     }
 
     if (!ALLOWED_STAKES.includes(item.stakeVC)) {
-      throw new Error(
-        "Stake must be 20, 50 or 100 VC"
+      throw new GameError(
+        400,
+        "INVALID_STAKE",
+        "Allowed stakes: 20, 50, 100 VC"
       );
     }
 
@@ -196,9 +204,19 @@ async function findProfile(userId, apiKey) {
     apiKey
   );
 
-  if (rows.length !== 1) {
-    throw new Error(
-      "User profile not uniquely found"
+  if (rows.length === 0) {
+    throw new GameError(
+      404,
+      "PROFILE_NOT_FOUND",
+      "No wallet profile exists for this account"
+    );
+  }
+
+  if (rows.length > 1) {
+    throw new GameError(
+      409,
+      "DUPLICATE_PROFILES",
+      "Multiple wallet profiles found. Admin review required."
     );
   }
 
@@ -208,8 +226,10 @@ async function findProfile(userId, apiKey) {
     !Number.isSafeInteger(profile.wallet) ||
     profile.wallet < 0
   ) {
-    throw new Error(
-      "Invalid wallet balance"
+    throw new GameError(
+      409,
+      "INVALID_WALLET",
+      "Wallet balance needs admin review"
     );
   }
 
@@ -231,6 +251,14 @@ export default async ({ req, res, error }) => {
       typeof req.body === "string"
         ? JSON.parse(req.body)
         : req.body;
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      throw new Error("Invalid body");
+    }
   } catch {
     return reply(res, 400, {
       ok: false,
@@ -238,9 +266,8 @@ export default async ({ req, res, error }) => {
     });
   }
 
-  const action = body?.action;
+  const action = body.action;
 
-  // Real wallet mutations remain disabled.
   if (
     [
       "play",
@@ -251,18 +278,18 @@ export default async ({ req, res, error }) => {
   ) {
     return reply(res, 503, {
       ok: false,
-      error:
-        "Transactional game settlement not enabled"
+      error: "Secure transactions not enabled",
+      acceptingEntries: false
     });
   }
 
-  const supported = [
-    "get_wallet",
-    "get_round",
-    "preview_entries"
-  ];
-
-  if (!supported.includes(action)) {
+  if (
+    ![
+      "get_wallet",
+      "get_round",
+      "preview_entries"
+    ].includes(action)
+  ) {
     return reply(res, 400, {
       ok: false,
       error: "Unsupported action"
@@ -278,15 +305,16 @@ export default async ({ req, res, error }) => {
   if (!userId) {
     return reply(res, 401, {
       ok: false,
-      error: "Login required"
+      code: "LOGIN_REQUIRED",
+      error: "Authenticated login required"
     });
   }
 
   if (!apiKey) {
     return reply(res, 503, {
       ok: false,
-      error:
-        "Function authentication unavailable"
+      code: "FUNCTION_KEY_MISSING",
+      error: "Function API key unavailable"
     });
   }
 
@@ -306,124 +334,117 @@ export default async ({ req, res, error }) => {
 
     const round = getCurrentRound();
 
-    const existingRounds = await getRows(
+    const rounds = await getRows(
       ROUNDS_TABLE,
       [
-        queryEqual(
-          "roundId",
-          round.roundId
-        ),
+        queryEqual("roundId", round.roundId),
         queryLimit(2)
       ],
       apiKey
     );
 
-    if (existingRounds.length > 1) {
-      return reply(res, 409, {
-        ok: false,
-        error: "Duplicate round records"
-      });
+    if (rounds.length > 1) {
+      throw new GameError(
+        409,
+        "DUPLICATE_ROUNDS",
+        "Multiple round records found"
+      );
     }
 
-    const storedRound = existingRounds[0];
+    const storedRound = rounds[0];
 
     if (action === "get_round") {
+      const settled =
+        storedRound?.status === "settled";
+
       return reply(res, 200, {
         ok: true,
         ...round,
-        status:
-          storedRound?.status || round.status,
-        winningNumber:
-          storedRound?.status === "settled"
-            ? storedRound.winningNumber
-            : null,
+        status: settled
+          ? "settled"
+          : storedRound?.status === "locked"
+            ? "locked"
+            : round.status,
+        winningNumber: settled
+          ? storedRound.winningNumber
+          : null,
         acceptingEntries: false,
         mode: "read_only"
       });
     }
 
-    // Preview only: no entry is created,
-    // and no wallet balance is changed.
-    if (action === "preview_entries") {
-      if (round.status !== "open") {
-        return reply(res, 409, {
-          ok: false,
-          error: "Entry window closed",
-          round
-        });
-      }
-
-      if (
-        storedRound &&
-        storedRound.status !== "open"
-      ) {
-        return reply(res, 409, {
-          ok: false,
-          error: "Round is not open"
-        });
-      }
-
-      if (
-        body.roundId &&
-        body.roundId !== round.roundId
-      ) {
-        return reply(res, 409, {
-          ok: false,
-          error: "Round ID mismatch"
-        });
-      }
-
-      let selectionData;
-
-      try {
-        selectionData = validateSelections(
-          body.selections
-        );
-      } catch (validationError) {
-        return reply(res, 400, {
-          ok: false,
-          error: validationError.message
-        });
-      }
-
-      const profile = await findProfile(
-        userId,
-        apiKey
+    if (round.status !== "open") {
+      throw new GameError(
+        409,
+        "ENTRY_WINDOW_CLOSED",
+        "Entry window is closed"
       );
+    }
 
-      const sufficientBalance =
-        profile.wallet >=
-        selectionData.totalStakeVC;
+    if (
+      storedRound &&
+      storedRound.status !== "open"
+    ) {
+      throw new GameError(
+        409,
+        "ROUND_NOT_OPEN",
+        "Round is not open"
+      );
+    }
 
-      return reply(res, 200, {
-        ok: true,
-        action: "preview_entries",
-        roundId: round.roundId,
-        selections:
-          selectionData.selections,
-        totalStakeVC:
-          selectionData.totalStakeVC,
-        walletVC: profile.wallet,
-        sufficientBalance,
-        walletAfterVC:
-          sufficientBalance
-            ? profile.wallet -
-              selectionData.totalStakeVC
-            : null,
-        acceptingEntries: false,
-        committed: false,
-        message:
-          "Preview only. No VC deducted."
+    if (
+      body.roundId &&
+      body.roundId !== round.roundId
+    ) {
+      throw new GameError(
+        409,
+        "ROUND_MISMATCH",
+        "Round ID mismatch"
+      );
+    }
+
+    const selectionData = validateSelections(
+      body.selections
+    );
+
+    const profile = await findProfile(
+      userId,
+      apiKey
+    );
+
+    const sufficientBalance =
+      profile.wallet >= selectionData.totalStakeVC;
+
+    return reply(res, 200, {
+      ok: true,
+      action: "preview_entries",
+      roundId: round.roundId,
+      selections: selectionData.selections,
+      totalStakeVC: selectionData.totalStakeVC,
+      walletVC: profile.wallet,
+      sufficientBalance,
+      walletAfterVC: sufficientBalance
+        ? profile.wallet - selectionData.totalStakeVC
+        : null,
+      acceptingEntries: false,
+      committed: false,
+      message: "Preview only. No VC deducted."
+    });
+
+  } catch (err) {
+    if (err instanceof GameError) {
+      return reply(res, err.status, {
+        ok: false,
+        code: err.code,
+        error: err.message
       });
     }
-  } catch (err) {
-    error(
-      "Game backend error: " +
-      err.message
-    );
+
+    error("Game backend error: " + err.message);
 
     return reply(res, 500, {
       ok: false,
+      code: "BACKEND_ERROR",
       error: "Game service unavailable"
     });
   }
