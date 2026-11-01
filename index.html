@@ -1,96 +1,418 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#08010f"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08010f">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="google-site-verification" content="YeulG82nJTfbib13P0WZ3deouTltaCzyV_VIGgQ1wGQ">
-<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
 <title>Samrat X-Treme</title>
 <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#38115d,#12051f 42%,#050108 80%);color:#fff;font-family:Arial,Helvetica,sans-serif}button,a{font:inherit}button{cursor:pointer}.app{max-width:480px;margin:auto;padding:18px 14px 42px}.hero{text-align:center;padding:16px 5px 20px;background:radial-gradient(ellipse at center,#481574,transparent 72%)}.hero-inner{display:flex;align-items:center;justify-content:center;gap:12px}.crown{font-size:58px;color:#ffd96b}.brand{text-align:left}.brand-name{font:bold clamp(30px,9vw,44px) Georgia,serif;color:#ffda70}.brand-sub{font-size:26px;font-style:italic;font-weight:900;letter-spacing:2px;color:#e5c5ff}.brand-tag{font-size:9px;letter-spacing:2px;color:#c9acd9;margin-top:5px}.panel{padding:14px;background:linear-gradient(135deg,#171027,#291049);border:1px solid #7046d8;border-radius:17px;margin-bottom:12px}.topbar,.account{display:flex;align-items:center;justify-content:space-between;gap:10px}.wallet-title,.muted{font-size:11px;color:#c9b5ff}.wallet{font-size:24px;font-weight:900;color:#ffdf63;margin-top:4px}.goal{text-align:center;border-color:#a88949;background:rgba(184,137,43,.12)}.goal strong{display:block;font-size:29px;color:#f4ce78}.goal span{font-size:12px;letter-spacing:2px;font-weight:900}.goal small{display:block;color:#d5c3dc;margin-top:7px}.name{font-size:13px;color:#ffe16b;font-weight:900;overflow-wrap:anywhere}.email{font-size:10px;color:#aa9abb;overflow-wrap:anywhere;margin-top:4px}.smallbtn{border:1px solid #8d55df;border-radius:11px;background:#45175c;color:white;font-size:11px;font-weight:900;padding:10px}.quick-menu{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.quick-link{text-align:center;text-decoration:none;padding:13px 3px;background:#261245;border:1px solid #753fc2;border-radius:14px;font-size:10px;font-weight:900}.quick-link span{display:block;font-size:22px;margin-bottom:6px}.install{display:block;width:100%;padding:13px;border:1px solid #a27bf3;border-radius:14px;background:linear-gradient(90deg,#45238d,#a32ac1);color:white;font-weight:900;margin-bottom:15px}.section-title{text-align:center;font-size:12px;font-weight:900;color:#d3c3ff;letter-spacing:1.4px;margin:21px 0 12px}.round{text-align:center}.timer{font-size:40px;font-weight:900;color:#ffe168;font-variant-numeric:tabular-nums;margin:8px}.round-detail{color:#c6b6e4;font-size:12px;line-height:1.7}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.number{height:68px;border-radius:17px;border:2px solid #6944b8;background:linear-gradient(145deg,#18102e,#341463);color:#fff;font-size:27px;font-weight:900}.number.selected{border-color:#fff4a7;color:#2a0712;background:linear-gradient(145deg,#fff45b,#ff9c00,#ff4d00)}.coins{display:flex;gap:8px}.coin{flex:1;padding:13px 4px;border:1px solid #6f4cc0;border-radius:13px;background:#171027;color:#fff;font-size:13px;font-weight:900}.coin.active{background:linear-gradient(135deg,#6332ff,#e82ebd)}.bets{margin-top:12px;padding:12px;border:1px solid #47346b;border-radius:12px;background:#0e0919;font-size:12px;line-height:1.8}.betrow{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30203e;padding:5px 0}.betrow:last-child{border:0}.remove{border:0;background:transparent;color:#ff8ba3;font-weight:bold}.primary{width:100%;padding:16px;margin-top:14px;border:0;border-radius:16px;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);color:#260617;font-weight:900;font-size:16px}.primary:disabled{opacity:.55}.notice{font-size:12px;color:#f7d2ee;text-align:center;line-height:1.6;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{text-align:center;padding:12px 4px;background:#100a1d;border:1px solid #302443;border-radius:13px}.stat strong{display:block;color:#ffe168;font-size:19px}.stat span{font-size:10px;color:#b1a4c6}.warning{text-align:center;color:#a59ab2;font-size:11px;line-height:1.7;margin-top:24px}.loading{text-align:center;margin-top:8px;font-size:11px;color:#c3a6e5}.pill{font-size:10px;border:1px solid #6b5289;padding:8px;border-radius:18px;color:#d4c0ed}.highlight{color:#ffe168;font-weight:bold}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#38115d,#12051f 42%,#050108 80%);color:#fff;font-family:Arial,Helvetica,sans-serif}
+button,a{font:inherit}
+button{cursor:pointer}
+.app{max-width:480px;margin:auto;padding:18px 14px 42px}
+.hero{text-align:center;padding:16px 5px 20px;background:radial-gradient(ellipse at center,#481574,transparent 72%)}
+.hero-inner{display:flex;align-items:center;justify-content:center;gap:12px}
+.crown{font-size:58px;color:#ffd96b}
+.brand{text-align:left}
+.brand-name{font:bold clamp(30px,9vw,44px) Georgia,serif;color:#ffda70}
+.brand-sub{font-size:26px;font-style:italic;font-weight:900;letter-spacing:2px;color:#e5c5ff}
+.brand-tag{font-size:9px;letter-spacing:2px;color:#c9acd9;margin-top:5px}
+.panel{padding:14px;background:linear-gradient(135deg,#171027,#291049);border:1px solid #7046d8;border-radius:17px;margin-bottom:12px}
+.topbar,.account{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wallet-title,.muted{font-size:11px;color:#c9b5ff}
+.wallet{font-size:24px;font-weight:900;color:#ffdf63;margin-top:4px}
+.goal{text-align:center;border-color:#a88949;background:rgba(184,137,43,.12)}
+.goal strong{display:block;font-size:29px;color:#f4ce78}
+.goal span{font-size:12px;letter-spacing:2px;font-weight:900}
+.goal small{display:block;color:#d5c3dc;margin-top:7px}
+.name{font-size:13px;color:#ffe16b;font-weight:900;overflow-wrap:anywhere}
+.email{font-size:10px;color:#aa9abb;overflow-wrap:anywhere;margin-top:4px}
+.smallbtn{border:1px solid #8d55df;border-radius:11px;background:#45175c;color:white;font-size:11px;font-weight:900;padding:10px}
+.quick-menu{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.quick-link{text-align:center;text-decoration:none;padding:13px 3px;background:#261245;border:1px solid #753fc2;border-radius:14px;font-size:10px;font-weight:900;color:white}
+.quick-link span{display:block;font-size:22px;margin-bottom:6px}
+.install{display:block;width:100%;padding:13px;border:1px solid #a27bf3;border-radius:14px;background:linear-gradient(90deg,#45238d,#a32ac1);color:white;font-weight:900;margin-bottom:15px}
+.section-title{text-align:center;font-size:12px;font-weight:900;color:#d3c3ff;letter-spacing:1.4px;margin:21px 0 12px}
+.round{text-align:center}
+.timer{font-size:40px;font-weight:900;color:#ffe168;font-variant-numeric:tabular-nums;margin:8px}
+.round-detail{color:#c6b6e4;font-size:12px;line-height:1.7}
+.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.number{height:68px;border-radius:17px;border:2px solid #6944b8;background:linear-gradient(145deg,#18102e,#341463);color:#fff;font-size:27px;font-weight:900}
+.number.selected{border-color:#fff4a7;color:#2a0712;background:linear-gradient(145deg,#fff45b,#ff9c00,#ff4d00)}
+.coins{display:flex;gap:8px;flex-wrap:wrap}
+.coin{flex:1;min-width:29%;padding:13px 4px;border:1px solid #6f4cc0;border-radius:13px;background:#171027;color:#fff;font-size:13px;font-weight:900}
+.coin.active{background:linear-gradient(135deg,#6332ff,#e82ebd)}
+.bets{margin-top:12px;padding:12px;border:1px solid #47346b;border-radius:12px;background:#0e0919;font-size:12px;line-height:1.8}
+.betrow{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30203e;padding:5px 0}
+.betrow:last-child{border:0}
+.remove{border:0;background:transparent;color:#ff8ba3;font-weight:bold}
+.primary{width:100%;padding:16px;margin-top:14px;border:0;border-radius:16px;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);color:#260617;font-weight:900;font-size:16px}
+.primary:disabled{opacity:.55}
+.notice{font-size:12px;color:#f7d2ee;text-align:center;line-height:1.6;margin-top:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{text-align:center;padding:12px 4px;background:#100a1d;border:1px solid #302443;border-radius:13px}
+.stat strong{display:block;color:#ffe168;font-size:19px}
+.stat span{font-size:10px;color:#b1a4c6}
+.warning{text-align:center;color:#a59ab2;font-size:11px;line-height:1.7;margin-top:24px}
+.loading{text-align:center;margin-top:8px;font-size:11px;color:#c3a6e5}
+.pill{font-size:10px;border:1px solid #6b5289;padding:8px;border-radius:18px;color:#d4c0ed}
+.highlight{color:#ffe168;font-weight:bold}
 </style>
 </head>
 <body>
 <main class="app">
-<header class="hero"><div class="hero-inner"><div class="crown">♛</div><div class="brand"><div class="brand-name">SAMRAT</div><div class="brand-sub">X-TREME</div><div class="brand-tag">PREDICT · PLAY · WIN</div></div></div></header>
-<div class="panel topbar"><div><div class="wallet-title">X-TREME WALLET</div><div class="wallet">🪙 <span id="wallet">—</span></div></div><div class="pill" id="accountStatus">CONNECTING</div></div>
-<div class="panel goal"><strong>🎯 50,000</strong><span>PLAYERS GOAL</span><small>Join the Samrat X-Treme Community</small></div>
-<div class="panel account"><div><div class="name" id="userName">Player</div><div class="email" id="userEmail">Checking account...</div></div><button class="smallbtn" id="logoutButton">LOGOUT</button></div>
-<nav class="quick-menu"><a class="quick-link" href="referral.html"><span>🎁</span>REFERRAL</a><a class="quick-link" href="reward.html"><span>👑</span>REWARD</a><a class="quick-link" href="profile.html"><span>👤</span>PROFILE</a></nav>
+
+<header class="hero">
+<div class="hero-inner">
+<div class="crown">♛</div>
+<div class="brand">
+<div class="brand-name">SAMRAT</div>
+<div class="brand-sub">X-TREME</div>
+<div class="brand-tag">PREDICT · PLAY · WIN</div>
+</div>
+</div>
+</header>
+
+<div class="panel topbar">
+<div>
+<div class="wallet-title">X-TREME WALLET</div>
+<div class="wallet">🪙 <span id="wallet">—</span></div>
+</div>
+<div class="pill" id="accountStatus">CONNECTING</div>
+</div>
+
+<div class="panel goal">
+<strong>🎯 50,000</strong>
+<span>PLAYERS GOAL</span>
+<small>Join the Samrat X-Treme Community</small>
+</div>
+
+<div class="panel account">
+<div>
+<div class="name" id="userName">Player</div>
+<div class="email" id="userEmail">Checking account...</div>
+</div>
+<button class="smallbtn" id="logoutButton">LOGOUT</button>
+</div>
+
+<nav class="quick-menu">
+<a class="quick-link" href="referral.html"><span>🎁</span>REFERRAL</a>
+<a class="quick-link" href="reward.html"><span>👑</span>REWARD</a>
+<a class="quick-link" href="profile.html"><span>👤</span>PROFILE</a>
+</nav>
+
 <button class="install" id="installButton">📲 DOWNLOAD ANDROID APK</button>
-<div class="panel round"><div class="wallet-title">NEXT 20-MINUTE DRAW · INDIA TIME (IST)</div><div class="timer" id="countdown">--:--</div><div class="round-detail">Round <span id="roundId">—</span> · Result at <span id="resultTime">—</span><div>Entries close 1 minute before result</div></div></div>
-<div class="section-title">CHOOSE NUMBERS (1–9)</div><div class="numbers" id="numberGrid"></div>
-<div class="section-title">SELECT VC FOR EACH NUMBER</div><div class="coins" id="coinGrid"></div>
+
+<div class="panel round">
+<div class="wallet-title">NEXT 20-MINUTE DRAW · INDIA TIME (IST)</div>
+<div class="timer" id="countdown">--:--</div>
+<div class="round-detail">
+Round <span id="roundId">—</span>
+· Result at <span id="resultTime">—</span>
+<div>Entries close 1 minute before result</div>
+</div>
+</div>
+
+<div class="section-title">CHOOSE NUMBERS (1–9)</div>
+<div class="numbers" id="numberGrid"></div>
+
+<div class="section-title">SELECT VC FOR EACH NUMBER</div>
+<div class="coins" id="coinGrid"></div>
+
 <button class="primary" id="addButton">+ ADD NUMBER TO SELECTION</button>
-<div class="bets"><div style="font-weight:bold;color:#e6cbff">YOUR SELECTIONS (PREVIEW)</div><div id="betRows" class="muted">No numbers selected</div><div style="display:flex;justify-content:space-between;margin-top:10px"><strong>Total VC</strong><strong id="totalStake">0 VC</strong></div><div style="display:flex;justify-content:space-between"><span>Winning payout per correct number</span><span class="highlight">8× total</span></div></div>
-<button class="primary" disabled id="lockButton">🔒 SERVER ROUND SETUP PENDING</button><div class="notice" id="message">This is a selection preview. No VC will be deducted until secure server-side draw processing is available.</div>
-<div class="section-title">PLAYER STATS</div><div class="stats"><div class="stat"><strong id="totalGames">—</strong><span>ROUNDS</span></div><div class="stat"><strong id="wins">—</strong><span>WINS</span></div><div class="stat"><strong id="losses">—</strong><span>LOSSES</span></div></div>
-<div class="panel" style="margin-top:15px"><div style="font-weight:900;color:#d3c3ff;font-size:12px">X-TREME HISTORY</div><div class="loading" id="historyStatus">Previous history is available after secure game migration.</div></div>
-<div class="warning">Entertainment-only virtual coin preview. Coins have no cash value and cannot be purchased, withdrawn or converted to real money. Results and wallet transactions require an authoritative server before entries can open.</div>
+
+<div class="bets">
+<div style="font-weight:bold;color:#e6cbff">YOUR SELECTIONS (PREVIEW)</div>
+<div id="betRows" class="muted">No numbers selected</div>
+<div style="display:flex;justify-content:space-between;margin-top:10px">
+<strong>Total VC</strong>
+<strong id="totalStake">0 VC</strong>
+</div>
+<div style="display:flex;justify-content:space-between">
+<span>Winning payout per correct number</span>
+<span class="highlight">8× stake</span>
+</div>
+</div>
+
+<button class="primary" disabled id="lockButton">🔒 SERVER ROUND SETUP PENDING</button>
+
+<div class="notice" id="message">
+Selection preview only. No VC will be deducted until secure server-side processing is available.
+</div>
+
+<div class="section-title">PLAYER STATS</div>
+<div class="stats">
+<div class="stat"><strong id="totalGames">—</strong><span>ROUNDS</span></div>
+<div class="stat"><strong id="wins">—</strong><span>WINS</span></div>
+<div class="stat"><strong id="losses">—</strong><span>LOSSES</span></div>
+</div>
+
+<div class="panel" style="margin-top:15px">
+<div style="font-weight:900;color:#d3c3ff;font-size:12px">X-TREME HISTORY</div>
+<div class="loading" id="historyStatus">Previous history is available after secure game migration.</div>
+</div>
+
+<div class="warning">
+Entertainment-only virtual coin preview. Coins have no cash value and cannot be purchased, withdrawn or converted to real money. Results and wallet transactions require an authoritative server before entries can open.
+</div>
+
 </main>
+
 <script>
 'use strict';
+
 const APPWRITE_ENDPOINT='https://sgp.cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID='6a7f2add0011a7bfc21a';
 const APPWRITE_DATABASE_ID='6a7f2d1d0035d9815939';
 const USER_PROFILES_TABLE='user_profiles';
-const client=new Appwrite.Client().setEndpoint(APPWRITE_ENDPOINT).setProject(APPWRITE_PROJECT_ID);
+
+const client=new Appwrite.Client()
+  .setEndpoint(APPWRITE_ENDPOINT)
+  .setProject(APPWRITE_PROJECT_ID);
+
 const account=new Appwrite.Account(client);
 const tablesDB=new Appwrite.TablesDB(client);
 const el=id=>document.getElementById(id);
-let selectedNumber=null,selectedCoins=20;
+
+let selectedNumber=null;
+let selectedCoins=20;
 const selections=new Map();
+
 function renderSelections(){
- const root=el('betRows');root.replaceChildren();
- if(!selections.size){root.textContent='No numbers selected';}
- for(const [number,coins] of selections){
-  const row=document.createElement('div');row.className='betrow';
-  const label=document.createElement('span');label.textContent=`Number ${number} · ${coins} VC → ${coins*8} VC if correct`;
-  const remove=document.createElement('button');remove.className='remove';remove.textContent='✕';remove.type='button';remove.setAttribute('aria-label',`Remove number ${number}`);
-  remove.onclick=()=>{selections.delete(number);renderSelections();};row.append(label,remove);root.append(row);
+ const root=el('betRows');
+ root.replaceChildren();
+
+ if(!selections.size){
+  root.textContent='No numbers selected';
  }
- el('totalStake').textContent=[...selections.values()].reduce((a,b)=>a+b,0).toLocaleString('en-IN')+' VC';
+
+ for(const [number,coins] of selections){
+  const row=document.createElement('div');
+  row.className='betrow';
+
+  const label=document.createElement('span');
+  label.textContent=
+   `Number ${number} · ${coins} VC → ${coins*8} VC if correct`;
+
+  const remove=document.createElement('button');
+  remove.className='remove';
+  remove.textContent='✕';
+  remove.type='button';
+  remove.setAttribute('aria-label',`Remove number ${number}`);
+
+  remove.onclick=()=>{
+   selections.delete(number);
+   renderSelections();
+  };
+
+  row.append(label,remove);
+  root.append(row);
+ }
+
+ const total=[...selections.values()]
+  .reduce((a,b)=>a+b,0);
+
+ el('totalStake').textContent=
+  total.toLocaleString('en-IN')+' VC';
 }
+
 for(let n=1;n<=9;n++){
- const b=document.createElement('button');b.type='button';b.className='number';b.textContent=n;
- b.onclick=()=>{selectedNumber=n;document.querySelectorAll('.number').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};el('numberGrid').append(b);
+ const b=document.createElement('button');
+ b.type='button';
+ b.className='number';
+ b.textContent=n;
+
+ b.onclick=()=>{
+  selectedNumber=n;
+  document.querySelectorAll('.number').forEach(
+   x=>x.classList.remove('selected')
+  );
+  b.classList.add('selected');
+ };
+
+ el('numberGrid').append(b);
 }
-for(const n of [20,50,75,100,150,200]){
- const b=document.createElement('button');b.type='button';b.className='coin'+(n===20?' active':'');b.textContent='🪙 '+n;
- b.onclick=()=>{selectedCoins=n;document.querySelectorAll('.coin').forEach(x=>x.classList.remove('active'));b.classList.add('active');};el('coinGrid').append(b);
+
+for(const n of [20,50,100]){
+ const b=document.createElement('button');
+ b.type='button';
+ b.className='coin'+(n===20?' active':'');
+ b.textContent='🪙 '+n;
+
+ b.onclick=()=>{
+  selectedCoins=n;
+  document.querySelectorAll('.coin').forEach(
+   x=>x.classList.remove('active')
+  );
+  b.classList.add('active');
+ };
+
+ el('coinGrid').append(b);
 }
-el('coinGrid').style.flexWrap='wrap';document.querySelectorAll('.coin').forEach(x=>x.style.minWidth='29%');
-el('addButton').onclick=()=>{if(selectedNumber===null){el('message').textContent='Choose a number first.';return;}selections.set(selectedNumber,selectedCoins);renderSelections();el('message').textContent='Selection saved locally as preview. No VC deducted.';};
+
+el('addButton').onclick=()=>{
+ if(selectedNumber===null){
+  el('message').textContent='Choose a number first.';
+  return;
+ }
+
+ selections.set(selectedNumber,selectedCoins);
+ renderSelections();
+
+ el('message').textContent=
+  'Selection saved locally as preview. No VC deducted.';
+};
+
+// IST-aligned 20-minute rounds: :00, :20, :40
+// Same round ID format as the Appwrite backend.
 function updateCountdown(){
- const now=Date.now(),interval=20*60*1000;
- const next=Math.floor(now/interval)*interval+interval;
- const remaining=Math.max(0,Math.ceil((next-now)/1000));
- const mm=String(Math.floor(remaining/60)).padStart(2,'0'),ss=String(remaining%60).padStart(2,'0');
+ const now=Date.now();
+ const interval=20*60*1000;
+ const istOffset=330*60*1000;
+
+ const shiftedNow=now+istOffset;
+ const roundStart=
+  Math.floor(shiftedNow/interval)*interval-istOffset;
+ const next=roundStart+interval;
+
+ const remaining=Math.max(
+  0,
+  Math.ceil((next-now)/1000)
+ );
+
+ const mm=String(
+  Math.floor(remaining/60)
+ ).padStart(2,'0');
+
+ const ss=String(
+  remaining%60
+ ).padStart(2,'0');
+
  el('countdown').textContent=mm+':'+ss;
- const date=new Date(next);
- el('resultTime').textContent=date.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});
- el('roundId').textContent='SX-'+Math.floor(next/interval);
- if(remaining<=60)el('message').textContent='Entries closed for this round. Next draw will open after result.';
+
+ el('resultTime').textContent=
+  new Date(next).toLocaleTimeString('en-IN',{
+   timeZone:'Asia/Kolkata',
+   hour:'2-digit',
+   minute:'2-digit',
+   hour12:true
+  });
+
+ el('roundId').textContent=
+  'r_'+new Date(roundStart)
+   .toISOString()
+   .replace(/[-:.TZ]/g,'');
+
+ if(remaining<=60){
+  el('message').textContent=
+   'Entries closed for this round. Next draw will open after result.';
+ }
 }
-updateCountdown();setInterval(updateCountdown,1000);
-el('installButton').onclick=()=>{location.href='https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/download/v1.0.4/app-release.apk';};
-el('logoutButton').onclick=async()=>{el('logoutButton').disabled=true;try{await account.deleteSession({sessionId:'current'});location.replace('login.html');}catch(e){el('logoutButton').disabled=false;el('message').textContent='Logout failed. Please retry.';}};
+
+updateCountdown();
+setInterval(updateCountdown,1000);
+
+el('installButton').onclick=()=>{
+ location.href=
+  'https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/download/v1.0.4/app-release.apk';
+};
+
+el('logoutButton').onclick=async()=>{
+ el('logoutButton').disabled=true;
+
+ try{
+  await account.deleteSession({sessionId:'current'});
+  location.replace('login.html');
+ }catch(e){
+  el('logoutButton').disabled=false;
+  el('message').textContent=
+   'Logout failed. Please retry.';
+ }
+};
+
 async function init(){
  try{
-  const user=await account.get();el('userName').textContent=user.name||'Player';el('userEmail').textContent=user.email||'';el('accountStatus').textContent='SIGNED IN';
+  const user=await account.get();
+
+  el('userName').textContent=user.name||'Player';
+  el('userEmail').textContent=user.email||'';
+  el('accountStatus').textContent='SIGNED IN';
+
   try{
-   const profile=await tablesDB.getRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:user.$id});
-   el('wallet').textContent=Number(profile.wallet||0).toLocaleString('en-IN');el('totalGames').textContent=Number(profile.rounds||0);el('wins').textContent=Number(profile.wins||0);el('losses').textContent=Number(profile.losses||0);
+   const profile=await tablesDB.getRow({
+    databaseId:APPWRITE_DATABASE_ID,
+    tableId:USER_PROFILES_TABLE,
+    rowId:user.$id
+   });
+
+   el('wallet').textContent=
+    Number(profile.wallet||0).toLocaleString('en-IN');
+
+   el('totalGames').textContent=Number(profile.rounds||0);
+   el('wins').textContent=Number(profile.wins||0);
+   el('losses').textContent=Number(profile.losses||0);
+
   }catch(e){
-   // New users get the 100 VC starter balance only if their profile does not already exist.
-   if(e.code!==404){throw e;}
-   const profile=await tablesDB.createRow({databaseId:APPWRITE_DATABASE_ID,tableId:USER_PROFILES_TABLE,rowId:user.$id,data:{userId:user.$id,name:user.name||'Player',email:user.email||'',wallet:100,wins:0,losses:0,rounds:0}});
-   el('wallet').textContent=Number(profile.wallet).toLocaleString('en-IN');el('totalGames').textContent='0';el('wins').textContent='0';el('losses').textContent='0';
+   if(e.code!==404){
+    throw e;
+   }
+
+   // Existing signup flow; server-side bonus
+   // hardening is required before opening play.
+   const profile=await tablesDB.createRow({
+    databaseId:APPWRITE_DATABASE_ID,
+    tableId:USER_PROFILES_TABLE,
+    rowId:user.$id,
+    data:{
+     userId:user.$id,
+     name:user.name||'Player',
+     email:user.email||'',
+     wallet:100,
+     wins:0,
+     losses:0,
+     rounds:0
+    }
+   });
+
+   el('wallet').textContent=
+    Number(profile.wallet).toLocaleString('en-IN');
+
+   el('totalGames').textContent='0';
+   el('wins').textContent='0';
+   el('losses').textContent='0';
   }
- }catch(e){if(e.code===401){location.replace('login.html');return;}el('accountStatus').textContent='SYNC ERROR';el('userEmail').textContent='Account/profile could not be loaded';console.error(e);}
+
+ }catch(e){
+  if(e.code===401){
+   location.replace('login.html');
+   return;
+  }
+
+  el('accountStatus').textContent='SYNC ERROR';
+  el('userEmail').textContent=
+   'Account/profile could not be loaded';
+
+  console.error(e);
+ }
 }
+
 init();
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').then(r=>r.update()).catch(console.error));}
+
+if('serviceWorker' in navigator){
+ window.addEventListener('load',()=>{
+  navigator.serviceWorker.register('service-worker.js')
+   .then(r=>r.update())
+   .catch(console.error);
+ });
+}
 </script>
-</body></html>
+</body>
+</html>
