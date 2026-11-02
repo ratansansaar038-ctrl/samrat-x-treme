@@ -256,6 +256,3 @@ export default async ({ req, res, error }) => {
     });
   }
 };
-'''
-p.write_text(code,encoding='utf-8')
-print('Created:',p,'bytes:',p.stat().st_size)
