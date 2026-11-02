@@ -1,6 +1,4 @@
-from pathlib import Path
-p=Path('/mnt/data/game-wallet-main-updated.js')
-code=r'''import https from "node:https";
+import https from "node:https";
 import { randomInt, createHash } from "node:crypto";
 
 const ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
