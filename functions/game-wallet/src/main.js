@@ -1,5 +1,5 @@
 import https from "node:https";
-import { randomInt, createHash } from "node:crypto";
+import { randomInt, createHash, randomBytes } from "node:crypto";
 
 const ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
 const PROJECT = "6a7f2add0011a7bfc21a";
@@ -152,6 +152,135 @@ async function grantCoins(admin, b, key) {
   return { ok: true, message: "Virtual coins credited", targetUserId: b.targetUserId, amount: b.amount };
 }
 
+
+// Server-created game sessions. The browser never chooses a challenge.
+const GAME_IDS = ["speed_tap", "memory_x"];
+const SYMBOLS = ["🌟", "⚡", "💎", "🔥", "🚀", "👑", "🎯", "🦁"];
+const speedLevels = { easy: 1400, medium: 900, extreme: 550 };
+const scoreId = sessionId => "s_" + createHash("sha256").update(sessionId).digest("hex").slice(0, 30);
+function shuffle(items) {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+async function startGame(user, b, key) {
+  if (!GAME_IDS.includes(b.gameId))
+    return { ok: false, error: "Invalid game" };
+  if (b.gameId === "speed_tap" && !Object.hasOwn(speedLevels, b.level))
+    return { ok: false, error: "Invalid difficulty" };
+  const now = Date.now();
+  const gameId = b.gameId;
+  const level = gameId === "speed_tap" ? b.level : "standard";
+  const challenge = gameId === "memory_x"
+    ? { deck: shuffle([...SYMBOLS, ...SYMBOLS]) }
+    : { targets: Array.from({ length: 500 }, () => randomInt(9)), interval: speedLevels[level] };
+  const sessionId = "g_" + randomBytes(15).toString("hex");
+  const startedAt = new Date(now).toISOString();
+  const expiresAt = new Date(now + (gameId === "speed_tap" ? 40000 : 70000)).toISOString();
+  await request("POST", tablePath("game_sessions"), key, {
+    rowId: sessionId,
+    data: {
+      userId: user, gameId, challenge: JSON.stringify({ ...challenge, level }),
+      startedAt, expiresAt, completed: false
+    }
+  });
+  return { ok: true, sessionId, gameId, level, challenge, startedAt, expiresAt };
+}
+function verifyMemory(deck, events, elapsedMs) {
+  if (!Array.isArray(deck) || deck.length !== 16 || !Array.isArray(events) || events.length > 500)
+    return null;
+  if (!Number.isInteger(elapsedMs) || elapsedMs < 1000 || elapsedMs > 60000) return null;
+  const matched = new Set();
+  let open = null, lockedUntil = -1, previousTime = -1;
+  for (const e of events) {
+    if (!Array.isArray(e) || e.length !== 2) return null;
+    const [i, t] = e;
+    if (!Number.isInteger(i) || i < 0 || i > 15 ||
+        !Number.isInteger(t) || t < 0 || t > elapsedMs ||
+        t < previousTime || t < lockedUntil || matched.has(i) || i === open) return null;
+    previousTime = t;
+    if (open === null) { open = i; continue; }
+    if (deck[open] === deck[i]) {
+      matched.add(open); matched.add(i);
+    } else lockedUntil = t + 700;
+    open = null;
+  }
+  if (matched.size !== 16 || open !== null) return null;
+  return { score: 8, durationMs: elapsedMs };
+}
+function verifySpeed(challenge, events, elapsedMs) {
+  if (!Array.isArray(events) || events.length > 1500 ||
+      !Number.isInteger(elapsedMs) || elapsedMs < 29500 || elapsedMs > 30500) return null;
+  let score = 0, hits = 0, misses = 0, cursor = 0, target = challenge.targets[0], last = -1;
+  let targetAt = 0;
+  const interval = challenge.interval;
+  for (const e of events) {
+    if (!Array.isArray(e) || e.length !== 2) return null;
+    const [tile, t] = e;
+    if (!Number.isInteger(tile) || tile < 0 || tile > 8 ||
+        !Number.isInteger(t) || t < last || t < 0 || t >= 30000) return null;
+    last = t;
+    while (t - targetAt >= interval) {
+      score = Math.max(0, score - 2); misses++;
+      targetAt += interval; cursor++;
+      target = challenge.targets[cursor];
+      if (target === undefined) return null;
+    }
+    if (tile === target) {
+      score += 10; hits++; targetAt = t; cursor++;
+      target = challenge.targets[cursor];
+      if (target === undefined) return null;
+    } else {
+      score = Math.max(0, score - 5); misses++;
+    }
+  }
+  while (30000 - targetAt >= interval) {
+    score = Math.max(0, score - 2); misses++;
+    targetAt += interval;
+  }
+  return { score, durationMs: 30000, hits, misses };
+}
+async function finishGame(user, b, key) {
+  if (typeof b.sessionId !== "string" || !/^g_[a-f0-9]{30}$/.test(b.sessionId))
+    return { ok: false, error: "Invalid session" };
+  const session = await request("GET", tablePath("game_sessions") + "/" + b.sessionId, key);
+  if (session.userId !== user || session.completed)
+    return { ok: false, error: "Session unavailable or already submitted" };
+  const started = Date.parse(session.startedAt), now = Date.now();
+  if (!Number.isFinite(started) || now > Date.parse(session.expiresAt) || now < started)
+    return { ok: false, error: "Session expired" };
+  let challenge;
+  try { challenge = JSON.parse(session.challenge); } catch { return { ok: false, error: "Invalid challenge" }; }
+  const elapsedMs = b.elapsedMs;
+  const actual = now - started;
+  // The server clock bounds elapsed time; browser-reported timestamps are not trusted alone.
+  if (!Number.isInteger(elapsedMs) || Math.abs(actual - elapsedMs) > 3000)
+    return { ok: false, error: "Game timing mismatch" };
+  const verified = session.gameId === "memory_x"
+    ? verifyMemory(challenge.deck, b.events, elapsedMs)
+    : session.gameId === "speed_tap" && Object.hasOwn(speedLevels, challenge.level)
+    ? verifySpeed(challenge, b.events, elapsedMs)
+    : null;
+  if (!verified) return { ok: false, error: "Invalid game replay" };
+  try {
+    await transact(key, [
+      op("update", "game_sessions", session.$id, { completed: true }),
+      op("create", "game_scores", scoreId(session.$id), {
+        userId: user, gameId: session.gameId, score: verified.score,
+        durationMs: verified.durationMs, level: challenge.level,
+        verified: true, playedAt: new Date().toISOString()
+      })
+    ]);
+  } catch (e) {
+    if (e.status === 409) return { ok: false, error: "Session already submitted" };
+    throw e;
+  }
+  return { ok: true, verified: true, gameId: session.gameId, ...verified };
+}
+
 // Read-only leaderboard: only server-verified rows are eligible.
 // Client-submitted scores are intentionally NOT accepted by this endpoint.
 async function getLeaderboard(gameId, key) {
@@ -187,12 +316,20 @@ export default async ({ req, res, error }) => {
     if (!b || typeof b !== "object" || Array.isArray(b)) throw Error();
   } catch { return send(res, 400, { ok: false, error: "Invalid JSON" }); }
   const action = b.action, user = req.headers["x-appwrite-user-id"], key = req.headers["x-appwrite-key"];
-  if (!["get_wallet", "get_round", "get_last_result", "place_entry", "grant_coins", "my_entries", "register_profile", "get_leaderboard"].includes(action))
+  if (!["get_wallet", "get_round", "get_last_result", "place_entry", "grant_coins", "my_entries", "register_profile", "get_leaderboard", "start_game", "finish_game"].includes(action))
     return send(res, 400, { ok: false, error: "Unsupported action" });
   if (!key) return send(res, 503, { ok: false, error: "Function API key missing" });
   if (!user && !["get_round", "get_last_result", "get_leaderboard"].includes(action))
     return send(res, 401, { ok: false, error: "Sign in required" });
   try {
+    if (action === "start_game") {
+      const x = await startGame(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+    if (action === "finish_game") {
+      const x = await finishGame(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
     if (action === "get_leaderboard") {
       const x = await getLeaderboard(b.gameId, key);
       return send(res, x.ok ? 200 : 400, x);
