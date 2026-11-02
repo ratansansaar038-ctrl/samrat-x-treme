@@ -183,7 +183,7 @@ async function startGame(user, b, key) {
   await request("POST", tablePath("game_sessions"), key, {
     rowId: sessionId,
     data: {
-      userId: user, gameId, challenge: JSON.stringify({ ...challenge, level }),
+      userId: user, gameid, challenge: JSON.stringify({ ...challenge, level }),
       startedAt, expiresAt, completed: false
     }
   });
@@ -259,9 +259,9 @@ async function finishGame(user, b, key) {
   // The server clock bounds elapsed time; browser-reported timestamps are not trusted alone.
   if (!Number.isInteger(elapsedMs) || Math.abs(actual - elapsedMs) > 3000)
     return { ok: false, error: "Game timing mismatch" };
-  const verified = session.gameId === "memory_x"
+  const verified = session.gameid === "memory_x"
     ? verifyMemory(challenge.deck, b.events, elapsedMs)
-    : session.gameId === "speed_tap" && Object.hasOwn(speedLevels, challenge.level)
+    : session.gameid === "speed_tap" && Object.hasOwn(speedLevels, challenge.level)
     ? verifySpeed(challenge, b.events, elapsedMs)
     : null;
   if (!verified) return { ok: false, error: "Invalid game replay" };
@@ -269,7 +269,7 @@ async function finishGame(user, b, key) {
     await transact(key, [
       op("update", "game_sessions", session.$id, { completed: true }),
       op("create", "game_scores", scoreId(session.$id), {
-        userId: user, gameId: session.gameId, score: verified.score,
+        userId: user, gameid: session.gameId, score: verified.score,
         durationMs: verified.durationMs, level: challenge.level,
         verified: true, playedAt: new Date().toISOString()
       })
@@ -278,7 +278,7 @@ async function finishGame(user, b, key) {
     if (e.status === 409) return { ok: false, error: "Session already submitted" };
     throw e;
   }
-  return { ok: true, verified: true, gameId: session.gameId, ...verified };
+  return { ok: true, verified: true, gameid: session.gameid, ...verified };
 }
 
 // Read-only leaderboard: only server-verified rows are eligible.
