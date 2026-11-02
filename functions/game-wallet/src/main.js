@@ -183,7 +183,7 @@ async function startGame(user, b, key) {
   await request("POST", tablePath("game_sessions"), key, {
     rowId: sessionId,
     data: {
-      userId: user, gameid, challenge: JSON.stringify({ ...challenge, level }),
+      userId: user, gameid:, gameId challenge: JSON.stringify({ ...challenge, level }),
       startedAt, expiresAt, completed: false
     }
   });
