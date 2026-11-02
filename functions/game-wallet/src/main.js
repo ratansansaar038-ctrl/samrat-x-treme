@@ -26,11 +26,18 @@ class GameError extends Error {
 }
 
 function qEqual(attribute, value) {
-  return { method: 'equal', attribute, values: [value] };
+  return {
+    method: 'equal',
+    attribute,
+    values: [value]
+  };
 }
 
 function qLimit(value) {
-  return { method: 'limit', values: [value] };
+  return {
+    method: 'limit',
+    values: [value]
+  };
 }
 
 function api(method, path, key, payload) {
@@ -58,6 +65,7 @@ function api(method, path, key, payload) {
 
       r.on('data', c => {
         raw += c;
+
         if (raw.length > 1000000) {
           r.destroy(new Error('Response too large'));
         }
@@ -74,10 +82,15 @@ function api(method, path, key, payload) {
           );
         }
 
-        if (r.statusCode < 200 || r.statusCode >= 300) {
+        if (
+          r.statusCode < 200 ||
+          r.statusCode >= 300
+        ) {
           const e = new Error(
-            data.message || `Database HTTP ${r.statusCode}`
+            data.message ||
+            `Database HTTP ${r.statusCode}`
           );
+
           e.status = r.statusCode;
           return reject(e);
         }
@@ -86,9 +99,9 @@ function api(method, path, key, payload) {
       });
     });
 
-    req.on('timeout', () =>
-      req.destroy(new Error('Database timeout'))
-    );
+    req.on('timeout', () => {
+      req.destroy(new Error('Database timeout'));
+    });
 
     req.on('error', reject);
 
@@ -105,7 +118,7 @@ function rowsPath(table, queries = []) {
   }
 
   return `/tablesdb/${DB}/tables/${table}/rows${
-    p.size ? '?' + p : ''
+    p.size ? '?' + p.toString() : ''
   }`;
 }
 
@@ -223,8 +236,11 @@ async function lastResult(key) {
   );
 
   if (!stored) {
-    // Demo result: generate only after round ends.
     const winningNumber = randomInt(1, 10);
+
+    const startAt = last.startsAt;
+    const endsAt = last.endsAt;
+    const settleAt = new Date().toISOString();
 
     try {
       stored = await api(
@@ -235,8 +251,11 @@ async function lastResult(key) {
           rowId: last.roundId,
           data: {
             roundId: last.roundId,
+            startAt,
+            endsAt,
             status: 'settled',
-            winningNumber
+            winningNumber,
+            settleAt
           }
         }
       );
@@ -245,7 +264,6 @@ async function lastResult(key) {
         throw e;
       }
 
-      // Concurrent request: read existing record.
       stored = await getStoredRound(
         last.roundId,
         key
@@ -260,7 +278,7 @@ async function lastResult(key) {
       roundId: last.roundId,
       winningNumber: null,
       message:
-        'Round record exists but has no verified result'
+        'Round exists but no verified result is saved'
     };
   }
 
@@ -388,8 +406,11 @@ export default async ({ req, res, error }) => {
     });
   }
 
-  const userId = req.headers['x-appwrite-user-id'];
-  const key = req.headers['x-appwrite-key'];
+  const userId =
+    req.headers['x-appwrite-user-id'];
+
+  const key =
+    req.headers['x-appwrite-key'];
 
   if (!userId) {
     return response(res, 401, {
@@ -518,7 +539,7 @@ export default async ({ req, res, error }) => {
       ok: false,
       code: 'BACKEND_ERROR',
       error:
-        'Game service unavailable; check database schema and function permissions'
+        'Game service unavailable; check function errors'
     });
   }
 };
