@@ -269,7 +269,7 @@ async function finishGame(user, b, key) {
     await transact(key, [
       op("update", "game_sessions", session.$id, { completed: true }),
       op("create", "game_scores", scoreId(session.$id), {
-        userId: user, gameid: session.gameId, score: verified.score,
+        userId: user, gameId: session.gameid, score: verified.score,
         durationMs: verified.durationMs, level: challenge.level,
         verified: true, playedAt: new Date().toISOString()
       })
