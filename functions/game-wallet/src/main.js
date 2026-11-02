@@ -1,25 +1,27 @@
 import https from "node:https";
-import { randomInt } from "node:crypto";
-const ENDPOINT = "https://sgp.cloud.appwrite.io/v1",
-  PROJECT = "6a7f2add0011a7bfc21a",
-  DB = "6a7f2d1d0035d9815939";
+import { randomInt, createHash } from "node:crypto";
+
+const ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
+const PROJECT = "6a7f2add0011a7bfc21a";
+const DB = "6a7f2d1d0035d9815939";
 const ROUND_MS = 1200000,
   OFFSET = 19800000;
-const ok = (res, status, data) => res.json(data, status);
+const send = (res, code, obj) => res.json(obj, code);
 const eq = (attribute, value) => ({
   method: "equal",
   attribute,
   values: [value],
 });
-const lim = (value) => ({ method: "limit", values: [value] });
+const lim = (n) => ({ method: "limit", values: [n] });
+
 function request(method, path, key, payload) {
   return new Promise((resolve, reject) => {
     const body = payload === undefined ? null : JSON.stringify(payload);
-    const r = https.request(
+    const req = https.request(
       new URL(ENDPOINT + path),
       {
         method,
-        timeout: 12000,
+        timeout: 15000,
         headers: {
           "X-Appwrite-Project": PROJECT,
           "X-Appwrite-Key": key,
@@ -32,42 +34,41 @@ function request(method, path, key, payload) {
             : {}),
         },
       },
-      (response) => {
+      (r) => {
         let raw = "";
-        response.on("data", (c) => {
-          raw += c;
-          if (raw.length > 1000000)
-            response.destroy(new Error("Response too large"));
+        r.on("data", (x) => {
+          raw += x;
+          if (raw.length > 1000000) r.destroy(new Error("Response too large"));
         });
-        response.on("end", () => {
+        r.on("end", () => {
           let data;
           try {
             data = JSON.parse(raw);
           } catch {
-            return reject(new Error("Invalid database response"));
+            return reject(new Error("Invalid JSON response"));
           }
-          if (response.statusCode < 200 || response.statusCode >= 300) {
+          if (r.statusCode < 200 || r.statusCode >= 300) {
             const e = new Error(data.message || "Database error");
-            e.status = response.statusCode;
+            e.status = r.statusCode;
             return reject(e);
           }
           resolve(data);
         });
       }
     );
-    r.on("timeout", () => r.destroy(new Error("Timeout")));
-    r.on("error", reject);
-    if (body) r.write(body);
-    r.end();
+    req.on("timeout", () => req.destroy(new Error("Timeout")));
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
   });
 }
-function path(table, queries = []) {
-  const p = new URLSearchParams();
-  for (const q of queries) p.append("queries[]", JSON.stringify(q));
-  return `/tablesdb/${DB}/tables/${table}/rows` + (p.size ? "?" + p : "");
+function tablePath(table, queries = []) {
+  const q = new URLSearchParams();
+  for (const x of queries) q.append("queries[]", JSON.stringify(x));
+  return `/tablesdb/${DB}/tables/${table}/rows` + (q.size ? "?" + q : "");
 }
 async function rows(table, queries, key) {
-  return (await request("GET", path(table, queries), key)).rows || [];
+  return (await request("GET", tablePath(table, queries), key)).rows || [];
 }
 function roundFor(t) {
   const start = Math.floor((t + OFFSET) / ROUND_MS) * ROUND_MS - OFFSET,
@@ -81,21 +82,106 @@ function roundFor(t) {
   };
 }
 async function stored(id, key) {
-  const r = await rows("game_rounds", [eq("roundId", id), lim(2)], key);
-  if (r.length > 1) throw Error("Duplicate rounds");
-  return r[0] || null;
+  const x = await rows("game_rounds", [eq("roundId", id), lim(2)], key);
+  if (x.length > 1) throw Error("Duplicate rounds");
+  return x[0] || null;
 }
 const valid = (r) =>
   r?.status === "settled" &&
   Number.isInteger(r.winningNumber) &&
   r.winningNumber >= 1 &&
   r.winningNumber <= 9;
-async function result(key) {
+async function profile(user, key) {
+  const x = await rows("user_profiles", [eq("userId", user), lim(2)], key);
+  if (x.length !== 1) throw Error("Profile missing or duplicated");
+  if (!Number.isSafeInteger(x[0].wallet) || x[0].wallet < 0)
+    throw Error("Invalid wallet");
+  return x[0];
+}
+const op = (action, table, rowId, data) => ({
+  action,
+  databaseId: DB,
+  tableId: table,
+  rowId,
+  data,
+});
+async function transact(key, operations) {
+  const tx = await request("POST", "/tablesdb/transactions", key, {});
+  try {
+    await request("POST", `/tablesdb/transactions/${tx.$id}/operations`, key, {
+      operations,
+    });
+    await request("PATCH", `/tablesdb/transactions/${tx.$id}`, key, {
+      commit: true,
+    });
+  } catch (e) {
+    try {
+      await request("PATCH", `/tablesdb/transactions/${tx.$id}`, key, {
+        rollback: true,
+      });
+    } catch {}
+    throw e;
+  }
+}
+async function settleRound(round, key) {
+  if (!valid(round)) return 0;
+  let total = 0;
+  // Re-query pending entries each batch. A transaction changes entry status and wallet together.
+  for (let batch = 0; batch < 100; batch++) {
+    const entries = await rows(
+      "game_entries",
+      [eq("roundId", round.roundId), eq("status", "pending"), lim(50)],
+      key
+    );
+    if (!entries.length) break;
+    let done = 0;
+    for (const entry of entries) {
+      if (
+        !Number.isInteger(entry.stakeVC) ||
+        entry.stakeVC < 1 ||
+        !Number.isInteger(entry.selectNumber)
+      )
+        continue;
+      const win = entry.selectNumber === round.winningNumber,
+        payout = win ? entry.stakeVC * 8 : 0;
+      const p = await profile(entry.userId, key);
+      const operations = [
+        op("update", "game_entries", entry.$id, {
+          status: win ? "won" : "lost",
+          payoutVC: payout,
+          settleAt: new Date().toISOString(),
+        }),
+        op("increment", "user_profiles", p.$id, { column: "rounds", value: 1 }),
+        op("increment", "user_profiles", p.$id, {
+          column: win ? "wins" : "losses",
+          value: 1,
+        }),
+      ];
+      if (payout)
+        operations.push(
+          op("increment", "user_profiles", p.$id, {
+            column: "wallet",
+            value: payout,
+          })
+        );
+      try {
+        await transact(key, operations);
+        done++;
+        total++;
+      } catch (e) {
+        if (e.status !== 409) throw e;
+      }
+    }
+    if (!done) break;
+  }
+  return total;
+}
+async function lastResult(key) {
   const previous = roundFor(Date.now() - ROUND_MS);
   let r = await stored(previous.roundId, key);
   if (!r) {
     try {
-      r = await request("POST", path("game_rounds"), key, {
+      r = await request("POST", tablePath("game_rounds"), key, {
         rowId: previous.roundId,
         data: {
           roundId: previous.roundId,
@@ -111,122 +197,225 @@ async function result(key) {
       r = await stored(previous.roundId, key);
     }
   }
+  const settled = valid(r) ? await settleRound(r, key) : 0;
   return {
     ok: true,
     available: valid(r),
     roundId: previous.roundId,
     winningNumber: valid(r) ? r.winningNumber : null,
-    message: valid(r) ? "Saved demo result" : "Result pending",
+    settledEntries: settled,
   };
 }
-async function profile(user, key) {
-  const r = await rows("user_profiles", [eq("userId", user), lim(2)], key);
-  if (r.length !== 1)
-    throw Error(r.length ? "Duplicate profiles" : "Profile not found");
-  if (!Number.isSafeInteger(r[0].wallet) || r[0].wallet < 0)
-    throw Error("Invalid wallet");
-  return r[0];
+async function placeEntry(user, b, key) {
+  const current = roundFor(Date.now());
+  if (current.status !== "open" || b.roundId !== current.roundId)
+    return { ok: false, error: "Round locked or changed. Refresh." };
+  if (
+    !Number.isInteger(b.number) ||
+    b.number < 1 ||
+    b.number > 9 ||
+    ![20, 50, 100].includes(b.stakeVC)
+  )
+    return { ok: false, error: "Invalid number or VC amount" };
+  const r = await stored(current.roundId, key);
+  if (r && r.status !== "open") return { ok: false, error: "Round closed" };
+  const p = await profile(user, key);
+  if (p.wallet < b.stakeVC)
+    return { ok: false, error: "Not enough VC. Request coins from admin." };
+  // One entry per user per round; deterministic ID makes retries idempotent.
+  const id =
+    "e_" +
+    createHash("sha256")
+      .update(user + "|" + current.roundId)
+      .digest("hex")
+      .slice(0, 30);
+  try {
+    await transact(key, [
+      op("create", "game_entries", id, {
+        roundId: current.roundId,
+        userId: user,
+        selectNumber: b.number,
+        stakeVC: b.stakeVC,
+        status: "pending",
+        payoutVC: 0,
+      }),
+      op("decrement", "user_profiles", p.$id, {
+        column: "wallet",
+        value: b.stakeVC,
+        min: 0,
+      }),
+    ]);
+  } catch (e) {
+    if (e.status === 409)
+      return {
+        ok: false,
+        error: "Entry already placed or wallet changed. Refresh.",
+      };
+    throw e;
+  }
+  return {
+    ok: true,
+    committed: true,
+    roundId: current.roundId,
+    number: b.number,
+    stakeVC: b.stakeVC,
+  };
+}
+async function grantCoins(admin, b, key) {
+  const allowed = (process.env.ADMIN_USER_IDS || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (!allowed.includes(admin))
+    return { ok: false, error: "Admin access denied" };
+  if (
+    typeof b.targetUserId !== "string" ||
+    !b.targetUserId.trim() ||
+    !Number.isSafeInteger(b.amount) ||
+    b.amount < 1 ||
+    b.amount > 100000
+  )
+    return { ok: false, error: "Invalid user or amount (1-100000)" };
+  const p = await profile(b.targetUserId.trim(), key);
+  await transact(key, [
+    op("increment", "user_profiles", p.$id, {
+      column: "wallet",
+      value: b.amount,
+      max: 900000000,
+    }),
+  ]);
+  return {
+    ok: true,
+    message: "Virtual coins credited",
+    targetUserId: b.targetUserId,
+    amount: b.amount,
+  };
 }
 export default async ({ req, res, error }) => {
   if (req.method !== "POST")
-    return ok(res, 405, { ok: false, error: "POST required" });
+    return send(res, 405, { ok: false, error: "POST required" });
   let b;
-  const scheduled = req.headers["x-appwrite-trigger"] === "schedule";
   try {
-    b = scheduled
-      ? { action: "get_last_result" }
-      : typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    b =
+      req.headers["x-appwrite-trigger"] === "schedule"
+        ? { action: "get_last_result" }
+        : typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
     if (!b || typeof b !== "object" || Array.isArray(b)) throw Error();
   } catch {
-    return ok(res, 400, { ok: false, error: "Invalid JSON" });
+    return send(res, 400, { ok: false, error: "Invalid JSON" });
   }
   const action = b.action,
     user = req.headers["x-appwrite-user-id"],
     key = req.headers["x-appwrite-key"];
   if (
-    !["get_wallet", "get_round", "get_last_result", "preview_entries"].includes(
-      action
-    )
+    ![
+      "get_wallet",
+      "get_round",
+      "get_last_result",
+      "place_entry",
+      "grant_coins",
+      "my_entries",
+      "register_profile",
+    ].includes(action)
   )
-    return ok(res, 400, { ok: false, error: "Unsupported action" });
+    return send(res, 400, { ok: false, error: "Unsupported action" });
   if (!key)
-    return ok(res, 503, { ok: false, error: "Function API key unavailable" });
+    return send(res, 503, { ok: false, error: "Function API key missing" });
   if (!user && !["get_round", "get_last_result"].includes(action))
-    return ok(res, 401, { ok: false, error: "Login required" });
+    return send(res, 401, { ok: false, error: "Sign in required" });
   try {
-    if (action === "get_last_result") return ok(res, 200, await result(key));
-    if (action === "get_wallet") {
-      const p = await profile(user, key);
-      return ok(res, 200, { ok: true, userId: user, wallet: p.wallet });
-    }
-    const current = roundFor(Date.now()),
-      r = await stored(current.roundId, key);
-    if (action === "get_round")
-      return ok(res, 200, {
+    if (action === "get_last_result")
+      return send(res, 200, await lastResult(key));
+    if (action === "get_round") {
+      const current = roundFor(Date.now()),
+        r = await stored(current.roundId, key);
+      return send(res, 200, {
         ok: true,
         ...current,
         serverTime: new Date().toISOString(),
-        status: valid(r)
-          ? "settled"
-          : r?.status === "locked"
-          ? "locked"
-          : current.status,
-        winningNumber: valid(r) ? r.winningNumber : null,
-        acceptingEntries: false,
-        mode: "free_demo",
-      });
-    if (current.status !== "open" || (r && r.status !== "open"))
-      return ok(res, 409, { ok: false, error: "Round locked" });
-    if (b.roundId && b.roundId !== current.roundId)
-      return ok(res, 409, { ok: false, error: "Round mismatch" });
-    if (
-      !Array.isArray(b.selections) ||
-      b.selections.length < 1 ||
-      b.selections.length > 9
-    )
-      return ok(res, 400, { ok: false, error: "Select 1–9 numbers" });
-    let total = 0;
-    const seen = new Set(),
-      selected = [];
-    for (const x of b.selections) {
-      if (
-        !Number.isInteger(x.number) ||
-        x.number < 1 ||
-        x.number > 9 ||
-        seen.has(x.number) ||
-        ![20, 50, 100].includes(x.stakeVC)
-      )
-        return ok(res, 400, { ok: false, error: "Invalid selections" });
-      seen.add(x.number);
-      total += x.stakeVC;
-      selected.push({
-        number: x.number,
-        stakeVC: x.stakeVC,
-        potentialPayoutVC: x.stakeVC * 8,
+        acceptingEntries:
+          current.status === "open" && (!r || r.status === "open"),
+        mode: "free_virtual_coins",
       });
     }
-    const p = await profile(user, key);
-    return ok(res, 200, {
-      ok: true,
-      action: "preview_entries",
-      roundId: current.roundId,
-      selections: selected,
-      totalStakeVC: total,
-      walletVC: p.wallet,
-      sufficientBalance: p.wallet >= total,
-      walletAfterVC: p.wallet >= total ? p.wallet - total : null,
-      acceptingEntries: false,
-      committed: false,
-      message: "Preview only. No VC deducted.",
-    });
+    if (action === "register_profile") {
+      const existing = await rows(
+        "user_profiles",
+        [eq("userId", user), lim(2)],
+        key
+      );
+      if (existing.length) return send(res, 200, { ok: true, created: false });
+      // The caller's identity comes from the Appwrite function's trusted user header.
+      const id = user;
+      try {
+        await request("POST", tablePath("user_profiles"), key, {
+          rowId: id,
+          data: {
+            userId: user,
+            name: typeof b.name === "string" ? b.name.slice(0, 80) : "",
+            email: typeof b.email === "string" ? b.email.slice(0, 160) : "",
+            wallet: 0,
+            wins: 0,
+            losses: 0,
+            rounds: 0,
+            referralPoints: 0,
+            rewardPoints: 0,
+            totalRewardsClaimed: 0,
+          },
+        });
+      } catch (e) {
+        if (e.status !== 409) throw e;
+      }
+      return send(res, 200, { ok: true, created: true });
+    }
+    if (action === "get_wallet") {
+      const p = await profile(user, key);
+      return send(res, 200, {
+        ok: true,
+        userId: user,
+        wallet: p.wallet,
+        wins: p.wins || 0,
+        losses: p.losses || 0,
+        rounds: p.rounds || 0,
+        isAdmin: (process.env.ADMIN_USER_IDS || "")
+          .split(",")
+          .map((x) => x.trim())
+          .includes(user),
+      });
+    }
+    if (action === "place_entry") {
+      const x = await placeEntry(user, b, key);
+      return send(res, x.ok ? 200 : 409, x);
+    }
+    if (action === "grant_coins") {
+      const x = await grantCoins(user, b, key);
+      return send(res, x.ok ? 200 : 403, x);
+    }
+    if (action === "my_entries") {
+      const current = roundFor(Date.now());
+      const x = await rows(
+        "game_entries",
+        [eq("userId", user), eq("roundId", current.roundId), lim(10)],
+        key
+      );
+      return send(res, 200, {
+        ok: true,
+        entries: x.map((y) => ({
+          number: y.selectNumber,
+          stakeVC: y.stakeVC,
+          status: y.status,
+          payoutVC: y.payoutVC,
+        })),
+      });
+    }
   } catch (e) {
-    error("Game backend error: " + e.message);
-    return ok(res, 500, {
+    error("Game backend: " + e.message);
+    return send(res, e.status === 409 ? 409 : 500, {
       ok: false,
-      code: "BACKEND_ERROR",
-      error: "Game service unavailable; check function errors",
+      error: "Game service error. Check function logs.",
+      code: e.status || 500,
     });
   }
 };
