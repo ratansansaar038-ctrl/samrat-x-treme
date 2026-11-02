@@ -1,0 +1,29 @@
+
+name: Samrat Automatic Draw
+
+on:
+  schedule:
+    - cron: "0,20,40 * * * *"
+  workflow_dispatch:
+
+jobs:
+  generate-result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Generate and save draw result
+        env:
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          APPWRITE_FUNCTION_ID: ${{ secrets.APPWRITE_FUNCTION_ID }}
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 2 \
+            --request POST \
+            --url "https://sgp.cloud.appwrite.io/v1/functions/${APPWRITE_FUNCTION_ID}/executions" \
+            --header "X-Appwrite-Project: ${APPWRITE_PROJECT}" \
+            --header "X-Appwrite-Key: ${APPWRITE_API_KEY}" \
+            --header "Content-Type: application/json" \
+            --data '{"body":"{\"action\":\"get_last_result\"}","async":false,"method":"POST","path":"/"}'
+            
