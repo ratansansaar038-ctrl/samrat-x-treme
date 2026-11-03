@@ -288,8 +288,8 @@ async function finishGame(user, b, key) {
 async function getLeaderboard(gameId, key) {
   if (!["speed_tap", "memory_x"].includes(gameId))
     return { ok: false, error: "Invalid game" };
-  const field = gameId === "speed_tap" ? "score" : "durationMs";
-  const direction = gameId === "speed_tap" ? "desc" : "asc";
+  const field = "score";
+const direction = "desc";
   // Read in rank order and deduplicate players. Cap scanned rows to 100.
   const result = await rows("game_scores", [
     eq("gameId", gameId), eq("verified", true), order(field, direction), lim(100)
