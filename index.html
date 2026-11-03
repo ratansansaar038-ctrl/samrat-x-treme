@@ -30,7 +30,7 @@ const {Client,Account,ID,Functions}=Appwrite;
 const client=new Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
 account=new Account(client);functions=new Functions(client);
 const FUNCTION_ID='6ae1bcc500208a5a7efb';
-async function api(action,extra={}){const r=await functions.createExecution(FUNCTION_ID,JSON.stringify({action,...extra}),false);let data;try{data=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid server response')}if(!data.ok)throw Error(data.error||'Server error');return data}
+async function api(action,extra={}){const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...extra}),async:false});let data;try{data=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid server response')}if(!data.ok)throw Error(data.error||'Server error');return data}
 function drawNumbers(id,cb){$(id).replaceChildren();for(let i=1;i<=9;i++){const b=document.createElement('button');b.className='num';b.textContent=i;b.onclick=()=>{cb(i);for(const x of $(id).children)x.classList.toggle('active',Number(x.textContent)===i)};$(id).appendChild(b)}}
 drawNumbers('guestNums',n=>guestNumber=n);drawNumbers('playerNums',n=>playerNumber=n);
 function updateCountdown(){if(!round)return;const ms=new Date(round.endsAt).getTime()-Date.now()-serverDelta;const sec=Math.max(0,Math.ceil(ms/1000));$('countdown').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`}
