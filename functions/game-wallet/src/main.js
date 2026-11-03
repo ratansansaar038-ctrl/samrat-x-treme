@@ -209,9 +209,10 @@ function verifyMemory(deck, events, elapsedMs) {
       matched.add(open); matched.add(i);
     } else lockedUntil = t + 700;
     open = null;
-  }
+    }
 if (open !== null) return null;
 return { score: matched.size / 2, durationMs: elapsedMs };
+}
 function verifySpeed(challenge, events, elapsedMs) {
   if (!Array.isArray(events) || events.length > 1500 ||
       !Number.isInteger(elapsedMs) || elapsedMs < 29500 || elapsedMs > 30500) return null;
