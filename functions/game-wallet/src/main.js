@@ -305,14 +305,20 @@ if (!previous || value > previous.score ||
     score: value,
     durationMs: r.durationMs
   });
-
   }
-  const entries = [...bestByUser].slice(0, 10).map(([userId, value], i) => ({
-    rank: i + 1,
-    player: "Player " + userId.slice(0, 6),
-    score: gameId === "speed_tap" ? value : null,
-    durationMs: gameId === "memory_x" ? value : null
-  }));
+  }
+    const entries = [...bestByUser]
+    .sort((a, b) =>
+      b[1].score - a[1].score ||
+      a[1].durationMs - b[1].durationMs
+    )
+    .slice(0, 10)
+    .map(([userId, value], i) => ({
+      rank: i + 1,
+      player: "Player " + userId.slice(0, 6),
+      score: value.score,
+      durationMs: gameId === "memory_x" ? value.durationMs : null
+    }));
   return { ok: true, gameId, verifiedOnly: true, entries };
 }
 
