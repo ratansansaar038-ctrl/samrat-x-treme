@@ -210,7 +210,7 @@ function verifyMemory(deck, events, elapsedMs) {
     } else lockedUntil = t + 700;
     open = null;
     }
-if (open !== null) return null;
+
 return { score: matched.size / 2, durationMs: elapsedMs };
 }
 function verifySpeed(challenge, events, elapsedMs) {
