@@ -25,12 +25,12 @@
 </div>
 <div class="grid" id="grid"></div>
 <div class="msg" id="message">Press START GAME</div>
-<button class="start" id="start">▶ START GAME</button>
+<button type="button" class="start" id="start">▶ START GAME</button>
 </section>
 <section class="panel">
 <h2>🏆 Online Top 10</h2>
 <div id="leaderboard">Loading...</div>
-<button class="start" id="refresh">Refresh ranking</button>
+<button type="button" class="start" id="refresh">Refresh ranking</button>
 </section>
 <div class="footer">Free skill game · No coins deducted · No cash value</div>
 </main>
@@ -43,7 +43,8 @@ const FUNCTION_ID='6ae1bcc500208a5a7efb';
 const $=id=>document.getElementById(id);
 const symbols=['🌟','⚡','💎','🔥','🚀','👑','🎯','🦁'];
 let api=null,signedIn=false;
-let deck=Array(16).fill('?'),opened=[],matched=new Set(),busy=false,playing=false;
+let deck=Array(16).fill('?'),opened=[],matched=new Set();
+let busy=false,playing=false,starting=false,finishing=false;
 let endAt=0,clock=null,token=0,session=null,events=[],started=0,best=null;
 try{const v=Number(localStorage.getItem('samrat_memory_x_best_seconds'));if(v>0&&v<=60)best=v;}catch{}
 $('best').textContent=best===null?'—':best+'s';
@@ -61,12 +62,8 @@ if(window.Appwrite){
   account.get().then(()=>{
     signedIn=true;
     $('mode').textContent='Signed in · Online verified mode available';
-  }).catch(()=>{
-    $('mode').textContent='Guest practice · Sign in on Home for online ranking';
-  });
-}else{
-  $('mode').textContent='Offline practice · Appwrite unavailable';
-}
+  }).catch(()=>{$('mode').textContent='Guest practice · Sign in on Home for online ranking';});
+}else{$('mode').textContent='Offline practice · Appwrite unavailable';}
 
 async function leaderboard(){
   const el=$('leaderboard');
@@ -76,9 +73,9 @@ async function leaderboard(){
     el.replaceChildren();
     if(!result.entries.length){el.textContent='No verified scores yet';return;}
     for(const e of result.entries){
-      const p=document.createElement('div');
-      p.className='rank';
-      p.textContent='#'+e.rank+' · '+e.player+' · '+e.score+'/8 pairs · '+(e.durationMs/1000).toFixed(2)+'s';
+      const p=document.createElement('div');p.className='rank';
+      const duration=Number.isFinite(e.durationMs)?(e.durationMs/1000).toFixed(2)+'s':'—';
+      p.textContent='#'+e.rank+' · '+e.player+' · '+e.score+'/8 pairs · '+duration;
       el.append(p);
     }
   }catch(e){el.textContent='Leaderboard unavailable: '+e.message;}
@@ -87,21 +84,23 @@ async function leaderboard(){
 function render(){
   const grid=$('grid');grid.replaceChildren();
   deck.forEach((symbol,i)=>{
-    const tile=document.createElement('button');
+    const tile=document.createElement('button');tile.type='button';
     tile.className='tile'+(matched.has(i)?' matched':opened.includes(i)?' open':'');
     tile.textContent=matched.has(i)||opened.includes(i)?symbol:'?';
     tile.disabled=!playing||busy||matched.has(i)||opened.includes(i);
-    tile.onclick=()=>flip(i);
-    grid.append(tile);
+    tile.onclick=()=>flip(i);grid.append(tile);
   });
   $('pairs').textContent=(matched.size/2)+'/8';
 }
 
 async function stop(win){
   if(!playing)return;
-  playing=false;token++;clearInterval(clock);
-  const elapsed=Math.min(60000,Math.floor(performance.now()-started));
+  playing=false;token++;clearInterval(clock);clock=null;
+  const elapsed=Math.min(60000,Math.max(1000,Math.floor(performance.now()-started)));
   const seconds=Math.max(1,Math.ceil(elapsed/1000));
+  const finishedSession=session;
+  const finishedEvents=events.map(e=>[...e]);
+  session=null;
   $('time').textContent=win?Math.max(0,Math.ceil((endAt-performance.now())/1000)):0;
   if(win){
     if(best===null||seconds<best){
@@ -110,22 +109,24 @@ async function stop(win){
       $('best').textContent=best+'s';
     }
     $('message').textContent='🎉 Completed in '+seconds+'s';
-  }else{
-    $('message').textContent='Time over · '+(matched.size/2)+'/8 pairs';
-  }
-  $('start').textContent='↻ PLAY AGAIN';
-  $('start').disabled=false;
+  }else{$('message').textContent='Time over · '+(matched.size/2)+'/8 pairs';}
   render();
-  if(session){
+  finishing=Boolean(finishedSession);
+  $('start').textContent=finishing?'Saving score...':'↻ PLAY AGAIN';
+  $('start').disabled=finishing;
+  if(finishedSession){
     try{
       $('message').textContent+=' · Checking server...';
       const result=await api('finish_game',{
-        sessionId:session.sessionId,events,elapsedMs:elapsed
+        sessionId:finishedSession.sessionId,events:finishedEvents,elapsedMs:elapsed
       });
       $('message').textContent='✓ Verified online: '+result.score+'/8 pairs';
       leaderboard();
-    }catch(e){
-      $('message').textContent='Online not saved: '+e.message;
+    }catch(e){$('message').textContent='Online not saved: '+e.message;}
+    finally{
+      finishing=false;
+      $('start').disabled=false;
+      $('start').textContent='↻ PLAY AGAIN';
     }
   }
 }
@@ -142,8 +143,7 @@ function flip(i){
       $('message').textContent='Correct pair!';render();
       if(matched.size===16)stop(true);
     }else{
-      busy=true;
-      const round=token;
+      busy=true;const round=token;
       $('message').textContent='Try again';
       setTimeout(()=>{
         if(round!==token)return;
@@ -153,41 +153,58 @@ function flip(i){
   }
 }
 
-async function start(){
-  if(playing)return;
-  $('start').disabled=true;
-  session=null;
-  if(signedIn&&api){
-    try{
-      session=await api('start_game',{gameId:'memory_x'});
-      deck=session.challenge.deck;
-    }catch(e){$('message').textContent='Online unavailable, practice only: '+e.message;}
+function shuffleLocal(){
+  deck=[...symbols,...symbols];
+  for(let i=deck.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]]=[deck[j],deck[i]];
   }
-  if(!session){
-    deck=[...symbols,...symbols];
-    for(let i=deck.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));
-      [deck[i],deck[j]]=[deck[j],deck[i]];
-    }
-  }
-  token++;
-  const round=token;
-  opened=[];matched=new Set();busy=false;playing=true;events=[];
-  started=performance.now();endAt=started+60000;
-  $('start').textContent='GAME IN PROGRESS';
-  $('time').textContent='60';
-  $('message').textContent=session?'Online verified round':'Guest practice';
-  render();clearInterval(clock);
-  clock=setInterval(()=>{
-    if(round!==token)return;
-    const left=Math.max(0,Math.ceil((endAt-performance.now())/1000));
-    $('time').textContent=left;
-    if(left===0)stop(false);
-  },100);
 }
 
-$('start').onclick=start;
-$('refresh').onclick=leaderboard;
+async function start(){
+  if(playing||starting||finishing)return;
+  starting=true;
+  $('start').disabled=true;
+  $('start').textContent='Starting...';
+  $('message').textContent='Preparing new round...';
+  session=null;
+  try{
+    if(signedIn&&api){
+      try{
+        const next=await api('start_game',{gameId:'memory_x'});
+        if(!Array.isArray(next.challenge?.deck)||next.challenge.deck.length!==16)throw Error('Invalid deck');
+        session=next;deck=[...next.challenge.deck];
+      }catch(e){
+        $('message').textContent='Online unavailable, practice only: '+e.message;
+      }
+    }
+    if(!session)shuffleLocal();
+    token++;
+    const round=token;
+    opened=[];matched=new Set();busy=false;events=[];
+    playing=true;started=performance.now();endAt=started+60000;
+    $('start').textContent='GAME IN PROGRESS';
+    $('time').textContent='60';
+    $('message').textContent=session?'Online verified round':'Guest practice';
+    render();clearInterval(clock);
+    clock=setInterval(()=>{
+      if(round!==token)return;
+      const left=Math.max(0,Math.ceil((endAt-performance.now())/1000));
+      $('time').textContent=left;
+      if(left===0)stop(false);
+    },100);
+  }catch(e){
+    playing=false;
+    $('message').textContent='Unable to start: '+e.message;
+    $('start').textContent='↻ TRY AGAIN';
+  }finally{
+    starting=false;
+    $('start').disabled=playing;
+  }
+}
+
+$('start').addEventListener('click',start);
+$('refresh').addEventListener('click',leaderboard);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden&&playing){session=null;stop(false);}
 });
