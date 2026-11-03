@@ -297,8 +297,15 @@ const direction = "desc";
   const bestByUser = new Map();
   for (const r of result) {
     const value = r[field];
-    if (typeof r.userId !== "string" || !Number.isSafeInteger(value) || value < 0 || (gameId === "memory_x" && value === 0)) continue;
-    if (!bestByUser.has(r.userId)) bestByUser.set(r.userId, value);
+    if (typeof r.userId !== "string" || !Number.isSafeInteger(value) || value < 0) continue;
+const previous = bestByUser.get(r.userId);
+if (!previous || value > previous.score ||
+    (value === previous.score && r.durationMs < previous.durationMs)) {
+  bestByUser.set(r.userId, {
+    score: value,
+    durationMs: r.durationMs
+  });
+
   }
   const entries = [...bestByUser].slice(0, 10).map(([userId, value], i) => ({
     rank: i + 1,
