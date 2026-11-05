@@ -366,7 +366,7 @@ async function requestVC(user, b, key) {
         response.on("end", () => {
           try {
             const data = JSON.parse(raw);
-            if (!data.ok) throw Error("Telegram delivery failed");
+            if (!data.ok) { const status = response.statusCode; const category = status === 401 ? "Invalid bot token" : status === 403 ? "Bot access denied" : status === 400 ? "Invalid chat ID or bot not started" : status === 429 ? "Telegram rate limit" : "Telegram API error"; reject(Error(category)); return; }
             resolve();
           } catch {
             reject(Error("Telegram delivery failed"));
@@ -879,11 +879,22 @@ export default async ({ req, res, error }) => {
     }
 
     if (action === "request_vc") {
-    const result = await requestVC(user, b, key);
-    return send(res, result.ok ? 200 : 400, result);
-  }
+      try {
+        const result = await requestVC(user, b, key);
+        return send(res, result.ok ? 200 : 400, result);
+      } catch (e) {
+        const safe = ["Invalid bot token",
+          "Bot access denied",
+          "Invalid chat ID or bot not started",
+          "Telegram rate limit", "Telegram API error"];
+        const reason = safe.includes(e.message)
+          ? e.message : "Telegram connection failed";
+        error("VC request failed: " + reason);
+        return send(res, 502, {ok:false,error:reason});
+      }
+    }
 
-  if (action === "grant_coins") {
+if (action === "grant_coins") {
       const x = await grantCoins(user, b, key);
       return send(res, x.ok ? 200 : 403, x);
     }
