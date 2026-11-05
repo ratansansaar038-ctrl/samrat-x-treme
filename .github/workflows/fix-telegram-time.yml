@@ -1,0 +1,67 @@
+
+name: Fix Telegram Time and Formatting
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-telegram:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix IST time and line breaks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("functions/game-wallet/src/main.js")
+          code = path.read_text(encoding="utf-8")
+
+          old_time = '"Time: " + new Date().toISOString()'
+
+          new_time = (
+              '"Time: " + new Date().toLocaleString("en-IN", {'
+              ' timeZone: "Asia/Kolkata",'
+              ' day: "2-digit",'
+              ' month: "2-digit",'
+              ' year: "numeric",'
+              ' hour: "2-digit",'
+              ' minute: "2-digit",'
+              ' second: "2-digit",'
+              ' hour12: true'
+              ' }) + " IST"'
+          )
+
+          if code.count(old_time) != 1:
+              raise SystemExit("Time field not found")
+
+          code = code.replace(old_time, new_time, 1)
+
+          old_break = '.join(' + chr(34) + chr(92)*2 + 'n' + chr(34) + ')'
+          new_break = '.join(' + chr(34) + chr(92) + 'n' + chr(34) + ')'
+
+          if code.count(old_break) != 1:
+              raise SystemExit("Telegram line break not found")
+
+          code = code.replace(old_break, new_break, 1)
+
+          path.write_text(code, encoding="utf-8")
+          print("Telegram IST time and formatting fixed")
+          PY
+
+      - name: Validate JavaScript
+        run: node --check functions/game-wallet/src/main.js
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js
+          git diff --cached --quiet || (git commit -m "Fix Telegram IST time and line breaks" && git push)
+          
