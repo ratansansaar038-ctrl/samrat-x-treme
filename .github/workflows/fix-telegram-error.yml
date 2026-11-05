@@ -1,0 +1,95 @@
+
+name: Fix Telegram Error Diagnosis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Improve Telegram error handling
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("functions/game-wallet/src/main.js")
+          code = path.read_text(encoding="utf-8")
+
+          old = '''            if (!data.ok) throw Error("Telegram delivery failed");
+            resolve();
+          } catch {
+            reject(Error("Telegram delivery failed"));
+          }'''
+
+          new = '''            if (!data.ok) {
+              const status = response.statusCode;
+              const category =
+                status === 401 ? "Invalid bot token" :
+                status === 403 ? "Bot access denied" :
+                status === 400 ? "Invalid chat ID or bot not started" :
+                status === 429 ? "Telegram rate limit" :
+                "Telegram API HTTP " + status;
+              reject(Error(category));
+              return;
+            }
+            resolve();
+          } catch (e) {
+            reject(e);
+          }'''
+
+          if code.count(old) != 1:
+              raise SystemExit("Expected Telegram block not found")
+
+          code = code.replace(old, new, 1)
+
+          old2 = '''    if (action === "request_vc") {
+      const result = await requestVC(user, b, key);
+      return send(res, result.ok ? 200 : 400, result);
+    }'''
+
+          new2 = '''    if (action === "request_vc") {
+      try {
+        const result = await requestVC(user, b, key);
+        return send(res, result.ok ? 200 : 400, result);
+      } catch (e) {
+        const safe = [
+          "Invalid bot token",
+          "Bot access denied",
+          "Invalid chat ID or bot not started",
+          "Telegram rate limit"
+        ];
+        const reason = safe.includes(e.message)
+          ? e.message
+          : "Telegram connection failed";
+        error("VC request failed: " + reason);
+        return send(res, 502, {
+          ok: false,
+          error: reason
+        });
+      }
+    }'''
+
+          if code.count(old2) != 1:
+              raise SystemExit("Expected request_vc handler not found")
+
+          code = code.replace(old2, new2, 1)
+          path.write_text(code, encoding="utf-8")
+          PY
+
+      - name: Validate JavaScript
+        run: node --check functions/game-wallet/src/main.js
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js
+          git diff --cached --quiet || (git commit -m "Diagnose Telegram VC request errors" && git push)
+          
