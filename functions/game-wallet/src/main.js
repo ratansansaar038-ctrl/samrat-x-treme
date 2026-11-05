@@ -151,6 +151,8 @@ async function settleRound(round, key) {
       const win = entry.selectNumber === round.winningNumber;
       const payout = win ? entry.stakeVc * 8 : 0;
       const p = await profile(entry.userId, key);
+      const previousEntries = await rows("game_entries", [eq("roundId", round.roundId), eq("userId", entry.userId), lim(100)], key);
+      const roundCounted = previousEntries.some(x => x.status === "won" || x.status === "lost");
 
       const operations = [
         op("update", "game_entries", entry.$id, {
@@ -158,15 +160,14 @@ async function settleRound(round, key) {
           payoutVc: payout,
           settleAt: new Date().toISOString()
         }),
-        op("increment", "user_profiles", p.$id, {
-          column: "rounds", value: 1
-        }),
+
         op("increment", "user_profiles", p.$id, {
           column: win ? "wins" : "losses",
           value: 1
         })
       ];
 
+      if (!roundCounted) operations.push(op("increment", "user_profiles", p.$id, { column: "rounds", value: 1 }));
       if (payout) operations.push(
         op("increment", "user_profiles", p.$id, {
           column: "wallet", value: payout
@@ -241,7 +242,7 @@ async function placeEntry(user, b, key) {
     };
 
   const id = "e_" + createHash("sha256")
-    .update(user + "|" + current.roundId)
+    .update(user + "|" + current.roundId + "|" + b.number)
     .digest("hex").slice(0, 30);
 
   try {
