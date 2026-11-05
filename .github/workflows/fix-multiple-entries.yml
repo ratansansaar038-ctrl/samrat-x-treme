@@ -8,145 +8,81 @@ permissions:
   contents: write
 
 jobs:
-  fix-round-system:
+  fix:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Fix backend and frontend
+      - name: Patch game files
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          backend = Path("functions/game-wallet/src/main.js")
-          frontend = Path("number-draw.html")
+          p = Path('functions/game-wallet/src/main.js')
+          f = Path('number-draw.html')
+          code = p.read_text()
+          page = f.read_text()
 
-          if not backend.exists() or not frontend.exists():
-              raise SystemExit("Required project files not found")
+          def change(src, old, new, label):
+              if old not in src:
+                  raise SystemExit('Missing expected code: ' + label)
+              return src.replace(old, new, 1)
 
-          code = backend.read_text(encoding="utf-8")
-          page = frontend.read_text(encoding="utf-8")
-
-          def replace_once(text, old, new, label):
-              if new in text:
-                  print(label + ": already applied")
-                  return text
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(
-                      label + ": expected one match, found " + str(count)
-                  )
-              return text.replace(old, new, 1)
-
-          # Allow one entry per selected number, per player, per round.
-          code = replace_once(
+          code = change(
               code,
               '.update(user + "|" + current.roundId)',
               '.update(user + "|" + current.roundId + "|" + b.number)',
-              "Unique entry per number"
+              'entry ID'
           )
 
-          # Keep rounds as a count of rounds played, not entries played.
-          old = '''      const p = await profile(entry.userId, key);
-      const operations = ['''
-
-          new = '''      const p = await profile(entry.userId, key);
-
-      const userRoundEntries = await rows("game_entries", [
-        eq("roundId", round.roundId),
-        eq("userId", entry.userId),
-        lim(100)
-      ], key);
-
-      const roundAlreadyCounted = userRoundEntries.some(x =>
-        x.status === "won" || x.status === "lost"
-      );
-
-      const operations = ['''
-
-          code = replace_once(
-              code, old, new, "Round count check"
+          code = change(
+              code,
+              'const p = await profile(entry.userId, key);',
+              'const p = await profile(entry.userId, key);\n      const previousEntries = await rows("game_entries", [eq("roundId", round.roundId), eq("userId", entry.userId), lim(100)], key);\n      const roundCounted = previousEntries.some(x => x.status === "won" || x.status === "lost");',
+              'round count check'
           )
 
-          old = '''        op("increment", "user_profiles", p.$id, {
-          column: "rounds", value: 1
-        }),
-        op("increment", "user_profiles", p.$id, {
-          column: win ? "wins" : "losses", value: 1
-        })'''
-
-          new = '''        op("increment", "user_profiles", p.$id, {
-          column: win ? "wins" : "losses", value: 1
-        })'''
-
-          code = replace_once(
-              code, old, new, "Separate rounds counter"
+          code = change(
+              code,
+              '        op("increment", "user_profiles", p.$id, {\n          column: "rounds", value: 1\n        }),',
+              '',
+              'old rounds increment'
           )
 
-          old = '''      if (payout) operations.push('''
-
-          new = '''      if (!roundAlreadyCounted) {
-        operations.push(
-          op("increment", "user_profiles", p.$id, {
-            column: "rounds", value: 1
-          })
-        );
-      }
-
-      if (payout) operations.push('''
-
-          code = replace_once(
-              code, old, new, "Count each round once"
+          code = change(
+              code,
+              '      if (payout) operations.push(',
+              '      if (!roundCounted) operations.push(op("increment", "user_profiles", p.$id, { column: "rounds", value: 1 }));\n      if (payout) operations.push(',
+              'new rounds increment'
           )
 
-          # Show correct instructions on the game page.
-          page = replace_once(
+          page = change(
               page,
-              "One entry per player per round. Correct number pays 8× VC.",
-              "Play multiple different numbers in one round. One entry per number. Correct number pays 8× VC.",
-              "Multiple entries instruction"
+              'One entry per player per round. Correct number pays 8× VC.',
+              'Multiple different numbers allowed per round. One entry per number. Correct number pays 8× VC.',
+              'game instructions'
           )
 
-          page = replace_once(
+          page = change(
               page,
-              "<h3>Current Round Entry</h3>",
-              "<h3>Current Round Entries</h3>",
-              "Entries heading"
+              '<h3>Current Round Entry</h3>',
+              '<h3>Current Round Entries</h3>',
+              'entries heading'
           )
 
-          # Do not change the API field names.
-          assert "stakeVc: b.stakeVC" in code
-          assert "payoutVc: 0" in code
-          assert "stakeVC: y.stakeVc" in code
-          assert "payoutVC: y.payoutVc" in code
-
-          # Confirm the new unique-entry rule.
-          assert '.update(user + "|" + current.roundId + "|" + b.number)' in code
-          assert "roundAlreadyCounted" in code
-
-          backend.write_text(code, encoding="utf-8")
-          frontend.write_text(page, encoding="utf-8")
-
-          print("Both files updated successfully")
+          p.write_text(code)
+          f.write_text(page)
+          print('Backend and website patched')
           PY
 
-      - name: Validate JavaScript syntax
+      - name: Validate backend syntax
         run: node --check functions/game-wallet/src/main.js
 
-      - name: Commit corrected files
-        shell: bash
+      - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add functions/game-wallet/src/main.js number-draw.html
-
-          if git diff --cached --quiet; then
-            echo "No changes needed"
-          else
-            git commit -m "Allow multiple number entries per round"
-            git push
-          fi
+          git diff --cached --quiet || (git commit -m "Allow multiple entries per round" && git push)
           
