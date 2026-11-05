@@ -337,11 +337,11 @@ async function requestVC(user, b, key) {
     "Player ID: " + clean(user),
     "Requested: " + amount + " VC",
     "Current Wallet: " + p.wallet + " VC",
-    "Time: " + new Date().toISOString(),
+    "Time: " + new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }) + " IST",
     "",
     "Action: Review and allocate VC in Admin Panel.",
     "No automatic credit."
-  ].join("\\n");
+  ].join("\n");
 
   const body = JSON.stringify({
     chat_id: chatId,
