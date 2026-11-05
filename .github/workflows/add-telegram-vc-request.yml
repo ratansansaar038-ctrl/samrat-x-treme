@@ -1,0 +1,180 @@
+
+name: Add Telegram VC Request
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Telegram integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          backend = Path("functions/game-wallet/src/main.js")
+          frontend = Path("number-draw.html")
+
+          code = backend.read_text(encoding="utf-8")
+          page = frontend.read_text(encoding="utf-8")
+
+          def replace_once(s, old, new):
+              if s.count(old) != 1:
+                  raise Exception("Expected exactly one match: " + old[:80])
+              return s.replace(old, new, 1)
+
+          telegram = '''
+          async function requestVC(user, b, key) {
+            const amount = Number(b.amount);
+            if (![20, 50, 100, 200].includes(amount))
+              return { ok: false, error: "Invalid VC amount" };
+
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chatId = process.env.TELEGRAM_CHAT_ID;
+
+            if (!token || !chatId)
+              return { ok: false, error: "Telegram not configured" };
+
+            const p = await profile(user, key);
+            const clean = x => String(x || "")
+              .replace(/[<>]/g, "").slice(0, 160);
+
+            const message = [
+              "SAMRAT X-TREME",
+              "NEW VC REQUEST",
+              "",
+              "Player: " + clean(p.name),
+              "Email: " + clean(p.email),
+              "Player ID: " + clean(user),
+              "Requested: " + amount + " VC",
+              "Current Wallet: " + p.wallet + " VC",
+              "Time: " + new Date().toISOString(),
+              "",
+              "Action: Review and allocate VC in Admin Panel.",
+              "No automatic credit."
+            ].join("\\\\n");
+
+            const body = JSON.stringify({
+              chat_id: chatId,
+              text: message
+            });
+
+            await new Promise((resolve, reject) => {
+              const r = https.request(
+                "https://api.telegram.org/bot" +
+                token + "/sendMessage",
+                {
+                  method: "POST",
+                  timeout: 12000,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Content-Length": Buffer.byteLength(body)
+                  }
+                },
+                response => {
+                  let raw = "";
+                  response.on("data", chunk => raw += chunk);
+                  response.on("end", () => {
+                    try {
+                      const data = JSON.parse(raw);
+                      if (!data.ok) throw Error("Telegram delivery failed");
+                      resolve();
+                    } catch {
+                      reject(Error("Telegram delivery failed"));
+                    }
+                  });
+                }
+              );
+              r.on("timeout", () => r.destroy(Error("Telegram timeout")));
+              r.on("error", reject);
+              r.end(body);
+            });
+
+            return {
+              ok: true,
+              message: "VC request sent to admin"
+            };
+          }
+
+          '''
+
+          code = replace_once(
+            code,
+            '// Speed Tap and Memory X games',
+            telegram + '// Speed Tap and Memory X games'
+          )
+
+          code = replace_once(
+            code,
+            '    "grant_coins",',
+            '    "grant_coins",\n    "request_vc",'
+          )
+
+          code = replace_once(
+            code,
+            '    if (action === "grant_coins") {',
+            '''    if (action === "request_vc") {
+              const result = await requestVC(user, b, key);
+              return send(res, result.ok ? 200 : 400, result);
+            }
+
+            if (action === "grant_coins") {'''
+          )
+
+          marker = '<h3>Choose Winning Number</h3>'
+          panel = '''
+          <div class="panel" style="margin:14px 0">
+            <h3>Request Free VC</h3>
+            <p class="small">Send a request to admin. Approval is manual. No purchase or cash value.</p>
+            <select id="vcRequestAmount">
+              <option value="20">20 VC</option>
+              <option value="50">50 VC</option>
+              <option value="100">100 VC</option>
+              <option value="200">200 VC</option>
+            </select>
+            <button class="btn secondary" id="requestVCBtn">REQUEST VC</button>
+            <div class="status" id="vcRequestMsg"></div>
+          </div>
+          '''
+          page = replace_once(page, marker, panel + marker)
+
+          marker2 = "$('grant').onclick=async()=>"
+          handler = '''
+          $('requestVCBtn').onclick=async()=>{
+            const btn=$('requestVCBtn');
+            btn.disabled=true;
+            msg('vcRequestMsg','Sending request...');
+            try{
+              const amount=Number($('vcRequestAmount').value);
+              await api('request_vc',{amount});
+              msg('vcRequestMsg','Request sent to admin on Telegram.');
+            }catch(e){
+              msg('vcRequestMsg',e.message);
+            }finally{
+              btn.disabled=false;
+            }
+          };
+          '''
+          page = replace_once(page, marker2, handler + marker2)
+
+          backend.write_text(code, encoding="utf-8")
+          frontend.write_text(page, encoding="utf-8")
+          print("Telegram VC request feature added")
+          PY
+
+      - name: Validate backend JavaScript
+        run: node --check functions/game-wallet/src/main.js
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html
+          git diff --cached --quiet || (git commit -m "Add Telegram VC request alerts" && git push)
