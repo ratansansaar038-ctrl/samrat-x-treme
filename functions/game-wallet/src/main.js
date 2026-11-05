@@ -312,6 +312,79 @@ async function grantCoins(admin, b, key) {
   };
 }
 
+
+async function requestVC(user, b, key) {
+  const amount = Number(b.amount);
+  if (![20, 50, 100, 200].includes(amount))
+    return { ok: false, error: "Invalid VC amount" };
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId)
+    return { ok: false, error: "Telegram not configured" };
+
+  const p = await profile(user, key);
+  const clean = x => String(x || "")
+    .replace(/[<>]/g, "").slice(0, 160);
+
+  const message = [
+    "SAMRAT X-TREME",
+    "NEW VC REQUEST",
+    "",
+    "Player: " + clean(p.name),
+    "Email: " + clean(p.email),
+    "Player ID: " + clean(user),
+    "Requested: " + amount + " VC",
+    "Current Wallet: " + p.wallet + " VC",
+    "Time: " + new Date().toISOString(),
+    "",
+    "Action: Review and allocate VC in Admin Panel.",
+    "No automatic credit."
+  ].join("\\n");
+
+  const body = JSON.stringify({
+    chat_id: chatId,
+    text: message
+  });
+
+  await new Promise((resolve, reject) => {
+    const r = https.request(
+      "https://api.telegram.org/bot" +
+      token + "/sendMessage",
+      {
+        method: "POST",
+        timeout: 12000,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body)
+        }
+      },
+      response => {
+        let raw = "";
+        response.on("data", chunk => raw += chunk);
+        response.on("end", () => {
+          try {
+            const data = JSON.parse(raw);
+            if (!data.ok) throw Error("Telegram delivery failed");
+            resolve();
+          } catch {
+            reject(Error("Telegram delivery failed"));
+          }
+        });
+      }
+    );
+    r.on("timeout", () => r.destroy(Error("Telegram timeout")));
+    r.on("error", reject);
+    r.end(body);
+  });
+
+  return {
+    ok: true,
+    message: "VC request sent to admin"
+  };
+}
+
 // Speed Tap and Memory X games
 
 const GAME_IDS = ["speed_tap", "memory_x", "memory_x_24"];
@@ -681,6 +754,7 @@ export default async ({ req, res, error }) => {
     "get_last_result",
     "place_entry",
     "grant_coins",
+    "request_vc",
     "my_entries",
     "my_history",
     "register_profile",
@@ -804,7 +878,12 @@ export default async ({ req, res, error }) => {
       return send(res, x.ok ? 200 : 409, x);
     }
 
-    if (action === "grant_coins") {
+    if (action === "request_vc") {
+    const result = await requestVC(user, b, key);
+    return send(res, result.ok ? 200 : 400, result);
+  }
+
+  if (action === "grant_coins") {
       const x = await grantCoins(user, b, key);
       return send(res, x.ok ? 200 : 403, x);
     }
