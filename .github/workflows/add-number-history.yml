@@ -1,0 +1,236 @@
+
+name: Add Number Challenge History
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-history:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create history feature
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          backend = Path("functions/game-wallet/src/main.js")
+          game = Path("number-draw.html")
+          history = Path("number-history.html")
+
+          code = backend.read_text(encoding="utf-8")
+          page = game.read_text(encoding="utf-8")
+
+          def change(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      label + ": expected 1 match, found " + str(count)
+                  )
+              return text.replace(old, new, 1)
+
+          code = change(
+              code,
+              '    "my_entries",',
+              '    "my_entries",\n    "my_history",',
+              "Register history API"
+          )
+
+          api = """
+              if (action === "my_history") {
+                const data = await rows("game_entries", [
+                  eq("userId", user),
+                  order("$createdAt", "desc"),
+                  lim(100)
+                ], key);
+
+                const groups = new Map();
+
+                for (const e of data) {
+                  if (!groups.has(e.roundId)) {
+                    if (groups.size >= 10) continue;
+                    groups.set(e.roundId, []);
+                  }
+
+                  groups.get(e.roundId).push({
+                    number: e.selectNumber,
+                    stakeVC: e.stakeVc,
+                    payoutVC: e.payoutVc || 0,
+                    status: e.status,
+                    createdAt: e.$createdAt
+                  });
+                }
+
+                const rounds = [...groups].map(([roundId, entries]) => ({
+                  roundId,
+                  entries,
+                  spentVC: entries.reduce((s, x) => s + x.stakeVC, 0),
+                  wonVC: entries.reduce((s, x) => s + x.payoutVC, 0)
+                }));
+
+                return send(res, 200, {
+                  ok: true,
+                  rounds,
+                  limitedTo: 100
+                });
+              }
+
+          """
+
+          code = change(
+              code,
+              '    if (action === "my_entries") {',
+              api + '    if (action === "my_entries") {',
+              "Add history API"
+          )
+
+          page = change(
+              page,
+              '<h3>Current Round Entries</h3>',
+              '<h3>Current Round Entries</h3><a class="btn secondary" href="number-history.html">MY GAME HISTORY</a>',
+              "History button"
+          )
+
+          history.write_text("""<!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>My Game History | Samrat X-Treme</title>
+          <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+          <style>
+          *{box-sizing:border-box}
+          body{margin:0;background:radial-gradient(ellipse at top,#421765,#130622 55%,#07020d);color:white;font:15px system-ui,Arial}
+          main{max-width:520px;margin:auto;padding:20px 15px 50px}
+          h1{text-align:center;color:#ffe080;font-size:27px}
+          h2{font-size:17px;color:#ffe080}
+          .sub{text-align:center;color:#dfc5f8}
+          .card{background:linear-gradient(145deg,#211139,#31164c);border:1px solid #7548b5;border-radius:18px;padding:16px;margin:14px 0}
+          .entry{padding:10px 0;border-top:1px solid #674487;line-height:1.8}
+          .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+          .muted{color:#cdb7e4;font-size:12px}
+          .won{color:#a4ffda}
+          .lost{color:#ffacac}
+          .pending{color:#ffe080}
+          a{color:#ffe080}
+          .btn{display:block;text-align:center;padding:14px;border-radius:12px;background:linear-gradient(90deg,#ffe34c,#ffad2b);color:#230b24;text-decoration:none;font-weight:800;margin:15px 0}
+          button{padding:12px;border:0;border-radius:10px;background:#6c42a0;color:white;font-weight:700}
+          </style>
+          </head>
+          <body>
+          <main>
+          <h1>SAMRAT X-TREME</h1>
+          <p class="sub">NUMBER CHALLENGE • MY HISTORY</p>
+          <a class="btn" href="number-draw.html">BACK TO NUMBER CHALLENGE</a>
+          <div class="card">
+          <h2>Last 10 Played Rounds</h2>
+          <p class="muted">Virtual coins only. No cash value.</p>
+          <button id="reload">REFRESH HISTORY</button>
+          <p id="status">Loading history...</p>
+          </div>
+          <div id="history"></div>
+          </main>
+          <script>
+          const {Client,Account,Functions}=Appwrite;
+          const client=new Client()
+            .setEndpoint("https://sgp.cloud.appwrite.io/v1")
+            .setProject("6a7f2add0011a7bfc21a");
+          const account=new Account(client);
+          const functions=new Functions(client);
+          const fn="6ae1bcc500208a5a7efb";
+          const area=document.getElementById("history");
+          const status=document.getElementById("status");
+
+          function element(tag,text,cls){
+            const e=document.createElement(tag);
+            e.textContent=text;
+            if(cls)e.className=cls;
+            return e;
+          }
+
+          async function load(){
+            area.replaceChildren();
+            status.textContent="Loading history...";
+            try{
+              await account.get();
+              const r=await functions.createExecution({
+                functionId:fn,
+                body:JSON.stringify({action:"my_history"}),
+                async:false
+              });
+              const d=JSON.parse(r.responseBody||"{}");
+              if(!d.ok)throw Error(d.error||"History unavailable");
+
+              if(!d.rounds.length){
+                status.textContent="No previous entries found.";
+                return;
+              }
+
+              status.textContent=d.rounds.length+" rounds loaded";
+
+              for(const round of d.rounds){
+                const card=element("section","","card");
+                card.appendChild(element("h2",round.roundId));
+
+                const summary=element(
+                  "p",
+                  "Spent: "+round.spentVC+
+                  " VC  |  Won: "+round.wonVC+" VC"
+                );
+                card.appendChild(summary);
+
+                for(const entry of round.entries){
+                  const item=element("div","","entry");
+                  const label=element(
+                    "div",
+                    "Number "+entry.number+
+                    " • "+entry.stakeVC+" VC"
+                  );
+                  item.appendChild(label);
+
+                  const result=element(
+                    "strong",
+                    entry.status.toUpperCase()+
+                    (entry.payoutVC
+                      ? " • +"+entry.payoutVC+" VC"
+                      : ""),
+                    entry.status
+                  );
+                  item.appendChild(result);
+                  card.appendChild(item);
+                }
+
+                area.appendChild(card);
+              }
+            }catch(e){
+              status.textContent=e.message;
+            }
+          }
+
+          document.getElementById("reload").onclick=load;
+          load();
+          </script>
+          </body>
+          </html>
+          """.replace("\n          ", "\n"), encoding="utf-8")
+
+          backend.write_text(code, encoding="utf-8")
+          game.write_text(page, encoding="utf-8")
+          print("History feature created")
+          PY
+
+      - name: Validate JavaScript
+        run: node --check functions/game-wallet/src/main.js
+
+      - name: Commit files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html number-history.html
+          git diff --cached --quiet || (git commit -m "Add Number Challenge history" && git push)
