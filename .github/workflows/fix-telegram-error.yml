@@ -1,4 +1,3 @@
-
 name: Fix Telegram Error Diagnosis
 
 on:
@@ -22,65 +21,51 @@ jobs:
           path = Path("functions/game-wallet/src/main.js")
           code = path.read_text(encoding="utf-8")
 
-          old = '''            if (!data.ok) throw Error("Telegram delivery failed");
-            resolve();
-          } catch {
-            reject(Error("Telegram delivery failed"));
-          }'''
-
-          new = '''            if (!data.ok) {
-              const status = response.statusCode;
-              const category =
-                status === 401 ? "Invalid bot token" :
-                status === 403 ? "Bot access denied" :
-                status === 400 ? "Invalid chat ID or bot not started" :
-                status === 429 ? "Telegram rate limit" :
-                "Telegram API HTTP " + status;
-              reject(Error(category));
-              return;
-            }
-            resolve();
-          } catch (e) {
-            reject(e);
-          }'''
+          old = 'if (!data.ok) throw Error("Telegram delivery failed");'
+          new = (
+              'if (!data.ok) {'
+              ' const status = response.statusCode;'
+              ' const category = status === 401 ? "Invalid bot token"'
+              ' : status === 403 ? "Bot access denied"'
+              ' : status === 400 ? "Invalid chat ID or bot not started"'
+              ' : status === 429 ? "Telegram rate limit"'
+              ' : "Telegram API error";'
+              ' reject(Error(category)); return;'
+              ' }'
+          )
 
           if code.count(old) != 1:
-              raise SystemExit("Expected Telegram block not found")
-
+              raise SystemExit("Telegram error block not found")
           code = code.replace(old, new, 1)
 
-          old2 = '''    if (action === "request_vc") {
-      const result = await requestVC(user, b, key);
-      return send(res, result.ok ? 200 : 400, result);
-    }'''
+          old_handler = (
+              'const result = await requestVC(user, b, key);'
+              '\n      return send(res, result.ok ? 200 : 400, result);'
+          )
 
-          new2 = '''    if (action === "request_vc") {
-      try {
-        const result = await requestVC(user, b, key);
-        return send(res, result.ok ? 200 : 400, result);
-      } catch (e) {
-        const safe = [
-          "Invalid bot token",
-          "Bot access denied",
-          "Invalid chat ID or bot not started",
-          "Telegram rate limit"
-        ];
-        const reason = safe.includes(e.message)
-          ? e.message
-          : "Telegram connection failed";
-        error("VC request failed: " + reason);
-        return send(res, 502, {
-          ok: false,
-          error: reason
-        });
-      }
-    }'''
+          new_handler = (
+              'try {'
+              ' const result = await requestVC(user, b, key);'
+              ' return send(res, result.ok ? 200 : 400, result);'
+              ' } catch (e) {'
+              ' const safe = ["Invalid bot token",'
+              ' "Bot access denied",'
+              ' "Invalid chat ID or bot not started",'
+              ' "Telegram rate limit",'
+              ' "Telegram API error"];'
+              ' const reason = safe.includes(e.message)'
+              ' ? e.message : "Telegram connection failed";'
+              ' error("VC request failed: " + reason);'
+              ' return send(res, 502, {ok:false,error:reason});'
+              ' }'
+          )
 
-          if code.count(old2) != 1:
-              raise SystemExit("Expected request_vc handler not found")
+          if code.count(old_handler) != 1:
+              raise SystemExit("Request handler not found")
+          code = code.replace(old_handler, new_handler, 1)
 
-          code = code.replace(old2, new2, 1)
           path.write_text(code, encoding="utf-8")
+          print("Telegram diagnosis updated")
           PY
 
       - name: Validate JavaScript
@@ -91,5 +76,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add functions/game-wallet/src/main.js
-          git diff --cached --quiet || (git commit -m "Diagnose Telegram VC request errors" && git push)
+          git diff --cached --quiet || (git commit -m "Fix Telegram error diagnosis" && git push)
           
