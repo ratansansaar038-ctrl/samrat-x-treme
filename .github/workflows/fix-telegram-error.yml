@@ -41,8 +41,8 @@ jobs:
           code = code.replace(old, new, 1)
 
           start = code.index('    if (action === "request_vc") {')
-          end = code.index('    if (action === "grant_coins") {', start)
-
+          
+          end = code.index('if (action === "grant_coins") {', start)
           handler = (
               '    if (action === "request_vc") {\n'
               '      try {\n'
