@@ -682,6 +682,7 @@ export default async ({ req, res, error }) => {
     "place_entry",
     "grant_coins",
     "my_entries",
+    "my_history",
     "register_profile",
     "get_leaderboard",
     "start_game",
@@ -806,6 +807,45 @@ export default async ({ req, res, error }) => {
     if (action === "grant_coins") {
       const x = await grantCoins(user, b, key);
       return send(res, x.ok ? 200 : 403, x);
+    }
+
+
+    if (action === "my_history") {
+      const data = await rows("game_entries", [
+        eq("userId", user),
+        order("$createdAt", "desc"),
+        lim(100)
+      ], key);
+
+      const groups = new Map();
+
+      for (const e of data) {
+        if (!groups.has(e.roundId)) {
+          if (groups.size >= 10) continue;
+          groups.set(e.roundId, []);
+        }
+
+        groups.get(e.roundId).push({
+          number: e.selectNumber,
+          stakeVC: e.stakeVc,
+          payoutVC: e.payoutVc || 0,
+          status: e.status,
+          createdAt: e.$createdAt
+        });
+      }
+
+      const rounds = [...groups].map(([roundId, entries]) => ({
+        roundId,
+        entries,
+        spentVC: entries.reduce((s, x) => s + x.stakeVC, 0),
+        wonVC: entries.reduce((s, x) => s + x.payoutVC, 0)
+      }));
+
+      return send(res, 200, {
+        ok: true,
+        rounds,
+        limitedTo: 100
+      });
     }
 
     if (action === "my_entries") {
