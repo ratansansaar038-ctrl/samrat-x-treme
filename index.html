@@ -1,1 +1,302 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090315"><link rel="manifest" href="manifest.json"><title>Samrat X-Treme | Play 3 Games</title><script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script><style>*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#421765,#130622 54%,#07020d);color:white;font:15px system-ui,Arial}.app{max-width:520px;margin:auto;padding:18px 15px 50px}.hero{text-align:center;padding:22px 0}.brand{font:900 43px Georgia,serif;color:#ffe080}.sub{font-size:23px;letter-spacing:5px;color:#e7c2ff;font-weight:800}.small{font-size:12px;color:#d7c0f5;line-height:1.7}.panel{background:linear-gradient(145deg,#211139,#31164c);border:1px solid #7548b5;border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 9px 30px #0005}.game{padding:23px 18px;text-align:center}.game h2{font-size:20px;margin:8px 0;color:#ffe48b}.game .emoji{font-size:34px}.btn{width:100%;display:block;text-align:center;text-decoration:none;padding:14px;margin:10px 0;border:0;border-radius:13px;background:linear-gradient(100deg,#ffe34c,#ffad2b,#fc4ca8);color:#230b24;font-weight:900;font-size:14px;cursor:pointer}.secondary{background:#492768;color:#fff;border:1px solid #976bce}.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}input,select{width:100%;padding:13px;margin:7px 0;background:#11071d;border:1px solid #835bad;border-radius:11px;color:#fff;font-size:15px}.status{min-height:20px;color:#ffe38b;font-size:13px;margin:7px 0}.hide{display:none!important}.links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.links a{color:#ead8ff;text-decoration:none;border:1px solid #65458c;border-radius:9px;padding:9px;font-size:12px}.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.num{background:#361c54;color:white;border:1px solid #8953c2;border-radius:12px;padding:18px;font-size:24px;font-weight:900}.num.active{background:linear-gradient(100deg,#ffe34c,#ff4b9a);color:#1b0827}.flex{display:flex;align-items:center;justify-content:space-between;gap:12px}.wallet{font-size:27px;font-weight:900;color:#ffde68}.stat{flex:1;text-align:center;background:#180b2b;padding:10px;border-radius:11px}.stat strong{display:block;font-size:20px;color:#ffe37e}.result{text-align:center;font-size:50px;color:#ffe37e;font-weight:900}.pill{border:1px solid #5b9e85;color:#a4ffda;border-radius:20px;padding:6px 9px;font-size:11px}h3{margin:0 0 10px;color:#ffe28a}button:disabled{opacity:.5}</style></head><body><main class="app"><header class="hero"><div class="brand">SAMRAT</div><div class="sub">X-TREME</div><p class="small">FREE VIRTUAL COIN GAMES • NO PURCHASE • NO CASH VALUE</p></header><section class="panel" id="authPanel"><h3>Player Login / Signup</h3><p class="small">Sign up once, then use Login on your next visit.</p><input id="email" type="email" placeholder="Email address" autocomplete="email"><input id="password" type="password" placeholder="Password (8+ characters)"><input id="name" placeholder="Name (only for new signup)"><div class="row"><button class="btn" id="login">LOGIN</button><button class="btn secondary" id="signup">SIGN UP</button></div><div class="status" id="authMsg"></div></section><section class="panel hide" id="signedPanel"><div class="flex"><div><h3>Welcome back!</h3><div id="signedName" class="small"></div></div><button class="btn secondary" style="width:auto" id="logout">LOG OUT</button></div><a class="btn" href="number-draw.html">OPEN MY WALLET & NUMBER DRAW</a><div class="status" id="signedMsg"></div></section><section class="panel game"><div class="emoji">🎯</div><h2>NUMBER CHALLENGE</h2><p class="small">20-minute live draw • Pick a number from 1–9</p><a class="btn" href="number-draw.html">▶ PLAY NUMBER DRAW</a></section><section class="panel game"><div class="emoji">⚡</div><h2>SPEED TAP ARENA</h2><p class="small">30-second reflex challenge • Easy / Medium / Extreme</p><a class="btn" href="speed-tap.html">▶ PLAY SPEED TAP</a></section><section class="panel game"><div class="emoji">🧠</div><h2>MEMORY X EXTREME 24</h2><p class="small">60 seconds • 24 cards • 12 pairs</p><a class="btn" href="memory-x.html">▶ PLAY MEMORY X</a></section><nav class="links"><a href="index.html">Home</a><a href="player-profile.html">My Profile</a><a href="referral.html">Referral</a><a href="reward.html">Rewards</a></nav><footer class="small" style="text-align:center;margin-top:22px">Entertainment only • Virtual coins have no monetary value</footer></main><script>const $=id=>document.getElementById(id);const msg=(id,s)=>$(id).textContent=String(s??'');const {Client,Account,ID,Functions}=Appwrite;const client=new Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');const account=new Account(client),functions=new Functions(client);const FUNCTION_ID='6ae1bcc500208a5a7efb';async function api(action,extra={}){const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...extra}),async:false});let d;try{d=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid server response')}if(!d.ok)throw Error(d.error||'Server error');return d}async function refreshUser(){try{const u=await account.get();$('authPanel').classList.add('hide');$('signedPanel').classList.remove('hide');msg('signedName',u.name||u.email)}catch{$('authPanel').classList.remove('hide');$('signedPanel').classList.add('hide')}}$('login').onclick=async()=>{try{await account.createEmailPasswordSession({email:$('email').value.trim(),password:$('password').value});await refreshUser()}catch(e){msg('authMsg',e.message)}};$('signup').onclick=async()=>{try{const name=$('name').value.trim(),email=$('email').value.trim(),password=$('password').value;if(!name)throw Error('Enter your name');await account.create({userId:ID.unique(),email,password,name});await account.createEmailPasswordSession({email,password});try{await api('register_profile',{name,email})}catch(e){msg('authMsg','Account created. Profile setup: '+e.message)}await refreshUser()}catch(e){msg('authMsg',e.message)}};$('logout').onclick=async()=>{try{await account.deleteSession({sessionId:'current'});await refreshUser()}catch(e){msg('signedMsg',e.message)}};refreshUser();</script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090315">
+  <link rel="manifest" href="manifest.json">
+  <title>Samrat X-Treme | Play 3 Games</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(ellipse at top, #421765, #130622 54%, #07020d);
+      color: white;
+      font: 15px system-ui, Arial;
+    }
+    .app { max-width: 520px; margin: auto; padding: 18px 15px 50px; }
+    .hero { text-align: center; padding: 22px 0; }
+    .brand { font: 900 43px Georgia, serif; color: #ffe080; }
+    .sub { font-size: 23px; letter-spacing: 5px; color: #e7c2ff; font-weight: 800; }
+    .small { font-size: 12px; color: #d7c0f5; line-height: 1.7; }
+    .panel {
+      background: linear-gradient(145deg, #211139, #31164c);
+      border: 1px solid #7548b5;
+      border-radius: 20px;
+      padding: 18px;
+      margin: 14px 0;
+      box-shadow: 0 9px 30px #0005;
+    }
+    .game { padding: 23px 18px; text-align: center; }
+    .game h2 { font-size: 20px; margin: 8px 0; color: #ffe48b; }
+    .game .emoji { font-size: 34px; }
+    .btn {
+      width: 100%;
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      padding: 14px;
+      margin: 10px 0;
+      border: 0;
+      border-radius: 13px;
+      background: linear-gradient(100deg, #ffe34c, #ffad2b, #fc4ca8);
+      color: #230b24;
+      font-weight: 900;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .secondary {
+      background: #492768;
+      color: #fff;
+      border: 1px solid #976bce;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; min-width: 0; }
+    input {
+      width: 100%;
+      padding: 13px;
+      margin: 7px 0;
+      background: #11071d;
+      border: 1px solid #835bad;
+      border-radius: 11px;
+      color: #fff;
+      font-size: 15px;
+    }
+    .status {
+      min-height: 20px;
+      color: #ffe38b;
+      font-size: 13px;
+      margin: 7px 0;
+    }
+    .hide { display: none !important; }
+    .links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .links a {
+      color: #ead8ff;
+      text-decoration: none;
+      border: 1px solid #65458c;
+      border-radius: 9px;
+      padding: 9px;
+      font-size: 12px;
+    }
+    .flex {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    h3 { margin: 0 0 10px; color: #ffe28a; }
+    button:disabled { opacity: .5; }
+  </style>
+</head>
+
+<body>
+<main class="app">
+
+  <header class="hero">
+    <div class="brand">SAMRAT</div>
+    <div class="sub">X-TREME</div>
+    <p class="small">
+      FREE VIRTUAL COIN GAMES • NO PURCHASE • NO CASH VALUE
+    </p>
+  </header>
+
+  <section class="panel" id="authPanel">
+    <h3>Player Login / Signup</h3>
+    <p class="small">Sign up once, then use Login on your next visit.</p>
+
+    <input id="email" type="email" placeholder="Email address" autocomplete="email">
+    <input id="password" type="password" placeholder="Password (8+ characters)">
+    <input id="name" placeholder="Name (only for new signup)">
+
+    <div class="row">
+      <button class="btn" id="login">LOGIN</button>
+      <button class="btn secondary" id="signup">SIGN UP</button>
+    </div>
+
+    <div class="status" id="authMsg"></div>
+  </section>
+
+  <section class="panel hide" id="signedPanel">
+    <div class="flex">
+      <div>
+        <h3>Welcome back!</h3>
+        <div id="signedName" class="small"></div>
+      </div>
+      <button class="btn secondary" style="width:auto" id="logout">
+        LOG OUT
+      </button>
+    </div>
+    <div class="status" id="signedMsg"></div>
+  </section>
+
+  <section class="panel game">
+    <div class="emoji">🎯</div>
+    <h2>NUMBER CHALLENGE</h2>
+    <p class="small">
+      20-minute live draw • Pick a number from 1–9
+    </p>
+    <a class="btn" href="number-draw.html">
+      ▶ PLAY NUMBER DRAW
+    </a>
+  </section>
+
+  <section class="panel game">
+    <div class="emoji">⚡</div>
+    <h2>SPEED TAP ARENA</h2>
+    <p class="small">
+      30-second reflex challenge • Easy / Medium / Extreme
+    </p>
+    <a class="btn" href="speed-tap.html">
+      ▶ PLAY SPEED TAP
+    </a>
+  </section>
+
+  <section class="panel game">
+    <div class="emoji">🧠</div>
+    <h2>MEMORY X EXTREME 24</h2>
+    <p class="small">
+      60 seconds • 24 cards • 12 pairs
+    </p>
+    <a class="btn" href="memory-x.html">
+      ▶ PLAY MEMORY X
+    </a>
+  </section>
+
+  <nav class="links">
+    <a href="index.html">Home</a>
+    <a href="player-profile.html">My Profile</a>
+    <a href="referral.html">Referral</a>
+    <a href="reward.html">Rewards</a>
+  </nav>
+
+  <footer class="small" style="text-align:center;margin-top:22px">
+    Entertainment only • Virtual coins have no monetary value
+  </footer>
+
+</main>
+
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+const msg = (id, value) => {
+  $(id).textContent = String(value ?? '');
+};
+
+const { Client, Account, ID, Functions } = Appwrite;
+
+const client = new Client()
+  .setEndpoint('https://sgp.cloud.appwrite.io/v1')
+  .setProject('6a7f2add0011a7bfc21a');
+
+const account = new Account(client);
+const functions = new Functions(client);
+const FUNCTION_ID = '6ae1bcc500208a5a7efb';
+
+async function api(action, extra = {}) {
+  const result = await functions.createExecution({
+    functionId: FUNCTION_ID,
+    body: JSON.stringify({ action, ...extra }),
+    async: false
+  });
+
+  let data;
+  try {
+    data = JSON.parse(result.responseBody || '{}');
+  } catch {
+    throw Error('Invalid server response');
+  }
+
+  if (!data.ok) {
+    throw Error(data.error || 'Server error');
+  }
+
+  return data;
+}
+
+async function refreshUser() {
+  try {
+    const user = await account.get();
+
+    $('authPanel').classList.add('hide');
+    $('signedPanel').classList.remove('hide');
+
+    msg('signedName', user.name || user.email);
+  } catch {
+    $('authPanel').classList.remove('hide');
+    $('signedPanel').classList.add('hide');
+  }
+}
+
+$('login').onclick = async () => {
+  try {
+    await account.createEmailPasswordSession({
+      email: $('email').value.trim(),
+      password: $('password').value
+    });
+
+    await refreshUser();
+  } catch (error) {
+    msg('authMsg', error.message);
+  }
+};
+
+$('signup').onclick = async () => {
+  try {
+    const name = $('name').value.trim();
+    const email = $('email').value.trim();
+    const password = $('password').value;
+
+    if (!name) {
+      throw Error('Enter your name');
+    }
+
+    await account.create({
+      userId: ID.unique(),
+      email,
+      password,
+      name
+    });
+
+    await account.createEmailPasswordSession({
+      email,
+      password
+    });
+
+    try {
+      await api('register_profile', { name, email });
+    } catch (error) {
+      msg('authMsg', 'Account created. Profile setup: ' + error.message);
+    }
+
+    await refreshUser();
+  } catch (error) {
+    msg('authMsg', error.message);
+  }
+};
+
+$('logout').onclick = async () => {
+  try {
+    await account.deleteSession({
+      sessionId: 'current'
+    });
+
+    await refreshUser();
+  } catch (error) {
+    msg('signedMsg', error.message);
+  }
+};
+
+refreshUser();
+</script>
+
+</body>
+</html>
