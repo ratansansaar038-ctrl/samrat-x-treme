@@ -1,0 +1,53 @@
+
+name: Permanent APK Button
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-homepage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add APK download button
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("index.html")
+          html = p.read_text(encoding="utf-8")
+
+          url = "https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk"
+
+          button = f'''
+          <section class="panel" id="permanentApkDownload"
+                   style="text-align:center">
+            <h3>📱 DOWNLOAD ANDROID APP</h3>
+            <a class="btn" href="{url}">
+              ⬇ DOWNLOAD APK
+            </a>
+            <p class="small">
+              Official Samrat X-Treme Android App
+            </p>
+          </section>
+          '''
+
+          if 'id="permanentApkDownload"' not in html:
+              anchor = '<section class="panel game">'
+              if anchor not in html:
+                  raise SystemExit("Homepage anchor not found")
+              html = html.replace(anchor, button + anchor, 1)
+              p.write_text(html, encoding="utf-8")
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || (git commit -m "Add permanent APK download button" && git push)
+          
