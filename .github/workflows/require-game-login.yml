@@ -1,0 +1,131 @@
+
+name: Require Login For Skill Games
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add login protection
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          games = [
+              "speed-tap.html",
+              "memory-x.html",
+              "math-challenge.html"
+          ]
+
+          gate = """
+          <style id="skill-login-style">
+          html:not(.skill-auth-ok) body {
+            visibility: hidden !important;
+          }
+          </style>
+
+          <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+          <script>
+          (async function () {
+            const destination =
+              "login.html?next=" +
+              encodeURIComponent(
+                location.pathname.split("/").pop()
+              );
+
+            try {
+              const client = new Appwrite.Client()
+                .setEndpoint(
+                  "https://sgp.cloud.appwrite.io/v1"
+                )
+                .setProject(
+                  "6a7f2add0011a7bfc21a"
+                );
+
+              const account = new Appwrite.Account(client);
+
+              await account.get();
+
+              document.documentElement.classList.add(
+                "skill-auth-ok"
+              );
+
+            } catch (error) {
+              location.replace(destination);
+            }
+          })();
+          </script>
+          """
+
+          for filename in games:
+              p = Path(filename)
+              s = p.read_text()
+
+              if 'id="skill-login-style"' not in s:
+                  s = s.replace(
+                      "</head>",
+                      gate + "</head>",
+                      1
+                  )
+                  p.write_text(s)
+
+          # Redirect to selected game after login
+          p = Path("login.html")
+          s = p.read_text()
+
+          helper = """
+          function loginDestination() {
+            const allowed = [
+              "speed-tap.html",
+              "memory-x.html",
+              "math-challenge.html"
+            ];
+
+            const next = new URLSearchParams(
+              location.search
+            ).get("next");
+
+            return allowed.includes(next)
+              ? next
+              : "index.html";
+          }
+          """
+
+          if "function loginDestination()" not in s:
+              s = s.replace(
+                  "async function prepareLoginPage()",
+                  helper +
+                  "\nasync function prepareLoginPage()",
+                  1
+              )
+
+          s = s.replace(
+              'window.location.replace("index.html");',
+              'window.location.replace(loginDestination());'
+          )
+
+          p.write_text(s)
+
+          print("Login protection installed.")
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add speed-tap.html memory-x.html math-challenge.html login.html
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Require login before playing skill games"
+            git push
+          fi
+          
