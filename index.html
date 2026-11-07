@@ -95,6 +95,55 @@
     h3 { margin: 0 0 10px; color: #ffe28a; }
     button:disabled { opacity: .5; }
   </style>
+
+<style>
+.skill-grid {
+  display:grid;
+  gap:16px;
+  margin:20px 0;
+}
+.skill-card {
+  display:flex;
+  align-items:center;
+  gap:18px;
+  padding:24px 18px;
+  min-height:160px;
+  border-radius:22px;
+  text-decoration:none;
+  color:white;
+  border:1px solid #8054ba;
+  box-shadow:0 12px 30px #0007;
+}
+.skill-card.speed {
+  background:linear-gradient(120deg,#51218b,#17102c);
+}
+.skill-card.memory {
+  background:linear-gradient(120deg,#174777,#17102c);
+}
+.skill-card.math {
+  background:linear-gradient(120deg,#79501f,#26102d);
+}
+.skill-icon {
+  font-size:48px;
+}
+.skill-card h2 {
+  font-size:21px;
+  color:#ffe58a;
+  margin:8px 0;
+}
+.skill-card p {
+  font-size:13px;
+  color:#ddd0ee;
+}
+.skill-card small {
+  color:#89ffb4;
+  font-weight:800;
+}
+.skill-card strong {
+  color:#ffdf63;
+  font-size:13px;
+}
+</style>
 </head>
 
 <body>
@@ -104,7 +153,7 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      FREE VIRTUAL COIN GAMES • NO PURCHASE • NO CASH VALUE
+      3 FREE SKILL GAMES • NO CASH VALUE
     </p>
   </header>
 
@@ -149,40 +198,41 @@
     Official Samrat X-Treme Android App
   </p>
 </section>
-<section class="panel game">
-    <div class="emoji">🎯</div>
-    <h2>NUMBER CHALLENGE</h2>
-    <p class="small">
-      20-minute live draw • Pick a number from 1–9
-    </p>
-    <a class="btn" href="number-draw.html">
-      ▶ PLAY NUMBER DRAW
-    </a>
-  </section>
 
-  <section class="panel game">
-    <div class="emoji">⚡</div>
-    <h2>SPEED TAP ARENA</h2>
-    <p class="small">
-      30-second reflex challenge • Easy / Medium / Extreme
-    </p>
-    <a class="btn" href="speed-tap.html">
-      ▶ PLAY SPEED TAP
-    </a>
-  </section>
+<section class="skill-grid">
 
-  <section class="panel game">
-    <div class="emoji">🧠</div>
-    <h2>MEMORY X EXTREME 24</h2>
-    <p class="small">
-      60 seconds • 24 cards • 12 pairs
-    </p>
-    <a class="btn" href="memory-x.html">
-      ▶ PLAY MEMORY X
-    </a>
-  </section>
+  <a class="skill-card speed" href="speed-tap.html">
+    <span class="skill-icon">⚡</span>
+    <div>
+      <small>● LIVE GAME</small>
+      <h2>SPEED TAP ARENA</h2>
+      <p>Reflex & Speed Challenge</p>
+      <strong>PLAY NOW →</strong>
+    </div>
+  </a>
 
-  <nav class="links">
+  <a class="skill-card memory" href="memory-x.html">
+    <span class="skill-icon">🧠</span>
+    <div>
+      <small>● LIVE GAME</small>
+      <h2>MEMORY X</h2>
+      <p>24 Cards · 12 Pairs</p>
+      <strong>PLAY NOW →</strong>
+    </div>
+  </a>
+
+  <a class="skill-card math" href="math-challenge.html">
+    <span class="skill-icon">🔢</span>
+    <div>
+      <small>● NEW SKILL GAME</small>
+      <h2>MATH CHALLENGE</h2>
+      <p>Quick Calculation & Logic</p>
+      <strong>PLAY NOW →</strong>
+    </div>
+  </a>
+
+</section>
+<nav class="links">
     <a href="index.html">Home</a>
     <a href="player-profile.html">My Profile</a>
     <a href="referral.html">Referral</a>

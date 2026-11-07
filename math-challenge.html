@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1">
+<title>Math Challenge | Samrat X-Treme</title>
+<style>
+body {
+  margin:0;
+  background:linear-gradient(#35165b,#090514);
+  color:white;
+  font:16px system-ui;
+}
+main {max-width:480px;margin:auto;padding:22px}
+a {color:#ffe16b}
+h1 {color:#ffe16b}
+.card {
+  background:#231439;
+  padding:22px;
+  border-radius:20px;
+  text-align:center;
+}
+#question {
+  font-size:38px;
+  font-weight:900;
+  margin:24px 0;
+}
+#answers {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+button {
+  background:#ffdb52;
+  color:#241033;
+  border:0;
+  padding:18px;
+  border-radius:12px;
+  font-size:20px;
+  font-weight:900;
+}
+</style>
+</head>
+<body>
+<main>
+  <a href="index.html">← HOME</a>
+  <h1>🔢 MATH CHALLENGE</h1>
+  <p>10 Questions · Test Your Math Skills</p>
+  <section class="card">
+    <p id="progress"></p>
+    <p id="score"></p>
+    <div id="question"></div>
+    <div id="answers"></div>
+    <p id="message"></p>
+    <button id="again" hidden>PLAY AGAIN</button>
+  </section>
+  <p>Free skill game · No cash rewards</p>
+</main>
+<script>
+let count=0,score=0,answer=0,locked=false;
+const el=id=>document.getElementById(id);
+const rnd=n=>Math.floor(Math.random()*n);
+
+function next(){
+  locked=false;
+  if(count>=10){
+    el('question').textContent='Completed!';
+    el('answers').replaceChildren();
+    el('score').textContent='Final Score: '+score+'/10';
+    el('progress').textContent='';
+    el('again').hidden=false;
+    return;
+  }
+
+  let a=rnd(15)+1,b=rnd(12)+1;
+  let op=rnd(3);
+  if(op===0) answer=a+b;
+  if(op===1) answer=a*b;
+  if(op===2){
+    answer=Math.abs(a-b);
+  }
+
+  el('question').textContent=
+    op===0?a+' + '+b+' = ?':
+    op===1?a+' × '+b+' = ?':
+    Math.max(a,b)+' − '+Math.min(a,b)+' = ?';
+
+  el('progress').textContent='Question '+(count+1)+'/10';
+  el('score').textContent='Score: '+score;
+  el('message').textContent='';
+
+  let choices=new Set([answer]);
+  while(choices.size<4){
+    choices.add(Math.max(0,answer+rnd(17)-8));
+  }
+
+  let nums=[...choices];
+  for(let i=nums.length-1;i>0;i--){
+    let j=rnd(i+1);
+    [nums[i],nums[j]]=[nums[j],nums[i]];
+  }
+
+  el('answers').replaceChildren();
+
+  nums.forEach(n=>{
+    let btn=document.createElement('button');
+    btn.textContent=n;
+    btn.onclick=()=>{
+      if(locked)return;
+      locked=true;
+      if(n===answer){
+        score++;
+        el('message').textContent='Correct!';
+      }else{
+        el('message').textContent='Answer: '+answer;
+      }
+      count++;
+      setTimeout(next,650);
+    };
+    el('answers').append(btn);
+  });
+}
+
+el('again').onclick=()=>{
+  count=0;
+  score=0;
+  el('again').hidden=true;
+  next();
+};
+next();
+</script>
+</body>
+</html>

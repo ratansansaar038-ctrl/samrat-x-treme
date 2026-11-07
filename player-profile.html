@@ -3,6 +3,20 @@
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#512079,#17092b 56%,#07020e);font:15px system-ui,Arial;color:#fff}.wrap{max-width:520px;margin:auto;padding:22px 16px 40px}a{color:#e7c7ff;text-decoration:none}.brand{text-align:center;font:900 30px Georgia;color:#ffe188;margin:24px 0 6px}.sub{text-align:center;letter-spacing:2px;color:#e4baff;font-weight:800}.card{background:linear-gradient(135deg,#27103f,#381654);border:1px solid #8d58c5;border-radius:20px;padding:18px;margin:16px 0;box-shadow:0 8px 25px #0005}h2{color:#ffe188;font-size:20px;margin:0 0 13px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #ffffff23}.row:last-child{border:0}.score{font-size:24px;color:#ffe188;font-weight:900}.muted{font-size:12px;color:#d6bee8;line-height:1.6}.btn{display:block;text-align:center;padding:13px;background:linear-gradient(90deg,#ffe25b,#ffa34b);color:#280d37;border-radius:12px;font-weight:900;margin:12px 0;text-decoration:none}button{background:#45266c;border:1px solid #aa7ce3;color:#fff;padding:10px 13px;border-radius:10px;font-weight:700;cursor:pointer}#name{width:100%;background:#170b2b;color:#fff;border:1px solid #9b70cc;border-radius:10px;padding:12px;font-size:16px;margin:8px 0}.notice{background:#180b2b;padding:13px;border-radius:12px;border:1px solid #65468c}.footer{text-align:center;color:#cdb6df;font-size:12px;margin-top:22px}.ranking{border-bottom:1px solid #ffffff25;padding:9px 2px;font-size:13px}.ranking:last-child{border-bottom:0}.gamehead{color:#ffe188;margin:18px 0 8px;font-weight:800}.me{color:#ffe188;font-weight:800}</style></head>
 <body><main class="wrap"><a href="index.html">← Homepage</a><div class="brand">SAMRAT X-TREME</div><div class="sub">👤 PLAYER PROFILE</div>
 <section class="card"><h2>आपका गेमिंग प्रोफाइल</h2><p id="login" class="muted">Checking login...</p><label for="name">Player Name (इस मोबाइल पर)</label><input id="name" maxlength="30" placeholder="अपना नाम लिखें"><button type="button" id="save">नाम सेव करें</button><p id="msg" class="muted" role="status"></p></section>
+
+<section class="card">
+  <h2>🎯 Number Draw</h2>
+  <p class="muted">
+    20-minute Number Challenge,
+    Wallet and Game History
+  </p>
+  <a class="btn" href="number-draw.html">
+    OPEN NUMBER DRAW →
+  </a>
+  <a class="btn" href="number-history.html">
+    MY GAME HISTORY →
+  </a>
+</section>
 <section class="card"><h2>🏆 Personal Best (इस मोबाइल पर)</h2><div class="row"><div>⚡ Speed Tap Arena<div class="muted">Highest local points</div></div><div class="score" id="speed">—</div></div><div class="row"><div>🧠 Memory X Extreme 24<div class="muted">Fastest local completion</div></div><div class="score" id="memory24">—</div></div><div class="row"><div>🧠 Memory X Classic<div class="muted">Fastest local completion</div></div><div class="score" id="memory8">—</div></div><a class="btn" href="speed-tap.html">PLAY SPEED TAP</a><a class="btn" href="memory-x.html">PLAY MEMORY X EXTREME</a></section>
 <section class="card"><h2>🌍 Verified Online Leaderboards</h2><p class="muted">ये रैंकिंग Appwrite में Server-Verified स्कोर से आती है। पीले रंग में आपका अकाउंट दिखेगा, यदि Top 10 में है।</p><div class="gamehead">🧠 Memory X Extreme 24</div><div class="notice" id="board24">Loading...</div><div class="gamehead">⚡ Speed Tap Arena</div><div class="notice" id="boardspeed">Loading...</div><div class="gamehead">🧠 Memory X Classic (8 pairs)</div><div class="notice" id="board8">Loading...</div><button type="button" id="refresh" style="width:100%;margin-top:16px">↻ Refresh Online Rankings</button><p class="muted">Personal Best इस मोबाइल का रिकॉर्ड है; Online Leaderboard अलग, Verified रिकॉर्ड दिखाता है।</p></section>
 <div class="footer">Free skill games · No cash rewards · No coin deduction</div></main>
