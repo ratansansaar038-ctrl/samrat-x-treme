@@ -1,4 +1,42 @@
-<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#120621"><title>Speed Tap Arena</title><style>*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#4a1a73,#17072b 52%,#06010c);color:white;font:15px system-ui,Arial;min-height:100vh}.wrap{max-width:520px;margin:auto;padding:20px 16px 36px}a{color:#e9c9ff;text-decoration:none}.brand{text-align:center;margin:20px 0 8px;font:900 30px Georgia;color:#ffe17c}.sub{text-align:center;letter-spacing:2px;color:#e3baff;font-size:18px;font-weight:900}.panel{background:linear-gradient(145deg,#24103e,#351454);border:1px solid #8655c9;border-radius:20px;padding:18px;margin:16px 0;box-shadow:0 8px 28px #0006}.muted{font-size:12px;color:#d5bdf3;line-height:1.6}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:16px 0}.stat{background:#180a2e;border-radius:12px;padding:12px 5px;text-align:center}.stat b{display:block;color:#ffe17c;font-size:24px}.stat small{color:#d2b5f3}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;touch-action:manipulation}.tile{aspect-ratio:1;background:#35205d;border:2px solid #7e4cb6;border-radius:18px;display:grid;place-items:center;font-size:34px;color:white;cursor:pointer}.tile.target,.tile.open,.tile.matched{background:radial-gradient(circle,#fff7a2,#ffcf32 52%,#ff8c24);border-color:#fff3ac;color:#461057}.tile:disabled{opacity:.7}.tile.target:disabled{opacity:1}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.level{border:1px solid #9861d6;border-radius:12px;background:#361d55;color:white;padding:12px 5px;font-weight:800}.level.selected{background:#ffcf47;color:#2b0d3e}.start{width:100%;border:0;border-radius:14px;padding:16px;background:linear-gradient(90deg,#ffe545,#ffa332,#ff45a0);color:#260b2c;font-size:17px;font-weight:900;margin-top:15px}.start:disabled{opacity:.55}.msg{text-align:center;min-height:43px;padding-top:12px;color:#ffe9a4;font-weight:700}.guide{background:#160b2b;border:1px solid #9861d6;border-radius:14px;padding:13px;margin:12px 0;line-height:1.7}.footer{text-align:center;font-size:11px;color:#c6addf;margin-top:20px}h2{text-align:center;color:#ffe17c}.hide{display:none}</style></head><body><main class="wrap"><a href="index.html">← Samrat X-Treme Home</a><div class="brand">SAMRAT X-TREME</div><div class="sub">⚡ SPEED TAP ARENA</div><section class="panel"><h2>30-Second Reflex Challenge</h2><div class="guide">पीले ⚡ पर Tap करो। सही +10, गलत −5, Miss −2। Easy, Medium या Extreme चुनो। Coins नहीं कटेंगे।</div><div class="muted" id="mode">Checking login...</div><div class="stats"><div class="stat"><b id="time">30</b><small>SECONDS</small></div><div class="stat"><b id="score">0</b><small>SCORE</small></div><div class="stat"><b id="best">0</b><small>BEST</small></div></div><div class="grid" id="grid"></div><div class="msg" id="message">Choose level and press START</div><div class="controls"><button class="level selected" data-level="easy">EASY</button><button class="level" data-level="medium">MEDIUM</button><button class="level" data-level="extreme">EXTREME</button></div><button class="start" id="start">▶ START GAME</button><p class="muted" id="accuracy"></p></section><section class="panel"><h2>🏆 Online Top 10</h2><div id="leaderboard">Loading...</div><button class="start" id="refresh">Refresh ranking</button></section><div class="footer">Free skill game · No cash value · Guests can practice</div></main><script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#120621"><title>Speed Tap Arena</title><style>*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#4a1a73,#17072b 52%,#06010c);color:white;font:15px system-ui,Arial;min-height:100vh}.wrap{max-width:520px;margin:auto;padding:20px 16px 36px}a{color:#e9c9ff;text-decoration:none}.brand{text-align:center;margin:20px 0 8px;font:900 30px Georgia;color:#ffe17c}.sub{text-align:center;letter-spacing:2px;color:#e3baff;font-size:18px;font-weight:900}.panel{background:linear-gradient(145deg,#24103e,#351454);border:1px solid #8655c9;border-radius:20px;padding:18px;margin:16px 0;box-shadow:0 8px 28px #0006}.muted{font-size:12px;color:#d5bdf3;line-height:1.6}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:16px 0}.stat{background:#180a2e;border-radius:12px;padding:12px 5px;text-align:center}.stat b{display:block;color:#ffe17c;font-size:24px}.stat small{color:#d2b5f3}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;touch-action:manipulation}.tile{aspect-ratio:1;background:#35205d;border:2px solid #7e4cb6;border-radius:18px;display:grid;place-items:center;font-size:34px;color:white;cursor:pointer}.tile.target,.tile.open,.tile.matched{background:radial-gradient(circle,#fff7a2,#ffcf32 52%,#ff8c24);border-color:#fff3ac;color:#461057}.tile:disabled{opacity:.7}.tile.target:disabled{opacity:1}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.level{border:1px solid #9861d6;border-radius:12px;background:#361d55;color:white;padding:12px 5px;font-weight:800}.level.selected{background:#ffcf47;color:#2b0d3e}.start{width:100%;border:0;border-radius:14px;padding:16px;background:linear-gradient(90deg,#ffe545,#ffa332,#ff45a0);color:#260b2c;font-size:17px;font-weight:900;margin-top:15px}.start:disabled{opacity:.55}.msg{text-align:center;min-height:43px;padding-top:12px;color:#ffe9a4;font-weight:700}.guide{background:#160b2b;border:1px solid #9861d6;border-radius:14px;padding:13px;margin:12px 0;line-height:1.7}.footer{text-align:center;font-size:11px;color:#c6addf;margin-top:20px}h2{text-align:center;color:#ffe17c}.hide{display:none}</style>
+<style id="skill-login-style">
+html:not(.skill-auth-ok) body {
+  visibility: hidden !important;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<script>
+(async function () {
+  const destination =
+    "login.html?next=" +
+    encodeURIComponent(
+      location.pathname.split("/").pop()
+    );
+
+  try {
+    const client = new Appwrite.Client()
+      .setEndpoint(
+        "https://sgp.cloud.appwrite.io/v1"
+      )
+      .setProject(
+        "6a7f2add0011a7bfc21a"
+      );
+
+    const account = new Appwrite.Account(client);
+
+    await account.get();
+
+    document.documentElement.classList.add(
+      "skill-auth-ok"
+    );
+
+  } catch (error) {
+    location.replace(destination);
+  }
+})();
+</script>
+</head><body><main class="wrap"><a href="index.html">← Samrat X-Treme Home</a><div class="brand">SAMRAT X-TREME</div><div class="sub">⚡ SPEED TAP ARENA</div><section class="panel"><h2>30-Second Reflex Challenge</h2><div class="guide">पीले ⚡ पर Tap करो। सही +10, गलत −5, Miss −2। Easy, Medium या Extreme चुनो। Coins नहीं कटेंगे।</div><div class="muted" id="mode">Checking login...</div><div class="stats"><div class="stat"><b id="time">30</b><small>SECONDS</small></div><div class="stat"><b id="score">0</b><small>SCORE</small></div><div class="stat"><b id="best">0</b><small>BEST</small></div></div><div class="grid" id="grid"></div><div class="msg" id="message">Choose level and press START</div><div class="controls"><button class="level selected" data-level="easy">EASY</button><button class="level" data-level="medium">MEDIUM</button><button class="level" data-level="extreme">EXTREME</button></div><button class="start" id="start">▶ START GAME</button><p class="muted" id="accuracy"></p></section><section class="panel"><h2>🏆 Online Top 10</h2><div id="leaderboard">Loading...</div><button class="start" id="refresh">Refresh ranking</button></section><div class="footer">Free skill game · No cash value · Guests can practice</div></main><script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
 <script>
 const ENDPOINT='https://sgp.cloud.appwrite.io/v1',PROJECT='6a7f2add0011a7bfc21a',FUNCTION_ID='6ae1bcc500208a5a7efb';
 let api=null, signedIn=false;

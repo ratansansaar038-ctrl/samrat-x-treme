@@ -41,6 +41,44 @@ button {
   font-weight:900;
 }
 </style>
+
+<style id="skill-login-style">
+html:not(.skill-auth-ok) body {
+  visibility: hidden !important;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<script>
+(async function () {
+  const destination =
+    "login.html?next=" +
+    encodeURIComponent(
+      location.pathname.split("/").pop()
+    );
+
+  try {
+    const client = new Appwrite.Client()
+      .setEndpoint(
+        "https://sgp.cloud.appwrite.io/v1"
+      )
+      .setProject(
+        "6a7f2add0011a7bfc21a"
+      );
+
+    const account = new Appwrite.Account(client);
+
+    await account.get();
+
+    document.documentElement.classList.add(
+      "skill-auth-ok"
+    );
+
+  } catch (error) {
+    location.replace(destination);
+  }
+})();
+</script>
 </head>
 <body>
 <main>

@@ -207,6 +207,23 @@ const form=document.getElementById("loginForm");
 const button=document.getElementById("loginButton");
 const message=document.getElementById("message");
 
+
+function loginDestination() {
+  const allowed = [
+    "speed-tap.html",
+    "memory-x.html",
+    "math-challenge.html"
+  ];
+
+  const next = new URLSearchParams(
+    location.search
+  ).get("next");
+
+  return allowed.includes(next)
+    ? next
+    : "index.html";
+}
+
 async function prepareLoginPage(){
 
 try{
@@ -215,7 +232,7 @@ await account.get();
 
 /* already logged in */
 
-window.location.replace("index.html");
+window.location.replace(loginDestination());
 return;
 
 }catch(error){
@@ -258,7 +275,7 @@ password:password
 message.style.color="#60ff9a";
 message.innerText="Login successful ✅";
 
-window.location.replace("index.html");
+window.location.replace(loginDestination());
 
 }catch(error){
 
