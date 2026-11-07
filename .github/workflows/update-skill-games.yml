@@ -1,0 +1,308 @@
+
+name: Update Skill Games Homepage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update website
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # HOMEPAGE
+          p = Path("index.html")
+          s = p.read_text()
+
+          start = s.index('<section class="panel game">')
+          end = s.index('<nav class="links">', start)
+
+          cards = """
+          <section class="skill-grid">
+
+            <a class="skill-card speed" href="speed-tap.html">
+              <span class="skill-icon">⚡</span>
+              <div>
+                <small>● LIVE GAME</small>
+                <h2>SPEED TAP ARENA</h2>
+                <p>Reflex & Speed Challenge</p>
+                <strong>PLAY NOW →</strong>
+              </div>
+            </a>
+
+            <a class="skill-card memory" href="memory-x.html">
+              <span class="skill-icon">🧠</span>
+              <div>
+                <small>● LIVE GAME</small>
+                <h2>MEMORY X</h2>
+                <p>24 Cards · 12 Pairs</p>
+                <strong>PLAY NOW →</strong>
+              </div>
+            </a>
+
+            <a class="skill-card math" href="math-challenge.html">
+              <span class="skill-icon">🔢</span>
+              <div>
+                <small>● NEW SKILL GAME</small>
+                <h2>MATH CHALLENGE</h2>
+                <p>Quick Calculation & Logic</p>
+                <strong>PLAY NOW →</strong>
+              </div>
+            </a>
+
+          </section>
+          """
+
+          s = s[:start] + cards + s[end:]
+
+          css = """
+          <style>
+          .skill-grid {
+            display:grid;
+            gap:16px;
+            margin:20px 0;
+          }
+          .skill-card {
+            display:flex;
+            align-items:center;
+            gap:18px;
+            padding:24px 18px;
+            min-height:160px;
+            border-radius:22px;
+            text-decoration:none;
+            color:white;
+            border:1px solid #8054ba;
+            box-shadow:0 12px 30px #0007;
+          }
+          .skill-card.speed {
+            background:linear-gradient(120deg,#51218b,#17102c);
+          }
+          .skill-card.memory {
+            background:linear-gradient(120deg,#174777,#17102c);
+          }
+          .skill-card.math {
+            background:linear-gradient(120deg,#79501f,#26102d);
+          }
+          .skill-icon {
+            font-size:48px;
+          }
+          .skill-card h2 {
+            font-size:21px;
+            color:#ffe58a;
+            margin:8px 0;
+          }
+          .skill-card p {
+            font-size:13px;
+            color:#ddd0ee;
+          }
+          .skill-card small {
+            color:#89ffb4;
+            font-weight:800;
+          }
+          .skill-card strong {
+            color:#ffdf63;
+            font-size:13px;
+          }
+          </style>
+          """
+
+          s = s.replace("</head>", css + "</head>", 1)
+          s = s.replace(
+            "FREE VIRTUAL COIN GAMES • NO PURCHASE • NO CASH VALUE",
+            "3 FREE SKILL GAMES • NO CASH VALUE"
+          )
+          p.write_text(s)
+
+          # MOVE NUMBER DRAW TO PROFILE
+          p = Path("player-profile.html")
+          s = p.read_text()
+
+          marker = '<section class="card"><h2>🏆 Personal Best'
+
+          profile_card = """
+          <section class="card">
+            <h2>🎯 Number Draw</h2>
+            <p class="muted">
+              20-minute Number Challenge,
+              Wallet and Game History
+            </p>
+            <a class="btn" href="number-draw.html">
+              OPEN NUMBER DRAW →
+            </a>
+            <a class="btn" href="number-history.html">
+              MY GAME HISTORY →
+            </a>
+          </section>
+          """
+
+          if marker in s and 'OPEN NUMBER DRAW' not in s:
+            s = s.replace(marker, profile_card + marker, 1)
+          p.write_text(s)
+
+          # MATH CHALLENGE
+          math = """<!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport"
+                content="width=device-width,initial-scale=1">
+          <title>Math Challenge | Samrat X-Treme</title>
+          <style>
+          body {
+            margin:0;
+            background:linear-gradient(#35165b,#090514);
+            color:white;
+            font:16px system-ui;
+          }
+          main {max-width:480px;margin:auto;padding:22px}
+          a {color:#ffe16b}
+          h1 {color:#ffe16b}
+          .card {
+            background:#231439;
+            padding:22px;
+            border-radius:20px;
+            text-align:center;
+          }
+          #question {
+            font-size:38px;
+            font-weight:900;
+            margin:24px 0;
+          }
+          #answers {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:12px;
+          }
+          button {
+            background:#ffdb52;
+            color:#241033;
+            border:0;
+            padding:18px;
+            border-radius:12px;
+            font-size:20px;
+            font-weight:900;
+          }
+          </style>
+          </head>
+          <body>
+          <main>
+            <a href="index.html">← HOME</a>
+            <h1>🔢 MATH CHALLENGE</h1>
+            <p>10 Questions · Test Your Math Skills</p>
+            <section class="card">
+              <p id="progress"></p>
+              <p id="score"></p>
+              <div id="question"></div>
+              <div id="answers"></div>
+              <p id="message"></p>
+              <button id="again" hidden>PLAY AGAIN</button>
+            </section>
+            <p>Free skill game · No cash rewards</p>
+          </main>
+          <script>
+          let count=0,score=0,answer=0,locked=false;
+          const el=id=>document.getElementById(id);
+          const rnd=n=>Math.floor(Math.random()*n);
+
+          function next(){
+            locked=false;
+            if(count>=10){
+              el('question').textContent='Completed!';
+              el('answers').replaceChildren();
+              el('score').textContent='Final Score: '+score+'/10';
+              el('progress').textContent='';
+              el('again').hidden=false;
+              return;
+            }
+
+            let a=rnd(15)+1,b=rnd(12)+1;
+            let op=rnd(3);
+            if(op===0) answer=a+b;
+            if(op===1) answer=a*b;
+            if(op===2){
+              answer=Math.abs(a-b);
+            }
+
+            el('question').textContent=
+              op===0?a+' + '+b+' = ?':
+              op===1?a+' × '+b+' = ?':
+              Math.max(a,b)+' − '+Math.min(a,b)+' = ?';
+
+            el('progress').textContent='Question '+(count+1)+'/10';
+            el('score').textContent='Score: '+score;
+            el('message').textContent='';
+
+            let choices=new Set([answer]);
+            while(choices.size<4){
+              choices.add(Math.max(0,answer+rnd(17)-8));
+            }
+
+            let nums=[...choices];
+            for(let i=nums.length-1;i>0;i--){
+              let j=rnd(i+1);
+              [nums[i],nums[j]]=[nums[j],nums[i]];
+            }
+
+            el('answers').replaceChildren();
+
+            nums.forEach(n=>{
+              let btn=document.createElement('button');
+              btn.textContent=n;
+              btn.onclick=()=>{
+                if(locked)return;
+                locked=true;
+                if(n===answer){
+                  score++;
+                  el('message').textContent='Correct!';
+                }else{
+                  el('message').textContent='Answer: '+answer;
+                }
+                count++;
+                setTimeout(next,650);
+              };
+              el('answers').append(btn);
+            });
+          }
+
+          el('again').onclick=()=>{
+            count=0;
+            score=0;
+            el('again').hidden=true;
+            next();
+          };
+          next();
+          </script>
+          </body>
+          </html>"""
+
+          Path("math-challenge.html").write_text(math)
+
+          # UPDATE APP DESCRIPTION
+          p = Path("manifest.json")
+          s = p.read_text()
+          s = s.replace(
+            "Market-linked numerology prediction game with virtual coins.",
+            "Free skill games: Speed Tap Arena, Memory X and Math Challenge."
+          )
+          p.write_text(s)
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html player-profile.html math-challenge.html manifest.json
+          git diff --cached --quiet || {
+            git commit -m "Premium skill games homepage and Math Challenge"
+            git push
+          }
