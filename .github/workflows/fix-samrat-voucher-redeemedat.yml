@@ -1,0 +1,73 @@
+name: Fix Samrat Voucher redeemedAt Error
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-voucher-redeem-fix
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Fix voucher datetime field without affecting existing games
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('functions/game-wallet/src/main.js')
+          if not path.is_file():
+              raise SystemExit('game-wallet backend not found; no changes made')
+          source = path.read_text(encoding='utf-8')
+          start_marker = 'async function redeemVoucher(user, b, key) {'
+          end_marker = 'async function grantCoins(admin, b, key) {'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('Unexpected backend layout; no changes made')
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          segment = source[start:end]
+          if segment.count('redeemedAt: now') != 2:
+              raise SystemExit('Expected 2 voucher datetime writes; no changes made')
+          # Leave the optional redeemedAt fields unset for now.
+          # Appwrite supplies $createdAt automatically on the audit row.
+          segment = segment.replace('        redeemedAt: now\n', '')
+          segment = segment.replace('        redeemedAt: now,\n', '')
+          segment = segment.replace('const now = new Date().toISOString();',
+                                    '// Redemption timestamp is in voucher_redemptions.$createdAt')
+          if 'redeemedAt: now' in segment:
+              raise SystemExit('Unable to safely remove datetime writes')
+          # Make sure the transaction still has all three operations.
+          for required in [
+              'op("create", "voucher_redemptions", voucher.$id, {',
+              'op("update", "vouchers", voucher.$id, {',
+              'op("increment", "user_profiles", player.$id, {'
+          ]:
+              if required not in segment:
+                  raise SystemExit('Critical wallet transaction missing; no changes made')
+          path.write_text(source[:start] + segment + source[end:], encoding='utf-8')
+          print('Voucher timestamp writes removed; atomic redemption preserved.')
+          PY
+
+      - name: Validate backend JavaScript
+        run: node --check functions/game-wallet/src/main.js
+
+      - name: Commit safe backend patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add functions/game-wallet/src/main.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix voucher redemption unknown redeemedAt attribute'
+            git push origin HEAD:main
+          fi
