@@ -1,0 +1,424 @@
+name: Connect Samrat VC Requests and Telegram
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-unified-vc-requests
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install one request queue, Telegram alerts and atomic admin approvals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          backend_path = Path('functions/game-wallet/src/main.js')
+          legacy_path = Path('functions/vc-approval/src/main.js')
+          requests_page = Path('admin-vc-requests.html')
+          number_page = Path('number-draw.html')
+          dashboard_page = Path('admin-dashboard.html')
+          files = [backend_path,legacy_path,requests_page,number_page,dashboard_page]
+          if not all(p.is_file() for p in files):
+              raise SystemExit('Expected project files missing. No changes made.')
+
+          main = backend_path.read_text(encoding='utf-8')
+          legacy = legacy_path.read_text(encoding='utf-8')
+          number = number_page.read_text(encoding='utf-8')
+          dashboard = dashboard_page.read_text(encoding='utf-8')
+
+          fragment = r'''// SAMRAT UNIFIED VC REQUESTS V1
+          // Uses the same vc_requests table already used by the legacy VC approval function.
+          // Set VC_REQUESTS_TABLE_ID in game-wallet only if its actual Appwrite table ID differs.
+          const vcRequestTable = () => {
+            const table = (process.env.VC_REQUESTS_TABLE_ID || 'vc_requests').trim();
+            if (!/^[a-zA-Z0-9._-]{1,36}$/.test(table)) {
+              throw Error('Invalid VC requests table configuration');
+            }
+            return table;
+          };
+
+          async function sendVCTelegram(message) {
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chatId = process.env.TELEGRAM_CHAT_ID;
+            if (!token || !chatId) return false;
+            const body = JSON.stringify({chat_id: chatId, text: message});
+            try {
+              return await new Promise((resolve, reject) => {
+                const r = https.request('https://api.telegram.org/bot' + token + '/sendMessage', {
+                  method: 'POST', timeout: 12000,
+                  headers: {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body)}
+                }, response => {
+                  let raw = '';
+                  response.on('data', chunk => { raw += chunk; if (raw.length > 64000) response.destroy(); });
+                  response.on('end', () => {
+                    try {
+                      const answer = JSON.parse(raw);
+                      resolve(response.statusCode >= 200 && response.statusCode < 300 && answer.ok === true);
+                    } catch { resolve(false); }
+                  });
+                });
+                r.on('timeout', () => r.destroy(new Error('Telegram timeout')));
+                r.on('error', reject);
+                r.end(body);
+              });
+            } catch { return false; }
+          }
+
+          const vcClean = value => String(value ?? '').replace(/[<>]/g, '').slice(0,160);
+
+          async function requestVC(user, b, key) {
+            const amount = Number(b.amount);
+            if (![20, 50, 100, 200].includes(amount))
+              return {ok:false,error:'Choose 20, 50, 100 or 200 VC'};
+
+            const table = vcRequestTable();
+            const player = await profile(user, key);
+
+            let latest;
+            try {
+              // Avoid requiring a new index in the existing table; latest 100 is sufficient for initial rollout.
+              latest = await rows(table, [order('$createdAt','desc'), lim(100)], key);
+            } catch (e) {
+              if ([400, 404].includes(e.status))
+                return {ok:false,error:'VC requests table unavailable. Check game-wallet VC_REQUESTS_TABLE_ID.'};
+              throw e;
+            }
+            const pending = latest.find(row => row.userId === user && row.status === 'pending');
+            if (pending) return {
+              ok:true, created:false, requestId:pending.$id, amount:pending.amount,
+              status:'pending', telegramNotified:null,
+              message:'Your earlier VC request is still pending admin review'
+            };
+
+            // Duplicate clicks in the same 20-minute window resolve to one deterministic request ID.
+            const bucket = Math.floor((Date.now() + OFFSET) / ROUND_MS);
+            const requestId = 'vcr_' + createHash('sha256').update(user+'|'+bucket).digest('hex').slice(0,30);
+            let row;
+            try {
+              row = await request('POST', tablePath(table), key, {
+                rowId:requestId,
+                data:{userId:user,amount,status:'pending'}
+              });
+            } catch (e) {
+              if (e.status === 409) {
+                // The request may already have been created; do not accidentally generate another.
+                const existing = await request('GET', tablePath(table) + '/' + requestId, key);
+                return {ok:true,created:false,requestId,amount:existing.amount,
+                  status:existing.status,telegramNotified:null,message:'Request already recorded in this interval'};
+              }
+              if ([400,404].includes(e.status))
+                return {ok:false,error:'VC requests table could not accept this request. Check table ID and columns.'};
+              throw e;
+            }
+
+            const message = [
+              'SAMRAT X-TREME | NEW VC REQUEST',
+              'Request ID: '+vcClean(row.$id),
+              'Player: '+vcClean(player.name),
+              'Player ID: '+vcClean(user),
+              'Email: '+vcClean(player.email),
+              'Requested: '+amount+' VC',
+              'Current wallet: '+player.wallet+' VC',
+              'Status: PENDING',
+              'Review (admin login): https://samratxtreme.online/admin-vc-requests.html',
+              'Approve/reject only in the Admin Control Room. No auto-credit.'
+            ].join('\n');
+
+            const telegramNotified = await sendVCTelegram(message);
+            return {ok:true,created:true,requestId:row.$id,amount,status:'pending',
+              telegramNotified,message:'Request saved for admin approval'};
+          }
+
+          async function adminListVCRequests(user, key) {
+            if (!dashboardIsAdmin(user))
+              return {ok:false,error:'Admin access denied'};
+            const table = vcRequestTable();
+            const found = await rows(table, [order('$createdAt','desc'), lim(100)], key);
+            const requests = found.map(row => ({
+              requestId:row.$id, userId:row.userId, amount:row.amount,
+              status:row.status, createdAt:row.$createdAt
+            }));
+            return {ok:true, requests, limit:100,
+              pending:requests.filter(r=>r.status==='pending').length};
+          }
+
+          async function adminDecideVCRequest(user, b, key) {
+            if (!dashboardIsAdmin(user))
+              return {ok:false,error:'Admin access denied'};
+            const requestId = typeof b.requestId === 'string' ? b.requestId.trim() : '';
+            const decision = b.decision;
+            if (!/^[a-zA-Z0-9._-]{1,36}$/.test(requestId) || !['approved','rejected'].includes(decision))
+              return {ok:false,error:'Invalid request ID or decision'};
+
+            const table = vcRequestTable();
+            const entry = await request('GET', tablePath(table)+'/'+requestId, key);
+            if (entry.status !== 'pending')
+              return {ok:false,error:'Request already handled: '+entry.status};
+            if (!Number.isSafeInteger(entry.amount) || entry.amount < 1 || entry.amount > 100000 ||
+                typeof entry.userId !== 'string' || !/^[a-zA-Z0-9._-]{1,36}$/.test(entry.userId))
+              return {ok:false,error:'Request details invalid; no credit made'};
+
+            const operations = [op('update', table, entry.$id, {status:decision})];
+            if (decision === 'approved') {
+              const player = await profile(entry.userId, key);
+              operations.push(op('increment','user_profiles',player.$id,{
+                column:'wallet',value:entry.amount,max:900000000
+              }));
+            }
+
+            try {
+              // One atomic commit changes request status and wallet together.
+              // Conflicting concurrent approval attempts must not double-credit.
+              await transact(key, operations);
+            } catch (e) {
+              if (e.status === 409)
+                return {ok:false,error:'Request was handled or wallet changed. Refresh before trying again.'};
+              throw e;
+            }
+
+            const telegramNotified = await sendVCTelegram([
+              'SAMRAT X-TREME | VC REQUEST '+decision.toUpperCase(),
+              'Request ID: '+vcClean(requestId),
+              'Player ID: '+vcClean(entry.userId),
+              'Amount: '+entry.amount+' VC',
+              decision === 'approved' ? 'Coins credited once in the same database transaction.' : 'No coins credited.'
+            ].join('\n'));
+
+            return {ok:true,requestId,userId:entry.userId,amount:entry.amount,
+              status:decision,telegramNotified};
+          }'''
+
+          requests_html = r'''<!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <meta name="theme-color" content="#0b0615"><title>Unified VC Requests | Samrat X-Treme</title>
+          <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+          <style>
+          :root{color-scheme:dark;--gold:#ffe080;--green:#58e9b7;--mute:#c8b5db;--edge:#68498c}
+          *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#48206b,#080512 75%);font:15px system-ui,Arial;color:#f7efff}
+          main{max-width:840px;margin:auto;padding:24px 16px 70px}h1{font:900 32px Georgia,serif;color:var(--gold);margin:24px 0 3px}h2{font-size:19px;color:var(--gold);margin:0 0 10px}a{color:var(--gold)}
+          .top{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}.badge{color:var(--green);border:1px solid #36c497;border-radius:30px;padding:8px 12px;font-size:12px;font-weight:800}
+          .box{border:1px solid var(--edge);border-radius:18px;background:#221432;padding:18px;margin:16px 0}.sub{color:var(--mute);font-size:13px;line-height:1.6}
+          .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.stat{padding:12px;border:1px solid #55416d;border-radius:12px;background:#110a1d}.stat strong{display:block;color:var(--gold);font-size:26px}.stat small{color:var(--mute);font-size:11px}
+          .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tools>*{flex:1}button,select{padding:12px;border:1px solid #8867a7;border-radius:11px;background:#3b2855;color:#fff;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}button.approve{background:#38dda3;color:#07291e;border-color:#38dda3;font-weight:800}button.reject{background:#713451;color:#fff;border-color:#b46b81;font-weight:700}
+          .req{padding:15px;border-radius:13px;background:#120c20;border:1px solid #5b4273;margin:12px 0;overflow-wrap:anywhere}.line{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.coins{color:var(--gold);font-weight:850}.status{font-size:11px;letter-spacing:.6px;color:#86f7c5;font-weight:850}.status.done{color:#f4b3d1}.name{font-weight:750}.small{font-size:12px;color:var(--mute);line-height:1.6;margin-top:5px}.buttons{display:flex;gap:10px;margin-top:12px}.buttons button{flex:1}
+          #msg{min-height:25px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--gold)}[hidden]{display:none!important}
+          </style></head><body><main>
+          <div class="top"><a href="admin-dashboard.html">← Admin Control Room</a><span id="badge" class="badge">VERIFYING</span></div>
+          <h1>VC Requests</h1>
+          <p class="sub">One Appwrite queue · Telegram alerts · Admin-only approval · Virtual coins have no cash value.</p>
+          <div id="msg" role="status" aria-live="polite">Checking admin login…</div>
+          <section id="main" hidden>
+          <div class="stats" aria-label="Request counts">
+          <div class="stat"><small>Recent requests</small><strong id="total">—</strong></div>
+          <div class="stat"><small>Pending</small><strong id="pending">—</strong></div>
+          <div class="stat"><small>Completed</small><strong id="completed">—</strong></div>
+          </div>
+          <section class="box">
+          <div class="tools"><button id="refresh">↻ Refresh Requests</button><select id="filter" aria-label="Request status filter">
+          <option value="all">All statuses</option><option value="pending">Pending</option>
+          <option value="approved">Approved</option><option value="rejected">Rejected</option>
+          <option value="processing">Legacy processing</option></select></div>
+          <p class="sub">Latest 100 requests are shown. Telegram is a notification channel, not an approval button. All decisions are made here.</p>
+          <div id="list"></div>
+          </section>
+          </section>
+          <script>
+          'use strict';
+          const $=id=>document.getElementById(id);
+          const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
+          const account=new Appwrite.Account(client),fn=new Appwrite.Functions(client);
+          const FUNCTION_ID='6ae1bcc500208a5a7efb';
+          let admin=false,busy=false,requests=[];
+          function notice(s,good=false){$('msg').textContent=s;$('msg').style.color=good?'#58e9b7':'#ffe080'}
+          function node(tag,content,cls){const e=document.createElement(tag);if(content!=null)e.textContent=String(content);if(cls)e.className=cls;return e}
+          function date(value){const d=new Date(value||0);return Number.isFinite(+d)?d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}
+          async function api(action,body={}){
+           const r=await fn.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...body}),async:false});
+           let x;try{x=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid backend response')}
+           if(r.status!=='completed'||r.responseStatusCode!==200||x.ok!==true)throw Error(x.error||'Appwrite Function error');
+           return x;
+          }
+          function render(){
+           $('list').replaceChildren();
+           $('total').textContent=String(requests.length);$('pending').textContent=String(requests.filter(x=>x.status==='pending').length);
+           $('completed').textContent=String(requests.filter(x=>x.status==='approved'||x.status==='rejected').length);
+           const filtered=requests.filter(x=>$('filter').value==='all'||x.status===$('filter').value);
+           if(!filtered.length){$('list').append(node('p','No requests in this view.','sub'));return}
+           for(const r of filtered){
+            const box=node('div',null,'req');const line=node('div',null,'line');
+            line.append(node('div',r.userId||'Unknown player','name'),node('div',r.amount+' VC','coins'));
+            box.append(line,node('div','Request ID: '+r.requestId,'small'),node('div','Created: '+date(r.createdAt),'small'));
+            box.append(node('div',String(r.status||'unknown').toUpperCase(),'status'+(r.status==='pending'?'':' done')));
+            if(r.status==='pending'){
+             const buttons=node('div',null,'buttons');
+             for(const decision of ['approved','rejected']){
+              const btn=node('button',decision==='approved'?'APPROVE':'REJECT',decision==='approved'?'approve':'reject');
+              btn.disabled=busy;btn.onclick=()=>decide(r,decision);buttons.append(btn);
+             }
+             box.append(buttons);
+            }
+            if(r.status==='processing')box.append(node('p','Legacy processing: inspect original logs and wallet before making any changes.','sub'));
+            $('list').append(box);
+           }
+          }
+          async function load(){if(!admin||busy)return;busy=true;$('refresh').disabled=true;notice('Loading recent requests…');
+           try{const d=await api('admin_list_vc_requests');requests=d.requests||[];render();notice('Requests loaded. '+requests.length+' recent records. '+(d.pending||0)+' pending.',true)}
+           catch(e){notice('Unable to load requests: '+e.message+'. If table missing, set VC_REQUESTS_TABLE_ID for game-wallet.');}
+           finally{busy=false;$('refresh').disabled=false;render()}}
+          async function decide(r,decision){if(!admin||busy||r.status!=='pending')return;
+           const what=decision==='approved'?'Approve and credit':'Reject without crediting';
+           if(!confirm(what+' '+r.amount+' VC for player '+r.userId+'? Request '+r.requestId))return;
+           busy=true;$('refresh').disabled=true;document.querySelectorAll('.buttons button').forEach(b=>b.disabled=true);
+           notice('Processing request '+r.requestId+'…');
+           try{const d=await api('admin_decide_vc_request',{requestId:r.requestId,decision});
+            notice('SUCCESS: Request '+d.requestId+' '+d.status+'. '+(d.status==='approved'?d.amount+' VC credited once.':'No VC credited.')+(d.telegramNotified?' Telegram notified.':' Telegram message not confirmed.'),true);
+            requests=requests.map(x=>x.requestId===d.requestId?{...x,status:d.status}:x);render();
+           }catch(e){notice('Decision not confirmed: '+e.message+'. REFRESH before attempting again; never credit twice.');render();}
+           finally{busy=false;$('refresh').disabled=false;render()}
+          }
+          $('refresh').onclick=load;$('filter').onchange=render;
+          (async()=>{try{await account.get();const p=await api('get_wallet');if(p.isAdmin!==true)throw Error('Admin access denied');
+           admin=true;$('badge').textContent='ADMIN VERIFIED';$('main').hidden=false;await load();
+           }catch(e){$('badge').textContent='ACCESS RESTRICTED';notice('Admin login required: '+e.message)}})();
+          </script></main></body></html>'''
+
+          marker = '// SAMRAT UNIFIED VC REQUESTS V1'
+          if marker not in main:
+              begin = 'async function requestVC(user, b, key) {'
+              finish = '// Speed Tap and Memory X games'
+              assert main.count(begin) == 1 and main.count(finish) == 1, 'Backend incompatible: request function markers'
+              i = main.index(begin)
+              j = main.index(finish, i)
+              main = main[:i] + fragment + '\n\n' + main[j:]
+
+              allowed = '    "request_vc",'
+              assert main.count(allowed) == 1, 'Backend incompatible: action allowlist'
+              main = main.replace(allowed, allowed + '\n    "admin_list_vc_requests",\n    "admin_decide_vc_request",',1)
+
+              begin = '    if (action === "request_vc") {'
+              finish = 'if (action === "admin_dashboard") {'
+              assert main.count(begin) == 1 and main.count(finish) == 1, 'Backend incompatible: router markers'
+              i = main.index(begin)
+              j = main.index(finish, i)
+              handlers = '''    if (action === "request_vc") {
+                const x = await requestVC(user, b, key);
+                return send(res, x.ok ? 200 : 400, x);
+              }
+
+              if (action === "admin_list_vc_requests") {
+                const x = await adminListVCRequests(user, key);
+                return send(res, x.ok ? 200 : 403, x);
+              }
+
+              if (action === "admin_decide_vc_request") {
+                const x = await adminDecideVCRequest(user, b, key);
+                return send(res, x.ok ? 200 : 409, x);
+              }
+          '''
+              main = main[:i] + handlers + '\n' + main[j:]
+          else:
+              assert main.count('async function adminDecideVCRequest(') == 1
+              assert main.count('"admin_decide_vc_request",') == 1
+              assert main.count('if (action === "admin_decide_vc_request")') == 1
+
+          legacy_marker = '// LEGACY VC MUTATION DISABLED - unified game-wallet approval is authoritative'
+          if legacy_marker not in legacy:
+              anchor = '  // LIST VC REQUESTS'
+              assert legacy.count(anchor) == 1, 'Legacy backend marker missing'
+              block = '''  // LEGACY VC MUTATION DISABLED - unified game-wallet approval is authoritative
+            // Prevent stale browser pages from using nontransactional balance overwrites.
+            if (input.action === "decide_vc_request" || input.action === "add_vc") {
+              return respond(res, 410, {
+                ok: false,
+                error: "This action moved to the Samrat Unified Admin Control Room"
+              });
+            }
+          '''
+              legacy = legacy.replace(anchor, block + '\n' + anchor, 1)
+
+          old_number = "    await api('request_vc',{amount});\n    msg('vcRequestMsg','Request sent to admin on Telegram.');"
+          new_number = '''    const result=await api('request_vc',{amount});
+              msg('vcRequestMsg', result.created === false
+                ? 'Existing request '+result.requestId+' is '+result.status+'. Admin review pending if status is PENDING.'
+                : 'Request '+result.requestId+' saved in Appwrite. '+(result.telegramNotified?'Admin notified on Telegram.':'Telegram alert not confirmed; request is visible to admin.'));'''
+          if old_number in number:
+              assert number.count(old_number) == 1
+              number = number.replace(old_number,new_number,1)
+          else:
+              assert new_number in number, 'Number Challenge request message changed unexpectedly'
+
+          old_note = 'Note: Current free-VC requests from the Number Challenge are delivered to Telegram. Those need manual review and allocation via “Add coins”; this page does not auto-approve them.'
+          new_note = 'Number Challenge VC requests are saved in Appwrite and reported to Telegram. Review and approve/reject in VC Requests; approved VC is credited once.'
+          if old_note in dashboard:
+              assert dashboard.count(old_note) == 1
+              dashboard = dashboard.replace(old_note,new_note,1)
+          else:
+              assert new_note in dashboard, 'Admin Control Room copy has changed unexpectedly'
+          dashboard = dashboard.replace('Review existing requests','Review and approve Appwrite VC requests')
+
+          # Verify edits BEFORE writing any files.
+          assert main.count('async function requestVC(') == 1
+          assert main.count('async function adminDecideVCRequest(') == 1
+          assert main.count('"admin_list_vc_requests",') == 1
+          assert main.count('"admin_decide_vc_request",') == 1
+          assert "transact(key, operations)" in main
+          assert 'VC_REQUESTS_TABLE_ID' in main
+          assert 'sendVCTelegram(message)' in main
+          assert 'LEGACY VC MUTATION DISABLED' in legacy
+          assert 'admin_decide_vc_request' in requests_html
+          assert 'vcRequestMsg' in number
+          assert 'VC requests are saved in Appwrite' in dashboard
+
+          backend_path.write_text(main,encoding='utf-8')
+          legacy_path.write_text(legacy,encoding='utf-8')
+          requests_page.write_text(requests_html+'\n',encoding='utf-8')
+          number_page.write_text(number,encoding='utf-8')
+          dashboard_page.write_text(dashboard,encoding='utf-8')
+          print('Unified VC requests installed. Appwrite deployment(s) may still need activation.')
+
+          PY
+      - name: Validate backend JavaScript syntax
+        shell: bash
+        run: |
+          node --check functions/game-wallet/src/main.js
+          node --check functions/vc-approval/src/main.js
+      - name: Validate mobile UI JavaScript syntax
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files=['admin-vc-requests.html','number-draw.html','admin-dashboard.html']
+          for name in files:
+              content=Path(name).read_text(encoding='utf-8')
+              assert content.count('<script>') == 1, f'Unexpected script tags in {name}'
+              source=content.split('<script>',1)[1].split('</script>',1)[0]
+              Path('/tmp/'+name+'.js').write_text(source,encoding='utf-8')
+
+          PY
+          node --check /tmp/admin-vc-requests.html.js
+          node --check /tmp/number-draw.html.js
+          node --check /tmp/admin-dashboard.html.js
+      - name: Commit updated integration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js functions/vc-approval/src/main.js admin-vc-requests.html number-draw.html admin-dashboard.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Unify Appwrite VC requests, Telegram notifications and atomic approvals"
+            git push
+          else
+            echo "Unified VC request integration already installed."
+          fi
