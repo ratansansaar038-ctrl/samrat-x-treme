@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090415">
+<title>Admin Control Room | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+:root{color-scheme:dark;--bg:#080511;--surface:#1b1030;--edge:#65438c;--ink:#f8f1ff;--mute:#c4addc;--gold:#ffdf7e;--mint:#54e8bb;--pink:#f9a1db}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse 800px 500px at 50% -200px,#5b2682,#080511 75%);font-family:system-ui,-apple-system,Arial,sans-serif;color:var(--ink)}
+a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}main{max-width:1120px;margin:0 auto;padding:20px 16px 80px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font:900 27px Georgia,serif;color:var(--gold)}.eyebrow{font-size:11px;letter-spacing:3px;color:#d8b9fa;font-weight:800}.badge{border:1px solid #3bba9b;color:#b5ffe8;background:#15453755;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:800}.intro{margin:30px 0 22px}.intro h1{font-size:clamp(29px,6vw,44px);margin:7px 0;letter-spacing:-1px}.intro p{color:var(--mute);line-height:1.6;margin:0;max-width:680px}
+.panel{border:1px solid var(--edge);background:linear-gradient(145deg,#211334f0,#1b102ee8);box-shadow:0 12px 35px #0005;border-radius:20px;padding:19px;margin:16px 0}.panel h2{font-size:20px;color:var(--gold);margin:0 0 8px}.hint{color:var(--mute);font-size:12px;line-height:1.6;margin:7px 0 13px}#notice{margin-top:16px;white-space:pre-wrap;color:var(--gold)}.error{color:#ffa9bb!important}.success{color:var(--mint)!important}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{background:#0e0a1b;border:1px solid #513675;border-radius:16px;padding:17px}.metric strong{display:block;font-size:29px;color:#ffe17d;margin-top:8px}.metric small{font-size:12px;color:var(--mute)}.metric:nth-child(3) strong{color:var(--mint)}
+.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.action{display:flex;flex-direction:column;gap:7px;justify-content:center;min-height:106px;padding:16px;border:1px solid #785ba7;border-radius:14px;background:#322047;text-decoration:none;font-weight:850}.action:hover,.action:focus-visible{border-color:var(--gold);background:#412757;outline:0}.action span{font-size:13px;font-weight:400;color:#d8c8e7}.action em{font-size:24px;font-style:normal}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}button{border-radius:11px;padding:11px 15px;border:1px solid #b58bd4;background:#3d2860;color:white;font-weight:700}.primary{background:var(--mint);border-color:var(--mint);color:#062a20}input{min-width:0;background:#0b0717;color:white;border:1px solid #8760b3;border-radius:11px;padding:12px;flex:1}input::placeholder{color:#9d88b4}
+.item{background:#120b22;border:1px solid #47335d;border-radius:13px;padding:13px;margin-top:9px}.line{display:flex;justify-content:space-between;gap:12px;align-items:start}.line>*{min-width:0}.name{font-weight:800;overflow-wrap:anywhere}.muted{font-size:12px;color:var(--mute);line-height:1.5;overflow-wrap:anywhere}.coin{color:var(--gold);font-weight:900;white-space:nowrap}.tiny{font-size:11px;letter-spacing:.3px}.state{font-size:11px;color:var(--mint);font-weight:750}.state.used{color:var(--pink)}.blank{color:var(--mute);padding:14px 0}.section-grid{display:grid;grid-template-columns:1fr;gap:0}
+[hidden]{display:none!important}footer{margin-top:25px;text-align:center;font-size:12px;color:var(--mute)}
+@media(min-width:680px){.metrics{grid-template-columns:repeat(4,1fr)}.actions{grid-template-columns:repeat(3,1fr)}.section-grid{grid-template-columns:1fr 1fr;gap:16px}.section-grid .panel{margin-top:0}.panel{padding:23px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div><div class="brand">SAMRAT X-TREME</div><div class="eyebrow">ADMIN CONTROL ROOM</div></div><span id="authBadge" class="badge">VERIFYING ADMIN</span></header>
+<section class="intro"><h1>Everything in one place.</h1><p>Manage virtual coins, review players and vouchers, and monitor recent game activity. Admin access only. No cash value or withdrawal.</p></section>
+<div id="notice" role="status" aria-live="polite">Checking admin session…</div>
+<section id="dashboard" hidden>
+<section class="metrics" aria-label="System statistics">
+<div class="metric"><small>Registered players</small><strong id="mPlayers">—</strong></div>
+<div class="metric"><small>Total vouchers</small><strong id="mVouchers">—</strong></div>
+<div class="metric"><small>Unused vouchers</small><strong id="mUnused">—</strong></div>
+<div class="metric"><small>Redeemed vouchers</small><strong id="mUsed">—</strong></div>
+</section>
+<section class="panel"><div class="line"><div><h2>Admin actions</h2><p class="hint">Existing tested tools, linked together here.</p></div><button class="primary" id="refresh">↻ Refresh</button></div>
+<div class="actions">
+<a class="action" href="admin-vouchers.html"><em>🎟️</em> Generate vouchers <span>20, 50, 100, 200 VC • CSV</span></a>
+<a class="action" href="admin-add-vc.html"><em>🪙</em> Add coins <span>Manual player wallet credit</span></a>
+<a class="action" href="admin-vc-requests.html"><em>📩</em> VC requests <span>Review existing requests</span></a>
+<a class="action" href="admin-rewards.html"><em>🏆</em> Reward claims <span>Review approvals</span></a>
+<a class="action" href="number-draw.html"><em>🎯</em> Number Challenge <span>20-minute live rounds</span></a>
+<a class="action" href="player-profile.html"><em>⚡</em> Leaderboards <span>Speed Tap and Memory X</span></a>
+</div><p class="hint">Note: Current free-VC requests from the Number Challenge are delivered to Telegram. Those need manual review and allocation via “Add coins”; this page does not auto-approve them.</p>
+</section>
+<div class="section-grid">
+<section class="panel"><h2>Players & wallets</h2><p class="hint">Recently registered players, up to 40. Search an exact Player User ID to find others.</p>
+<form id="searchForm" class="toolbar"><input id="playerId" maxlength="36" placeholder="Search exact Player User ID" aria-label="Player User ID"><button type="submit">Find</button><button type="button" id="clearSearch">Clear</button></form>
+<div id="searchStatus" class="hint" aria-live="polite"></div><div id="players"></div></section>
+<section class="panel"><h2>Voucher history</h2><p class="hint">Latest 60 vouchers. Used and unused status. Never share these codes publicly.</p>
+<div id="vouchers"></div></section>
+<section class="panel"><h2>Recent Number Draws</h2><p class="hint">Latest 8 recorded rounds. The result comes from stored game data.</p><div id="rounds"></div></section>
+<section class="panel"><h2>Mini Game activity</h2><p class="hint">Latest 8 recorded scores, subject to backend verification.</p><div id="games"></div></section>
+</div>
+</section>
+<footer><a href="index.html">← Samrat X-Treme homepage</a> · Admin dashboard v1</footer>
+</main>
+<script>
+'use strict';
+const PROJECT='6a7f2add0011a7bfc21a', FUNCTION_ID='6ae1bcc500208a5a7efb';
+const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject(PROJECT);
+const account=new Appwrite.Account(client), functions=new Appwrite.Functions(client);
+const el=id=>document.getElementById(id);
+let verified=false;
+const text=(id,value)=>el(id).textContent=String(value??'—');
+const message=(s,error=false)=>{const n=el('notice');n.textContent=s;n.className=error?'error':'success';};
+function node(tag,content,cls){const e=document.createElement(tag);if(content!=null)e.textContent=String(content);if(cls)e.className=cls;return e;}
+function fmt(n){return typeof n==='number'?n.toLocaleString('en-IN'):'—';}
+function date(s){if(!s)return '—';const d=new Date(s);return Number.isFinite(+d)?d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';}
+async function api(action,body={}){
+ const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...body}),async:false});
+ let d;try{d=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid function response');}
+ if(r.status!=='completed'||r.responseStatusCode!==200||!d.ok)throw Error(d.error||'Request failed. Check function deployment.');
+ return d;
+}
+function item(parent,heading,meta,right,rightStyle){const box=node('div',null,'item'),line=node('div',null,'line'),left=node('div');left.append(node('div',heading,'name'),node('div',meta,'muted'));line.append(left,node('div',right,rightStyle||'coin'));box.append(line);parent.append(box);}
+function renderPlayers(items){const dst=el('players');dst.replaceChildren();if(!items?.length){dst.append(node('p','No player records in this selection.','blank'));return;}
+ for(const p of items){item(dst,p.name||('Player '+String(p.userId).slice(0,7)),(p.email||'No email')+'\nID: '+p.userId+' · W '+(p.wins??0)+' / L '+(p.losses??0),fmt(p.wallet)+' VC');}}
+function renderVouchers(items){const dst=el('vouchers');dst.replaceChildren();if(!items?.length){dst.append(node('p','No vouchers found.','blank'));return;}
+ for(const v of items){const used=Boolean(v.isRedeemed);item(dst,v.code,(used?'REDEEMED':'UNUSED')+' · Created '+date(v.createdAt)+(used&&v.redeemedBy?'\nUser: '+v.redeemedBy:''),fmt(v.coins)+' VC',used?'state used':'state');}}
+function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!items?.length){dst.append(node('p','No rounds found.','blank'));return;}
+ for(const r of items){item(dst,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');}}
+function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
+ for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
+async function refresh(){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
+ try{const d=await api('admin_dashboard');text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
+ renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);const partial=d.warnings?.length?' Some sections unavailable: '+d.warnings.join(', '):'';message('Dashboard updated. '+date(new Date().toISOString())+partial);}
+ catch(e){message('Dashboard unavailable: '+e.message,true);}finally{el('refresh').disabled=false;}}
+el('refresh').addEventListener('click',refresh);
+el('searchForm').addEventListener('submit',async e=>{e.preventDefault();if(!verified)return;const userId=el('playerId').value.trim();if(!/^[a-zA-Z0-9._-]{1,36}$/.test(userId)){text('searchStatus','Enter a valid exact Player ID.');return;}
+ text('searchStatus','Looking up player…');try{const d=await api('admin_find_player',{userId});renderPlayers(d.players);text('searchStatus',d.players?.length?'Player found. Clear to restore recent list.':'No matching player.');}catch(err){text('searchStatus','Lookup failed: '+err.message);}});
+el('clearSearch').addEventListener('click',()=>{el('playerId').value='';text('searchStatus','');refresh();});
+(async()=>{try{await account.get();const r=await api('get_wallet');if(r.isAdmin!==true)throw Error('You are not an authorized administrator.');verified=true;el('dashboard').hidden=false;text('authBadge','ADMIN VERIFIED');await refresh();}catch(e){text('authBadge','ACCESS RESTRICTED');message('Admin login required: '+e.message+' · Sign in via the homepage, then reopen this page.',true);}})();
+</script>
+</body>
+</html>

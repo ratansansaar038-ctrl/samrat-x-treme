@@ -367,6 +367,90 @@ async function unusedVouchers(user,key){
     .map(x=>({code:x.code,coins:x.coins})),limit:100};
 }
 
+// SAMRAT ADMIN DASHBOARD V1 - server-only access, no direct client table privileges.
+const dashboardIsAdmin = user => typeof user === 'string' &&
+  (process.env.ADMIN_USER_IDS || '').split(',')
+    .map(value => value.trim()).filter(Boolean).includes(user);
+
+async function adminSnapshot(table, queries, key) {
+  const data = await request('GET', tablePath(table, queries), key);
+  return {
+    total: Number.isSafeInteger(data.total) ? data.total : null,
+    rows: Array.isArray(data.rows) ? data.rows : []
+  };
+}
+
+async function adminDashboard(user, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: 'Admin access denied' };
+
+  const items = [
+    ['players', 'user_profiles', [order('$createdAt', 'desc'), lim(40)]],
+    ['vouchers', 'vouchers', [order('$createdAt', 'desc'), lim(60)]],
+    ['unused', 'vouchers', [eq('isRedeemed', false), lim(1)]],
+    ['redeemed', 'vouchers', [eq('isRedeemed', true), lim(1)]],
+    ['rounds', 'game_rounds', [order('$createdAt', 'desc'), lim(8)]],
+    ['games', 'game_scores', [order('$createdAt', 'desc'), lim(8)]]
+  ];
+  const results = await Promise.allSettled(items.map(
+    async ([name, table, query]) => [name, await adminSnapshot(table, query, key)]
+  ));
+  const data = {};
+  const warnings = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'fulfilled') {
+      const [name, value] = result.value;
+      data[name] = value;
+    } else {
+      warnings.push(items[i][0]);
+    }
+  }
+
+  return {
+    ok: true,
+    stats: {
+      players: data.players?.total ?? null,
+      vouchers: data.vouchers?.total ?? null,
+      unused: data.unused?.total ?? null,
+      redeemed: data.redeemed?.total ?? null
+    },
+    players: (data.players?.rows || []).map(x => ({
+      userId: x.userId, name: x.name, email: x.email, wallet: x.wallet,
+      wins: x.wins, losses: x.losses, rounds: x.rounds
+    })),
+    vouchers: (data.vouchers?.rows || []).map(x => ({
+      code: x.code, coins: x.coins, isRedeemed: x.isRedeemed,
+      redeemedBy: x.redeemedBy, createdAt: x.$createdAt
+    })),
+    rounds: (data.rounds?.rows || []).map(x => ({
+      roundId: x.roundId, status: x.status, winningNumber: x.winningNumber,
+      endsAt: x.endsAt
+    })),
+    games: (data.games?.rows || []).map(x => ({
+      userId: x.userId, gameId: x.gameId, score: x.score,
+      playedAt: x.playedAt || x.$createdAt, verified: x.verified
+    })),
+    warnings
+  };
+}
+
+async function adminFindPlayer(user, b, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: 'Admin access denied' };
+  const target = typeof b.userId === 'string' ? b.userId.trim() : '';
+  if (!/^[a-zA-Z0-9._-]{1,36}$/.test(target))
+    return { ok: false, error: 'Invalid Player ID' };
+  const matching = await rows('user_profiles', [eq('userId', target), lim(2)], key);
+  return {
+    ok: true,
+    players: matching.map(x => ({
+      userId: x.userId, name: x.name, email: x.email, wallet: x.wallet,
+      wins: x.wins, losses: x.losses, rounds: x.rounds
+    }))
+  };
+}
+
 async function grantCoins(admin, b, key) {
   const allowed = (process.env.ADMIN_USER_IDS || "")
     .split(",").map(x => x.trim()).filter(Boolean);
@@ -845,6 +929,8 @@ export default async ({ req, res, error }) => {
     "request_vc",
     "redeem_voucher",
     "generate_vouchers",
+    "admin_dashboard",
+    "admin_find_player",
     "unused_vouchers",
     "my_entries",
     "my_history",
@@ -985,6 +1071,14 @@ export default async ({ req, res, error }) => {
       }
     }
 
+if (action === "admin_dashboard") {
+  const d = await adminDashboard(user, key);
+  return send(res, d.ok ? 200 : 403, d);
+}
+if (action === "admin_find_player") {
+  const d = await adminFindPlayer(user, b, key);
+  return send(res, d.ok ? 200 : 403, d);
+}
 if (action === "generate_vouchers") {
     const x=await makeVouchers(user,b,key);
     return send(res,x.ok?200:403,x);
