@@ -303,7 +303,7 @@ async function redeemVoucher(user, b, key) {
     return { ok: false, error: "Voucher configuration invalid" };
 
   const player = await profile(user, key);
-  const now = new Date().toISOString();
+  // Redemption timestamp is in voucher_redemptions.$createdAt
 
   try {
     await transact(key, [
@@ -311,12 +311,10 @@ async function redeemVoucher(user, b, key) {
         code,
         userId: user,
         coins: voucher.coins,
-        redeemedAt: now
       }),
       op("update", "vouchers", voucher.$id, {
         isRedeemed: true,
         redeemedBy: user,
-        redeemedAt: now
       }),
       op("increment", "user_profiles", player.$id, {
         column: "wallet",
