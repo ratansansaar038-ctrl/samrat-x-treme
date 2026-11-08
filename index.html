@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -171,7 +170,7 @@
     </div>
 
     <p style="text-align:center;margin:12px"><a href="forgot-password.html" style="color:#ffe16a">Forgot Password?</a></p>
-<div class="status" id="authMsg"></div>
+    <div class="status" id="authMsg"></div>
   </section>
 
   <section class="panel hide" id="signedPanel">
@@ -187,68 +186,86 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
-  
-<section class="panel" id="permanentApkDownload"
-         style="text-align:center">
-  <h3>📱 DOWNLOAD ANDROID APP</h3>
-  <a class="btn" href="https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk">
-    ⬇ DOWNLOAD APK
-  </a>
-  <p class="small">
-    Official Samrat X-Treme Android App
-  </p>
-</section>
+  <!-- 🪙 VIRTUAL COINS STORE & VOUCHER REDEEM PANEL -->
+  <section class="panel" style="text-align:center; border: 1px solid #ffd15c;">
+    <h3 style="color:#ffe080; margin-bottom:4px;">🪙 GET VIRTUAL COINS</h3>
+    <p class="small" style="margin-top:0;">
+      Instant Game Tokens • <strong>500 VC for ₹50</strong>
+    </p>
 
-<section class="skill-grid">
+    <a class="btn" href="https://imojo.in/9xpzaQ" target="_blank" style="background: linear-gradient(100deg, #00e676, #00b0ff); color:#081c15;">
+      💳 BUY 500 VC (₹50) VIA UPI
+    </a>
 
-  <a class="skill-card speed" href="speed-tap.html">
-    <span class="skill-icon">⚡</span>
-    <div>
-      <small>● LIVE GAME</small>
-      <h2>SPEED TAP ARENA</h2>
-      <p>Reflex & Speed Challenge</p>
-      <strong>PLAY NOW →</strong>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #643d8c;">
+      <p class="small" style="margin-bottom:6px;">Payment ke baad mila Voucher Code yahan daalein:</p>
+      <input id="voucherCode" placeholder="Enter Voucher Code (e.g. MOJO...)" style="text-align:center; text-transform:uppercase;">
+      <button class="btn secondary" id="redeemBtn" style="margin-top:4px;">REDEEM VOUCHER</button>
+      <div class="status" id="voucherMsg"></div>
     </div>
-  </a>
+  </section>
 
-  <a class="skill-card memory" href="memory-x.html">
-    <span class="skill-icon">🧠</span>
-    <div>
-      <small>● LIVE GAME</small>
-      <h2>MEMORY X</h2>
-      <p>24 Cards · 12 Pairs</p>
-      <strong>PLAY NOW →</strong>
-    </div>
-  </a>
+  <section class="panel" id="permanentApkDownload" style="text-align:center">
+    <h3>📱 DOWNLOAD ANDROID APP</h3>
+    <a class="btn" href="https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk">
+      ⬇ DOWNLOAD APK
+    </a>
+    <p class="small">
+      Official Samrat X-Treme Android App
+    </p>
+  </section>
 
-  <a class="skill-card math" href="math-challenge.html">
-    <span class="skill-icon">🔢</span>
-    <div>
-      <small>● NEW SKILL GAME</small>
-      <h2>MATH CHALLENGE</h2>
-      <p>Quick Calculation & Logic</p>
-      <strong>PLAY NOW →</strong>
-    </div>
-  </a>
+  <section class="skill-grid">
 
-</section>
-<nav class="links">
+    <a class="skill-card speed" href="speed-tap.html">
+      <span class="skill-icon">⚡</span>
+      <div>
+        <small>● LIVE GAME</small>
+        <h2>SPEED TAP ARENA</h2>
+        <p>Reflex & Speed Challenge</p>
+        <strong>PLAY NOW →</strong>
+      </div>
+    </a>
+
+    <a class="skill-card memory" href="memory-x.html">
+      <span class="skill-icon">🧠</span>
+      <div>
+        <small>● LIVE GAME</small>
+        <h2>MEMORY X</h2>
+        <p>24 Cards · 12 Pairs</p>
+        <strong>PLAY NOW →</strong>
+      </div>
+    </a>
+
+    <a class="skill-card math" href="math-challenge.html">
+      <span class="skill-icon">🔢</span>
+      <div>
+        <small>● NEW SKILL GAME</small>
+        <h2>MATH CHALLENGE</h2>
+        <p>Quick Calculation & Logic</p>
+        <strong>PLAY NOW →</strong>
+      </div>
+    </a>
+
+  </section>
+
+  <nav class="links">
     <a href="index.html">Home</a>
     <a href="player-profile.html">My Profile</a>
     <a href="referral.html">Referral</a>
     <a href="reward.html">Rewards</a>
   </nav>
 
-  
-<div class="policy-links" style="
-  display:flex;justify-content:center;
-  gap:12px;flex-wrap:wrap;margin:16px 0;
-  font-size:12px">
-  <a href="terms.html">Terms & Conditions</a>
-  <a href="privacy.html">Privacy Policy</a>
-  <a href="fair-play.html">Fair Play Policy</a>
-</div>
-<footer class="small" style="text-align:center;margin-top:22px">
+  <div class="policy-links" style="
+    display:flex;justify-content:center;
+    gap:12px;flex-wrap:wrap;margin:16px 0;
+    font-size:12px">
+    <a href="terms.html">Terms & Conditions</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="fair-play.html">Fair Play Policy</a>
+  </div>
+
+  <footer class="small" style="text-align:center;margin-top:22px">
     Entertainment only • Virtual coins have no monetary value
   </footer>
 
@@ -363,6 +380,23 @@ $('logout').onclick = async () => {
     await refreshUser();
   } catch (error) {
     msg('signedMsg', error.message);
+  }
+};
+
+// Voucher Redeem Handler
+$('redeemBtn').onclick = async () => {
+  const code = $('voucherCode').value.trim();
+  if (!code) {
+    msg('voucherMsg', 'Please enter a valid voucher code.');
+    return;
+  }
+  msg('voucherMsg', 'Verifying voucher...');
+  try {
+    await api('redeem_voucher', { code });
+    msg('voucherMsg', 'Success! 500 VC added to your balance.');
+    $('voucherCode').value = '';
+  } catch (err) {
+    msg('voucherMsg', err.message || 'Invalid or already used voucher.');
   }
 };
 
