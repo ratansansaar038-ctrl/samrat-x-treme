@@ -1,0 +1,247 @@
+name: Install Samrat Voucher Redemption
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-voucher-install
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the existing project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Add voucher redemption without changing existing games
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          backend_path = Path('functions/game-wallet/src/main.js')
+          frontend_path = Path('number-draw.html')
+          if not backend_path.is_file() or not frontend_path.is_file():
+              raise SystemExit('Expected game-wallet or number-draw.html file not found. No changes made.')
+
+          backend = backend_path.read_text(encoding='utf-8')
+          frontend = frontend_path.read_text(encoding='utf-8')
+
+          # Fail before any writes if this is an incompatible version of the project.
+          backend_markers = [
+              'async function grantCoins(admin, b, key) {',
+              '    "request_vc",',
+              'if (action === "grant_coins") {',
+              'async function profile(user, key)',
+              'async function transact(key, operations)',
+          ]
+          for marker in backend_markers:
+              if marker not in backend:
+                  raise SystemExit('Backend has changed; missing: ' + marker)
+          if '<section class="panel hide" id="playerPanel">' not in frontend:
+              raise SystemExit('Player panel marker missing. No changes made.')
+          if 'async function refreshWallet()' not in frontend or 'async function api(action,extra={})' not in frontend:
+              raise SystemExit('Expected wallet/API functions missing. No changes made.')
+
+          # Server-only checks + all three writes in ONE atomic Appwrite transaction.
+          # The ledger row's ID is the same as the voucher row ID. That makes
+          # double redemption impossible even with concurrent requests.
+          redeem_backend = r'''
+          async function redeemVoucher(user, b, key) {
+            const code = typeof b.code === "string"
+              ? b.code.trim().toUpperCase() : "";
+
+            if (!/^[A-Z0-9-]{8,64}$/.test(code))
+              return { ok: false, error: "Enter a valid voucher code" };
+
+            const found = await rows("vouchers", [
+              eq("code", code), lim(2)
+            ], key);
+
+            if (found.length !== 1)
+              return { ok: false, error: "Invalid or unavailable voucher" };
+
+            const voucher = found[0];
+            if (voucher.isRedeemed !== false)
+              return { ok: false, error: "Voucher already used or unavailable" };
+
+            if (!Number.isSafeInteger(voucher.coins) ||
+                voucher.coins < 1 || voucher.coins > 100000)
+              return { ok: false, error: "Voucher configuration invalid" };
+
+            const player = await profile(user, key);
+            const now = new Date().toISOString();
+
+            try {
+              await transact(key, [
+                op("create", "voucher_redemptions", voucher.$id, {
+                  code,
+                  userId: user,
+                  coins: voucher.coins,
+                  redeemedAt: now
+                }),
+                op("update", "vouchers", voucher.$id, {
+                  isRedeemed: true,
+                  redeemedBy: user,
+                  redeemedAt: now
+                }),
+                op("increment", "user_profiles", player.$id, {
+                  column: "wallet",
+                  value: voucher.coins,
+                  max: 900000000
+                })
+              ]);
+            } catch (e) {
+              if (e.status === 409)
+                return { ok: false, error: "Voucher already redeemed or wallet busy; please retry" };
+              throw e;
+            }
+
+            return {
+              ok: true,
+              message: "Virtual coins credited",
+              coinsAdded: voucher.coins
+            };
+          }
+
+          '''
+          if 'async function redeemVoucher(' not in backend:
+              backend = backend.replace('async function grantCoins(admin, b, key) {',
+                                        redeem_backend + 'async function grantCoins(admin, b, key) {', 1)
+          if '    "redeem_voucher",' not in backend:
+              backend = backend.replace('    "request_vc",',
+                                        '    "request_vc",\n    "redeem_voucher",', 1)
+          if 'if (action === "redeem_voucher")' not in backend:
+              redeem_handler = '''if (action === "redeem_voucher") {
+                const result = await redeemVoucher(user, b, key);
+                return send(res, result.ok ? 200 : 400, result);
+              }
+
+              '''
+              backend = backend.replace('if (action === "grant_coins") {',
+                                        redeem_handler + 'if (action === "grant_coins") {', 1)
+
+          # Only replace the visible manual Player ID block; preserve the
+          # existing unlimited Request Free VC / Telegram workflow unchanged.
+          old_manual = ('<p class="small">Need coins? Share your Player ID with admin. '
+                        'Coins are virtual and cannot be purchased or withdrawn.</p>'
+                        '<div class="row"><input id="myId" readonly aria-label="Player ID">'
+                        '<button class="btn secondary" style="max-width:105px" id="copyId">COPY ID</button></div>')
+          voucher_card = '''
+          <section class="panel" id="redeemVoucherPanel"
+                   style="margin:14px 0;background:linear-gradient(135deg,#111827,#1b2540);border-color:#365e65">
+            <h3>🎟️ Redeem In-Game Coins</h3>
+            <p class="small">Use a one-time arcade voucher to credit virtual coins.</p>
+            <form id="voucherRedeemForm" autocomplete="off">
+              <div class="row" style="align-items:center;gap:8px">
+                <input id="voucherCode" type="text" maxlength="64" required
+                       placeholder="Enter Voucher Code" aria-label="Enter Voucher Code"
+                       style="flex:1;min-width:0;text-transform:uppercase">
+                <button type="submit" id="voucherRedeemButton" class="btn"
+                        style="flex:0 0 100px;width:100px;background:#22c55e;color:#052e16;margin:7px 0">
+                  Redeem
+                </button>
+              </div>
+            </form>
+            <div id="voucherRedeemMessage" class="status" role="status" aria-live="polite"></div>
+            <p class="small">Need Coins?
+              <a href="#" id="buyArcadeVoucher" style="color:#86efac;text-decoration:underline">
+                Buy Arcade Voucher (Instant Delivery)
+              </a>
+            </p>
+            <p class="small">Coins are strictly virtual tokens with no cash value.
+              Non-withdrawable and for in-game entertainment only.</p>
+          </section>
+          '''
+          if 'id="redeemVoucherPanel"' not in frontend:
+              if old_manual not in frontend:
+                  raise SystemExit('Expected manual Player ID box not found. No changes made.')
+              frontend = frontend.replace(old_manual, voucher_card, 1)
+              frontend = frontend.replace("$('myId').value=user.$id;", '', 1)
+              start = frontend.find("$('copyId').onclick=async()=>")
+              finish = frontend.find("$('submitEntry').onclick=", start)
+              if start == -1 or finish == -1:
+                  raise SystemExit('Player ID copy handler not found. No changes made.')
+              frontend = frontend[:start] + frontend[finish:]
+
+          # The store does not have a supplied approved checkout URL yet.
+          # Show an explanatory message, rather than sending users to a fake link.
+          voucher_js = r'''
+          $('voucherRedeemForm').addEventListener('submit', async event => {
+            event.preventDefault();
+            const button = $('voucherRedeemButton');
+            const code = $('voucherCode').value.trim().toUpperCase();
+            if (!user) {
+              msg('voucherRedeemMessage', 'Please sign in first.');
+              return;
+            }
+            if (!/^[A-Z0-9-]{8,64}$/.test(code)) {
+              msg('voucherRedeemMessage', 'Please enter a valid voucher code.');
+              return;
+            }
+            button.disabled = true;
+            msg('voucherRedeemMessage', 'Verifying voucher...');
+            try {
+              const result = await api('redeem_voucher', { code });
+              msg('voucherRedeemMessage',
+                  '✅ ' + result.coinsAdded + ' VC added to your wallet!');
+              $('voucherCode').value = '';
+              await refreshWallet();
+            } catch (e) {
+              msg('voucherRedeemMessage', '❌ ' + e.message);
+            } finally {
+              button.disabled = false;
+            }
+          });
+          $('buyArcadeVoucher').addEventListener('click', event => {
+            event.preventDefault();
+            msg('voucherRedeemMessage',
+                'Voucher store link will be added after checkout setup.');
+          });
+          '''
+          if "$('voucherRedeemForm').addEventListener" not in frontend:
+              marker = "$('grant').onclick=async()=>"
+              if marker not in frontend:
+                  raise SystemExit('Admin handler marker missing. No changes made.')
+              frontend = frontend.replace(marker, voucher_js + marker, 1)
+
+          frontend = frontend.replace(
+              'FREE VIRTUAL COIN GAMES • NO PURCHASE • NO CASH VALUE',
+              'VIRTUAL COINS • NO CASH VALUE • NON-WITHDRAWABLE')
+
+          # Final sanity checks before any file is written.
+          assert 'async function redeemVoucher(' in backend
+          assert '"redeem_voucher"' in backend
+          assert 'id="redeemVoucherPanel"' in frontend
+          assert 'id="requestVCBtn"' in frontend  # Preserve free VC requests
+          assert 'id="grant"' in frontend         # Preserve admin wallet
+          assert 'Need coins? Share your Player ID with admin.' not in frontend
+          assert "$('copyId').onclick" not in frontend
+          backend_path.write_text(backend, encoding='utf-8')
+          frontend_path.write_text(frontend, encoding='utf-8')
+          print('Voucher backend and frontend safely patched.')
+          PY
+
+      - name: Validate backend JavaScript
+        run: |
+          node --check functions/game-wallet/src/main.js
+          test -f number-draw.html
+
+      - name: Commit the updates to main
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html
+          if git diff --cached --quiet; then
+            echo "No changes necessary; voucher integration already installed."
+          else
+            git commit -m "Add one-time Appwrite voucher redemption and arcade UI"
+            git push
+          fi
