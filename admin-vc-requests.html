@@ -1,1 +1,93 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VC Requests | Samrat X-Treme Admin</title><script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script><style>*{box-sizing:border-box}body{margin:0;padding:16px;background:radial-gradient(circle at top,#431267,#08010f 70%);color:white;font:14px Arial}.wrap{max-width:850px;margin:auto}.card{background:#1e112e;border:1px solid #65439b;border-radius:16px;padding:18px;margin:12px 0}h1{color:#ffe16a}a{color:#ffe16a}.muted{color:#b7a8c7}.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #423050}.row span:last-child{word-break:break-all;text-align:right}.buttons{display:flex;gap:10px;margin-top:14px}button{padding:12px 16px;border:0;border-radius:10px;font-weight:bold;cursor:pointer}button:disabled{opacity:.5}.approve{background:#68efb2}.reject{background:#ff8d9d}.refresh{background:#ffe16a}.status{margin:12px 0;color:#ffe16a;white-space:pre-wrap}</style></head><body><main class="wrap"><h1>SAMRAT X-TREME</h1><p class="muted">ADMIN • VC REQUESTS</p><p><a href="admin-add-vc.html">Manual Add VC</a> · <a href="admin-rewards.html">Reward Admin</a> · <a href="index.html">Home</a></p><button class="refresh" id="refresh" disabled>REFRESH REQUESTS</button><div class="status" id="status">Checking admin...</div><div id="requests"></div></main><script>'use strict';const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a'),account=new Appwrite.Account(client),functions=new Appwrite.Functions(client),FUNCTION_ID='6adf3c3a003718eab6c2',ADMIN_USER_ID='6a8031600025646ad144';const $=id=>document.getElementById(id);let admin=false;async function run(action,extra={}){const x=await functions.createExecution(FUNCTION_ID,JSON.stringify({action,...extra}),false,'/','POST');let r={};try{r=JSON.parse(x.responseBody||'{}')}catch{}if(x.status!=='completed'||x.responseStatusCode!==200||!r.ok)throw Error(r.error||x.errors||'Request failed');return r;}function node(tag,text,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}async function load(){if(!admin)return;$('refresh').disabled=true;$('status').textContent='Loading requests...';$('requests').replaceChildren();try{const r=await run('list_vc_requests');const items=r.requests||[];$('status').textContent=items.length+' requests ('+items.filter(x=>x.status==='pending').length+' pending)';if(!items.length)$('requests').append(node('p','No requests yet.','muted'));for(const item of items){const card=node('section','', 'card');for(const [k,v] of [['Request',item.requestId||item.id||'MISSING'],['Player ID',item.userId],['Amount',Number(item.amount).toLocaleString('en-IN')+' VC'],['Status',item.status],['Created',item.createdAt?new Date(item.createdAt).toLocaleString('en-IN'):'-']]){const row=node('div','','row');row.append(node('span',k),node('span',v));card.append(row);}if(item.status==='pending'){const buttons=node('div','','buttons');for(const decision of ['approved','rejected']){const btn=node('button',decision==='approved'?'APPROVE':'REJECT',decision==='approved'?'approve':'reject');btn.onclick=async()=>{if(!(item.requestId||item.id)){ $('status').textContent='Missing request ID — approval blocked.';return;}if(!confirm((decision==='approved'?'Credit ':'Reject ')+item.amount+' VC request for '+item.userId+'?'))return;buttons.querySelectorAll('button').forEach(b=>b.disabled=true);$('status').textContent='Processing request...';try{const result=await run('decide_vc_request',{requestId:(item.requestId||item.id),decision});$('status').textContent='Request '+result.status+(result.balance!==undefined?'. Wallet: '+result.balance+' VC':'');await load();}catch(e){$('status').textContent='ERROR: '+e.message+' — do not repeat if request is processing.';buttons.querySelectorAll('button').forEach(b=>b.disabled=false);}};buttons.append(btn);}card.append(buttons);}if(item.status==='processing')card.append(node('p','Processing: check wallet and function logs. Never credit twice.','muted'));$('requests').append(card);}}catch(e){$('status').textContent='Cannot load requests: '+e.message;}finally{$('refresh').disabled=false;}}$('refresh').onclick=load;(async()=>{try{const user=await account.get();if(user.$id!==ADMIN_USER_ID){$('status').textContent='Access denied.';return;}admin=true;await load();}catch(e){$('status').textContent='Admin login required.';}})();</script></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0615"><title>Unified VC Requests | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+:root{color-scheme:dark;--gold:#ffe080;--green:#58e9b7;--mute:#c8b5db;--edge:#68498c}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#48206b,#080512 75%);font:15px system-ui,Arial;color:#f7efff}
+main{max-width:840px;margin:auto;padding:24px 16px 70px}h1{font:900 32px Georgia,serif;color:var(--gold);margin:24px 0 3px}h2{font-size:19px;color:var(--gold);margin:0 0 10px}a{color:var(--gold)}
+.top{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}.badge{color:var(--green);border:1px solid #36c497;border-radius:30px;padding:8px 12px;font-size:12px;font-weight:800}
+.box{border:1px solid var(--edge);border-radius:18px;background:#221432;padding:18px;margin:16px 0}.sub{color:var(--mute);font-size:13px;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.stat{padding:12px;border:1px solid #55416d;border-radius:12px;background:#110a1d}.stat strong{display:block;color:var(--gold);font-size:26px}.stat small{color:var(--mute);font-size:11px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tools>*{flex:1}button,select{padding:12px;border:1px solid #8867a7;border-radius:11px;background:#3b2855;color:#fff;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}button.approve{background:#38dda3;color:#07291e;border-color:#38dda3;font-weight:800}button.reject{background:#713451;color:#fff;border-color:#b46b81;font-weight:700}
+.req{padding:15px;border-radius:13px;background:#120c20;border:1px solid #5b4273;margin:12px 0;overflow-wrap:anywhere}.line{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.coins{color:var(--gold);font-weight:850}.status{font-size:11px;letter-spacing:.6px;color:#86f7c5;font-weight:850}.status.done{color:#f4b3d1}.name{font-weight:750}.small{font-size:12px;color:var(--mute);line-height:1.6;margin-top:5px}.buttons{display:flex;gap:10px;margin-top:12px}.buttons button{flex:1}
+#msg{min-height:25px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--gold)}[hidden]{display:none!important}
+</style></head><body><main>
+<div class="top"><a href="admin-dashboard.html">← Admin Control Room</a><span id="badge" class="badge">VERIFYING</span></div>
+<h1>VC Requests</h1>
+<p class="sub">One Appwrite queue · Telegram alerts · Admin-only approval · Virtual coins have no cash value.</p>
+<div id="msg" role="status" aria-live="polite">Checking admin login…</div>
+<section id="main" hidden>
+<div class="stats" aria-label="Request counts">
+<div class="stat"><small>Recent requests</small><strong id="total">—</strong></div>
+<div class="stat"><small>Pending</small><strong id="pending">—</strong></div>
+<div class="stat"><small>Completed</small><strong id="completed">—</strong></div>
+</div>
+<section class="box">
+<div class="tools"><button id="refresh">↻ Refresh Requests</button><select id="filter" aria-label="Request status filter">
+<option value="all">All statuses</option><option value="pending">Pending</option>
+<option value="approved">Approved</option><option value="rejected">Rejected</option>
+<option value="processing">Legacy processing</option></select></div>
+<p class="sub">Latest 100 requests are shown. Telegram is a notification channel, not an approval button. All decisions are made here.</p>
+<div id="list"></div>
+</section>
+</section>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
+const account=new Appwrite.Account(client),fn=new Appwrite.Functions(client);
+const FUNCTION_ID='6ae1bcc500208a5a7efb';
+let admin=false,busy=false,requests=[];
+function notice(s,good=false){$('msg').textContent=s;$('msg').style.color=good?'#58e9b7':'#ffe080'}
+function node(tag,content,cls){const e=document.createElement(tag);if(content!=null)e.textContent=String(content);if(cls)e.className=cls;return e}
+function date(value){const d=new Date(value||0);return Number.isFinite(+d)?d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}
+async function api(action,body={}){
+ const r=await fn.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...body}),async:false});
+ let x;try{x=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid backend response')}
+ if(r.status!=='completed'||r.responseStatusCode!==200||x.ok!==true)throw Error(x.error||'Appwrite Function error');
+ return x;
+}
+function render(){
+ $('list').replaceChildren();
+ $('total').textContent=String(requests.length);$('pending').textContent=String(requests.filter(x=>x.status==='pending').length);
+ $('completed').textContent=String(requests.filter(x=>x.status==='approved'||x.status==='rejected').length);
+ const filtered=requests.filter(x=>$('filter').value==='all'||x.status===$('filter').value);
+ if(!filtered.length){$('list').append(node('p','No requests in this view.','sub'));return}
+ for(const r of filtered){
+  const box=node('div',null,'req');const line=node('div',null,'line');
+  line.append(node('div',r.userId||'Unknown player','name'),node('div',r.amount+' VC','coins'));
+  box.append(line,node('div','Request ID: '+r.requestId,'small'),node('div','Created: '+date(r.createdAt),'small'));
+  box.append(node('div',String(r.status||'unknown').toUpperCase(),'status'+(r.status==='pending'?'':' done')));
+  if(r.status==='pending'){
+   const buttons=node('div',null,'buttons');
+   for(const decision of ['approved','rejected']){
+    const btn=node('button',decision==='approved'?'APPROVE':'REJECT',decision==='approved'?'approve':'reject');
+    btn.disabled=busy;btn.onclick=()=>decide(r,decision);buttons.append(btn);
+   }
+   box.append(buttons);
+  }
+  if(r.status==='processing')box.append(node('p','Legacy processing: inspect original logs and wallet before making any changes.','sub'));
+  $('list').append(box);
+ }
+}
+async function load(){if(!admin||busy)return;busy=true;$('refresh').disabled=true;notice('Loading recent requests…');
+ try{const d=await api('admin_list_vc_requests');requests=d.requests||[];render();notice('Requests loaded. '+requests.length+' recent records. '+(d.pending||0)+' pending.',true)}
+ catch(e){notice('Unable to load requests: '+e.message+'. If table missing, set VC_REQUESTS_TABLE_ID for game-wallet.');}
+ finally{busy=false;$('refresh').disabled=false;render()}}
+async function decide(r,decision){if(!admin||busy||r.status!=='pending')return;
+ const what=decision==='approved'?'Approve and credit':'Reject without crediting';
+ if(!confirm(what+' '+r.amount+' VC for player '+r.userId+'? Request '+r.requestId))return;
+ busy=true;$('refresh').disabled=true;document.querySelectorAll('.buttons button').forEach(b=>b.disabled=true);
+ notice('Processing request '+r.requestId+'…');
+ try{const d=await api('admin_decide_vc_request',{requestId:r.requestId,decision});
+  notice('SUCCESS: Request '+d.requestId+' '+d.status+'. '+(d.status==='approved'?d.amount+' VC credited once.':'No VC credited.')+(d.telegramNotified?' Telegram notified.':' Telegram message not confirmed.'),true);
+  requests=requests.map(x=>x.requestId===d.requestId?{...x,status:d.status}:x);render();
+ }catch(e){notice('Decision not confirmed: '+e.message+'. REFRESH before attempting again; never credit twice.');render();}
+ finally{busy=false;$('refresh').disabled=false;render()}
+}
+$('refresh').onclick=load;$('filter').onchange=render;
+(async()=>{try{await account.get();const p=await api('get_wallet');if(p.isAdmin!==true)throw Error('Admin access denied');
+ admin=true;$('badge').textContent='ADMIN VERIFIED';$('main').hidden=false;await load();
+ }catch(e){$('badge').textContent='ACCESS RESTRICTED';notice('Admin login required: '+e.message)}})();
+</script></main></body></html>

@@ -485,76 +485,166 @@ async function grantCoins(admin, b, key) {
 }
 
 
+// SAMRAT UNIFIED VC REQUESTS V1
+// Uses the same vc_requests table already used by the legacy VC approval function.
+// Set VC_REQUESTS_TABLE_ID in game-wallet only if its actual Appwrite table ID differs.
+const vcRequestTable = () => {
+  const table = (process.env.VC_REQUESTS_TABLE_ID || 'vc_requests').trim();
+  if (!/^[a-zA-Z0-9._-]{1,36}$/.test(table)) {
+    throw Error('Invalid VC requests table configuration');
+  }
+  return table;
+};
+
+async function sendVCTelegram(message) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return false;
+  const body = JSON.stringify({chat_id: chatId, text: message});
+  try {
+    return await new Promise((resolve, reject) => {
+      const r = https.request('https://api.telegram.org/bot' + token + '/sendMessage', {
+        method: 'POST', timeout: 12000,
+        headers: {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body)}
+      }, response => {
+        let raw = '';
+        response.on('data', chunk => { raw += chunk; if (raw.length > 64000) response.destroy(); });
+        response.on('end', () => {
+          try {
+            const answer = JSON.parse(raw);
+            resolve(response.statusCode >= 200 && response.statusCode < 300 && answer.ok === true);
+          } catch { resolve(false); }
+        });
+      });
+      r.on('timeout', () => r.destroy(new Error('Telegram timeout')));
+      r.on('error', reject);
+      r.end(body);
+    });
+  } catch { return false; }
+}
+
+const vcClean = value => String(value ?? '').replace(/[<>]/g, '').slice(0,160);
+
 async function requestVC(user, b, key) {
   const amount = Number(b.amount);
   if (![20, 50, 100, 200].includes(amount))
-    return { ok: false, error: "Invalid VC amount" };
+    return {ok:false,error:'Choose 20, 50, 100 or 200 VC'};
 
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const table = vcRequestTable();
+  const player = await profile(user, key);
 
-  if (!token || !chatId)
-    return { ok: false, error: "Telegram not configured" };
+  let latest;
+  try {
+    // Avoid requiring a new index in the existing table; latest 100 is sufficient for initial rollout.
+    latest = await rows(table, [order('$createdAt','desc'), lim(100)], key);
+  } catch (e) {
+    if ([400, 404].includes(e.status))
+      return {ok:false,error:'VC requests table unavailable. Check game-wallet VC_REQUESTS_TABLE_ID.'};
+    throw e;
+  }
+  const pending = latest.find(row => row.userId === user && row.status === 'pending');
+  if (pending) return {
+    ok:true, created:false, requestId:pending.$id, amount:pending.amount,
+    status:'pending', telegramNotified:null,
+    message:'Your earlier VC request is still pending admin review'
+  };
 
-  const p = await profile(user, key);
-  const clean = x => String(x || "")
-    .replace(/[<>]/g, "").slice(0, 160);
+  // Duplicate clicks in the same 20-minute window resolve to one deterministic request ID.
+  const bucket = Math.floor((Date.now() + OFFSET) / ROUND_MS);
+  const requestId = 'vcr_' + createHash('sha256').update(user+'|'+bucket).digest('hex').slice(0,30);
+  let row;
+  try {
+    row = await request('POST', tablePath(table), key, {
+      rowId:requestId,
+      data:{userId:user,amount,status:'pending'}
+    });
+  } catch (e) {
+    if (e.status === 409) {
+      // The request may already have been created; do not accidentally generate another.
+      const existing = await request('GET', tablePath(table) + '/' + requestId, key);
+      return {ok:true,created:false,requestId,amount:existing.amount,
+        status:existing.status,telegramNotified:null,message:'Request already recorded in this interval'};
+    }
+    if ([400,404].includes(e.status))
+      return {ok:false,error:'VC requests table could not accept this request. Check table ID and columns.'};
+    throw e;
+  }
 
   const message = [
-    "SAMRAT X-TREME",
-    "NEW VC REQUEST",
-    "",
-    "Player: " + clean(p.name),
-    "Email: " + clean(p.email),
-    "Player ID: " + clean(user),
-    "Requested: " + amount + " VC",
-    "Current Wallet: " + p.wallet + " VC",
-    "Time: " + new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }) + " IST",
-    "",
-    "Action: Review and allocate VC in Admin Panel.",
-    "No automatic credit."
-  ].join("\n");
+    'SAMRAT X-TREME | NEW VC REQUEST',
+    'Request ID: '+vcClean(row.$id),
+    'Player: '+vcClean(player.name),
+    'Player ID: '+vcClean(user),
+    'Email: '+vcClean(player.email),
+    'Requested: '+amount+' VC',
+    'Current wallet: '+player.wallet+' VC',
+    'Status: PENDING',
+    'Review (admin login): https://samratxtreme.online/admin-vc-requests.html',
+    'Approve/reject only in the Admin Control Room. No auto-credit.'
+  ].join('\n');
 
-  const body = JSON.stringify({
-    chat_id: chatId,
-    text: message
-  });
+  const telegramNotified = await sendVCTelegram(message);
+  return {ok:true,created:true,requestId:row.$id,amount,status:'pending',
+    telegramNotified,message:'Request saved for admin approval'};
+}
 
-  await new Promise((resolve, reject) => {
-    const r = https.request(
-      "https://api.telegram.org/bot" +
-      token + "/sendMessage",
-      {
-        method: "POST",
-        timeout: 12000,
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body)
-        }
-      },
-      response => {
-        let raw = "";
-        response.on("data", chunk => raw += chunk);
-        response.on("end", () => {
-          try {
-            const data = JSON.parse(raw);
-            if (!data.ok) { const status = response.statusCode; const category = status === 401 ? "Invalid bot token" : status === 403 ? "Bot access denied" : status === 400 ? "Invalid chat ID or bot not started" : status === 429 ? "Telegram rate limit" : "Telegram API error"; reject(Error(category)); return; }
-            resolve();
-          } catch {
-            reject(Error("Telegram delivery failed"));
-          }
-        });
-      }
-    );
-    r.on("timeout", () => r.destroy(Error("Telegram timeout")));
-    r.on("error", reject);
-    r.end(body);
-  });
+async function adminListVCRequests(user, key) {
+  if (!dashboardIsAdmin(user))
+    return {ok:false,error:'Admin access denied'};
+  const table = vcRequestTable();
+  const found = await rows(table, [order('$createdAt','desc'), lim(100)], key);
+  const requests = found.map(row => ({
+    requestId:row.$id, userId:row.userId, amount:row.amount,
+    status:row.status, createdAt:row.$createdAt
+  }));
+  return {ok:true, requests, limit:100,
+    pending:requests.filter(r=>r.status==='pending').length};
+}
 
-  return {
-    ok: true,
-    message: "VC request sent to admin"
-  };
+async function adminDecideVCRequest(user, b, key) {
+  if (!dashboardIsAdmin(user))
+    return {ok:false,error:'Admin access denied'};
+  const requestId = typeof b.requestId === 'string' ? b.requestId.trim() : '';
+  const decision = b.decision;
+  if (!/^[a-zA-Z0-9._-]{1,36}$/.test(requestId) || !['approved','rejected'].includes(decision))
+    return {ok:false,error:'Invalid request ID or decision'};
+
+  const table = vcRequestTable();
+  const entry = await request('GET', tablePath(table)+'/'+requestId, key);
+  if (entry.status !== 'pending')
+    return {ok:false,error:'Request already handled: '+entry.status};
+  if (!Number.isSafeInteger(entry.amount) || entry.amount < 1 || entry.amount > 100000 ||
+      typeof entry.userId !== 'string' || !/^[a-zA-Z0-9._-]{1,36}$/.test(entry.userId))
+    return {ok:false,error:'Request details invalid; no credit made'};
+
+  const operations = [op('update', table, entry.$id, {status:decision})];
+  if (decision === 'approved') {
+    const player = await profile(entry.userId, key);
+    operations.push(op('increment','user_profiles',player.$id,{
+      column:'wallet',value:entry.amount,max:900000000
+    }));
+  }
+
+  try {
+    // One atomic commit changes request status and wallet together.
+    // Conflicting concurrent approval attempts must not double-credit.
+    await transact(key, operations);
+  } catch (e) {
+    if (e.status === 409)
+      return {ok:false,error:'Request was handled or wallet changed. Refresh before trying again.'};
+    throw e;
+  }
+
+  const telegramNotified = await sendVCTelegram([
+    'SAMRAT X-TREME | VC REQUEST '+decision.toUpperCase(),
+    'Request ID: '+vcClean(requestId),
+    'Player ID: '+vcClean(entry.userId),
+    'Amount: '+entry.amount+' VC',
+    decision === 'approved' ? 'Coins credited once in the same database transaction.' : 'No coins credited.'
+  ].join('\n'));
+
+  return {ok:true,requestId,userId:entry.userId,amount:entry.amount,
+    status:decision,telegramNotified};
 }
 
 // Speed Tap and Memory X games
@@ -927,6 +1017,8 @@ export default async ({ req, res, error }) => {
     "place_entry",
     "grant_coins",
     "request_vc",
+    "admin_list_vc_requests",
+    "admin_decide_vc_request",
     "redeem_voucher",
     "generate_vouchers",
     "admin_dashboard",
@@ -1056,19 +1148,18 @@ export default async ({ req, res, error }) => {
     }
 
     if (action === "request_vc") {
-      try {
-        const result = await requestVC(user, b, key);
-        return send(res, result.ok ? 200 : 400, result);
-      } catch (e) {
-        const safe = ["Invalid bot token",
-          "Bot access denied",
-          "Invalid chat ID or bot not started",
-          "Telegram rate limit", "Telegram API error"];
-        const reason = safe.includes(e.message)
-          ? e.message : "Telegram connection failed";
-        error("VC request failed: " + reason);
-        return send(res, 502, {ok:false,error:reason});
-      }
+      const x = await requestVC(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
+    if (action === "admin_list_vc_requests") {
+      const x = await adminListVCRequests(user, key);
+      return send(res, x.ok ? 200 : 403, x);
+    }
+
+    if (action === "admin_decide_vc_request") {
+      const x = await adminDecideVCRequest(user, b, key);
+      return send(res, x.ok ? 200 : 409, x);
     }
 
 if (action === "admin_dashboard") {

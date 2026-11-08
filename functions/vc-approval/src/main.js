@@ -358,6 +358,15 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
+  // LEGACY VC MUTATION DISABLED - unified game-wallet approval is authoritative
+  // Prevent stale browser pages from using nontransactional balance overwrites.
+  if (input.action === "decide_vc_request" || input.action === "add_vc") {
+    return respond(res, 410, {
+      ok: false,
+      error: "This action moved to the Samrat Unified Admin Control Room"
+    });
+  }
+
   // LIST VC REQUESTS
 
   if (input.action === "list_vc_requests") {

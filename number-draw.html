@@ -43,8 +43,10 @@ $('requestVCBtn').onclick=async()=>{
   msg('vcRequestMsg','Sending request...');
   try{
     const amount=Number($('vcRequestAmount').value);
-    await api('request_vc',{amount});
-    msg('vcRequestMsg','Request sent to admin on Telegram.');
+    const result=await api('request_vc',{amount});
+    msg('vcRequestMsg', result.created === false
+      ? 'Existing request '+result.requestId+' is '+result.status+'. Admin review pending if status is PENDING.'
+      : 'Request '+result.requestId+' saved in Appwrite. '+(result.telegramNotified?'Admin notified on Telegram.':'Telegram alert not confirmed; request is visible to admin.'));
   }catch(e){
     msg('vcRequestMsg',e.message);
   }finally{
