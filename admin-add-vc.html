@@ -1,7 +1,99 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Add VC | Samrat X-Treme</title><script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script><style>*{box-sizing:border-box}body{margin:0;padding:20px;background:radial-gradient(circle at top,#431267,#08010f 70%);color:white;font-family:Arial,sans-serif}.wrap{max-width:540px;margin:auto}.card{background:#201033;border:1px solid #7046d8;border-radius:18px;padding:20px;margin-top:18px}h1{color:#ffe16a}label{display:block;margin:15px 0 7px}input,button{width:100%;padding:14px;border-radius:10px;font-size:16px}input{background:#10091b;color:#fff;border:1px solid #7046d8}button{background:#ffe16a;border:0;font-weight:bold;margin-top:20px}button:disabled{opacity:.5}a{color:#ffe16a}#status{margin-top:16px;white-space:pre-wrap;line-height:1.5}</style></head><body><div class="wrap"><a href="admin-rewards.html">← Reward Admin</a><div class="card"><h1>ADD VC</h1><p>Admin-only virtual coin grant. No cash or payments.</p><p id="who">Checking login...</p><form id="form"><label>User ID (Appwrite Auth userId)</label><input id="userId" required maxlength="36" autocomplete="off" placeholder="User's userId"><label>VC to add</label><input id="amount" required type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="e.g. 1000"><button id="send" disabled>ADD VC</button></form><div id="status" role="status"></div></div></div><script>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0c0717">
+<title>Safe Add VC | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+  :root{color-scheme:dark;--gold:#ffe080;--green:#58e9b7;--ink:#f6edff;--mute:#c3aedc}
+  *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#421765,#0b0615 72%);color:var(--ink);font:15px system-ui,Arial}
+  main{max-width:590px;margin:auto;padding:20px 16px 70px}h1{font:900 31px Georgia,serif;color:var(--gold);margin:22px 0 5px}h2{color:var(--gold);font-size:19px}
+  a{color:var(--gold)}.sub{font-size:12px;letter-spacing:2px;font-weight:750;color:var(--mute)}
+  .card{background:#201330;border:1px solid #79529e;border-radius:20px;padding:21px;margin:18px 0;box-shadow:0 10px 32px #0004}
+  label{display:block;color:#e9d7ff;font-weight:650;margin:14px 0 6px}
+  input{width:100%;font:inherit;background:#10091b;color:#fff;padding:14px;border:1px solid #956fc0;border-radius:12px}
+  button{font:inherit;padding:14px 16px;border-radius:12px;font-weight:800;cursor:pointer;border:1px solid #9374b9;background:#38204b;color:#fff}
+  button.primary{background:var(--green);border-color:var(--green);color:#07281f}
+  button:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;gap:10px;margin:13px 0;flex-wrap:wrap}.row button{flex:1}
+  #status{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;min-height:22px;color:var(--gold)}
+  .player{border:1px solid #605078;background:#130b20;padding:14px;border-radius:13px;overflow-wrap:anywhere}
+  .player strong{color:var(--green)}.hint{font-size:12px;color:var(--mute);line-height:1.6}
+  .hide{display:none}.badge{display:inline-block;padding:8px 12px;border:1px solid #47cda4;border-radius:99px;color:var(--green);font-size:12px;font-weight:800}
+</style>
+</head>
+<body><main>
+  <a href="admin-dashboard.html">← Admin Control Room</a>
+  <h1>SAMRAT X-TREME</h1><div class="sub">SECURE ADMIN · ADD VIRTUAL COINS</div>
+  <section class="card">
+    <div id="badge" class="badge">VERIFYING ADMIN…</div>
+    <p id="status" role="status" aria-live="polite">Checking admin session…</p>
+    <form id="form" class="hide">
+      <label for="userId">Player User ID</label>
+      <input id="userId" maxlength="36" required autocomplete="off" spellcheck="false" placeholder="Paste exact Appwrite Player User ID">
+      <div class="row"><button type="button" id="lookup">FIND PLAYER</button></div>
+      <div id="player" class="player hide" aria-live="polite"></div>
+      <label for="amount">Coins to add (VC)</label>
+      <input id="amount" type="number" min="1" max="100000" step="1" inputmode="numeric" required placeholder="e.g. 20">
+      <div class="row"><button id="submit" type="submit" class="primary" disabled>ADD VC TO WALLET</button></div>
+    </form>
+    <p class="hint">Only free virtual coins. No cash value or withdrawal. The current game-wallet backend uses an atomic wallet increment, not the legacy manual balance overwrite.</p>
+  </section>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
 const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
-const account=new Appwrite.Account(client),functions=new Appwrite.Functions(client),FUNCTION_ID='6adf3c3a003718eab6c2',ADMIN_USER_ID='6a8031600025646ad144';
-const el=id=>document.getElementById(id);let admin=false;
-(async()=>{try{const user=await account.get();if(user.$id!==ADMIN_USER_ID){el('who').textContent='Access denied: this account is not the admin.';return;}admin=true;el('who').textContent='Signed in: '+(user.email||user.name);el('send').disabled=false;}catch(e){el('who').textContent='Please log in first.';}})();
-el('form').addEventListener('submit',async e=>{e.preventDefault();if(!admin)return;const userId=el('userId').value.trim(),amount=Number(el('amount').value);if(!/^[a-zA-Z0-9._-]{1,36}$/.test(userId)||!Number.isSafeInteger(amount)||amount<1||amount>100000){el('status').textContent='Enter valid user ID and VC amount (1–100000).';return;}if(!confirm('Add '+amount+' VC to user '+userId+'?'))return;el('send').disabled=true;el('status').textContent='Adding VC...';try{const execution=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action:'add_vc',userId,amount}),async:false,method:'POST',path:'/'});let result={};try{result=JSON.parse(execution.responseBody||'{}')}catch{}if(execution.status==='completed'&&execution.responseStatusCode===200&&result.ok){el('status').textContent='Success: '+result.added+' VC added. New wallet: '+result.balance+' VC.';}else{el('status').textContent='Not added: '+(result.error||execution.errors||('HTTP '+execution.responseStatusCode));}}catch(err){el('status').textContent='Not added: '+(err.message||String(err));}finally{el('send').disabled=false;}});
-</script></body></html>
+const account=new Appwrite.Account(client),functions=new Appwrite.Functions(client);
+const FUNCTION_ID='6ae1bcc500208a5a7efb';
+let admin=false,selected=null,busy=false;
+const status=(s,good=false)=>{$('status').textContent=s;$('status').style.color=good?'#58e9b7':'#ffe080'};
+const validId=s=>/^[a-zA-Z0-9._-]{1,36}$/.test(s);
+async function api(action,extra={}){
+  const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...extra}),async:false});
+  let data;try{data=JSON.parse(r.responseBody||'{}')}catch{throw Error('Invalid game-wallet response')}
+  if(r.status!=='completed'||r.responseStatusCode!==200||data.ok!==true)throw Error(data.error||'Request failed. Check Appwrite function deployment.');
+  return data;
+}
+function resetPlayer(){selected=null;$('submit').disabled=true;$('player').classList.add('hide');$('player').replaceChildren()}
+async function findPlayer(silent=false){
+  if(!admin||busy)return null;
+  const userId=$('userId').value.trim();resetPlayer();
+  if(!validId(userId)){status('Enter the exact Player User ID (1–36 characters).');return null}
+  $('lookup').disabled=true;status('Finding player…');
+  try{
+    const r=await api('admin_find_player',{userId});
+    if(r.players?.length!==1)throw Error('Player not found or duplicated');
+    const p=r.players[0];selected=p;
+    const box=$('player');
+    const name=document.createElement('strong');name.textContent=p.name||'Unnamed Player';
+    const info=document.createElement('div');info.textContent='ID: '+p.userId+' · Wallet: '+Number(p.wallet||0).toLocaleString('en-IN')+' VC';
+    box.append(name,info);box.classList.remove('hide');
+    $('submit').disabled=false;if(!silent)status('Player verified. Enter amount and confirm.');
+    return p;
+  }catch(e){status('Player lookup failed: '+e.message);return null}
+  finally{$('lookup').disabled=false}
+}
+$('lookup').addEventListener('click',()=>findPlayer());
+$('userId').addEventListener('input',resetPlayer);
+$('form').addEventListener('submit',async e=>{
+  e.preventDefault();if(!admin||busy||!selected)return;
+  const userId=$('userId').value.trim(),amount=Number($('amount').value);
+  if(userId!==selected.userId||!validId(userId)||!Number.isSafeInteger(amount)||amount<1||amount>100000){status('Invalid player ID or VC amount (1–100000).');return}
+  if(!confirm('Add '+amount+' VC to '+(selected.name||userId)+'? Current wallet: '+selected.wallet+' VC.'))return;
+  busy=true;$('submit').disabled=true;$('lookup').disabled=true;status('Submitting VC grant…');
+  try{
+    const r=await api('grant_coins',{targetUserId:userId,amount});
+    status('SUCCESS: '+r.amount+' VC added to player '+userId+'. Refreshing wallet…',true);
+    $('amount').value='';
+  }catch(err){status('Grant not confirmed: '+err.message+' Do NOT retry until checking the player wallet to avoid double credit.');}
+  finally{busy=false;$('lookup').disabled=false;resetPlayer()}
+});
+(async()=>{
+  try{await account.get();const p=await api('get_wallet');if(p.isAdmin!==true)throw Error('This account is not an authorized admin.');
+    admin=true;$('badge').textContent='ADMIN VERIFIED';$('form').classList.remove('hide');status('Ready. Find a player before adding VC.',true);
+  }catch(e){$('badge').textContent='ACCESS RESTRICTED';status('Login as admin on the homepage, then reload this page. '+e.message)}
+})();
+</script>
+</body></html>
