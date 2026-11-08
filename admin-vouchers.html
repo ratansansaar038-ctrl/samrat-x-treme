@@ -1,0 +1,78 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Vouchers | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;color:#fff;font:15px system-ui;
+background:radial-gradient(ellipse at top,#472069,#0c0717)}
+main{max-width:530px;margin:auto;padding:24px 16px}h1,h2{color:#ffe17d}
+.card{padding:20px;margin:16px 0;background:#26163e;border:1px solid #754ba5;
+border-radius:18px}label{display:block;margin:10px 0 5px}a{color:#ffe17d}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input{width:100%;padding:12px;border-radius:10px;background:#10091f;
+border:1px solid #8466aa;color:white}button{border:0;padding:13px;
+border-radius:10px;background:#ffe17d;color:#241234;font-weight:800;margin:10px 5px 0 0}
+button:disabled{opacity:.5}.green{background:#35db96}small{color:#ccb8dd}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:250px;
+overflow:auto;background:#10091e;padding:12px;border-radius:10px}
+.hide{display:none}
+</style></head><body><main><a href="index.html">← Home</a>
+<h1>🎟️ Bulk Voucher Generator</h1>
+<p>Admin only · Virtual coins have no cash value</p>
+<section class="card"><h2>Create voucher codes</h2>
+<p id="status">Checking admin login...</p>
+<form id="form" class="hide"><div class="grid">
+<label>20 VC<input id="n20" type="number" min="0" max="50" value="0" required></label>
+<label>50 VC<input id="n50" type="number" min="0" max="50" value="0" required></label>
+<label>100 VC<input id="n100" type="number" min="0" max="50" value="0" required></label>
+<label>200 VC<input id="n200" type="number" min="0" max="50" value="0" required></label>
+</div><button class="green" id="generate">GENERATE (MAX 50)</button></form></section>
+<section class="card"><h2>Voucher codes</h2>
+<small id="summary">No vouchers loaded.</small><pre id="codes"></pre>
+<button id="download" disabled>Download CSV</button>
+<button id="load" disabled>Load recent unused codes</button>
+<p><small>Unused list covers latest 100 saved vouchers only. Never share codes publicly.</small></p>
+</section>
+<script>
+const $=id=>document.getElementById(id);
+const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1')
+  .setProject('6a7f2add0011a7bfc21a');
+const account=new Appwrite.Account(client),fn=new Appwrite.Functions(client);
+const functionId='6ae1bcc500208a5a7efb';let records=[];
+async function api(action,extra={}){
+  const r=await fn.createExecution({functionId,
+    body:JSON.stringify({action,...extra}),async:false});
+  const d=JSON.parse(r.responseBody||'{}');
+  if(!d.ok)throw Error(d.error||'Request failed');return d;
+}
+function show(items){records=items;$('summary').textContent=items.length+' codes';
+  $('codes').textContent=items.map(x=>x.code+' | '+x.coins+' VC').join('\n');
+  $('download').disabled=!items.length;}
+$('form').onsubmit=async e=>{e.preventDefault();
+  const quantities=Object.fromEntries([20,50,100,200].map(n=>[n,Number($('n'+n).value)]));
+  const qty=Object.values(quantities);
+  if(qty.some(n=>!Number.isSafeInteger(n)||n<0||n>50)||
+     qty.reduce((a,b)=>a+b,0)<1||qty.reduce((a,b)=>a+b,0)>50){
+    $('status').textContent='Total must be 1 to 50 vouchers';return;}
+  $('generate').disabled=true;$('status').textContent='Generating...';
+  try{const d=await api('generate_vouchers',{quantities});show(d.vouchers);
+    $('status').textContent='Generated '+d.vouchers.length+' codes. Download CSV.';}
+  catch(err){$('status').textContent=err.message+' — check unused codes before retrying';}
+  finally{$('generate').disabled=false;}
+};
+$('load').onclick=async()=>{try{const d=await api('unused_vouchers');
+  show(d.vouchers);$('status').textContent='Loaded latest unused codes';}
+  catch(e){$('status').textContent=e.message;}};
+$('download').onclick=()=>{if(!records.length)return;
+  const csv='code,coins\r\n'+records.map(x=>x.code+','+x.coins).join('\r\n')+'\r\n';
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  const a=document.createElement('a');a.href=url;
+  a.download='samrat-vouchers-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+(async()=>{try{await account.get();const data=await api('get_wallet');
+  if(!data.isAdmin)throw Error('Admin access denied');
+  $('form').classList.remove('hide');$('load').disabled=false;
+  $('status').textContent='Admin verified';}
+  catch(e){$('status').textContent='Login as admin: '+e.message;}})();
+</script></main></body></html>

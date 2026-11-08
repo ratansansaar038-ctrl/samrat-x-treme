@@ -335,6 +335,38 @@ async function redeemVoucher(user, b, key) {
   };
 }
 
+
+async function makeVouchers(user,b,key){
+  const admins=(process.env.ADMIN_USER_IDS||'').split(',').map(x=>x.trim());
+  if(!admins.includes(user))return {ok:false,error:'Admin only'};
+  const counts=b.quantities;
+  if(!counts||typeof counts!=='object'||Array.isArray(counts))
+    return {ok:false,error:'Invalid quantities'};
+  const vouchers=[];
+  for(const tier of [20,50,100,200]){
+    const n=counts[String(tier)]??0;
+    if(!Number.isSafeInteger(n)||n<0||n>50)
+      return {ok:false,error:'Invalid quantity'};
+    for(let i=0;i<n;i++){
+      const code='SX-'+randomBytes(12).toString('hex').toUpperCase();
+      vouchers.push({code,coins:tier});
+    }
+  }
+  if(vouchers.length<1||vouchers.length>50)
+    return {ok:false,error:'Choose 1 to 50 vouchers total'};
+  await transact(key,vouchers.map(v=>op('create','vouchers',v.code,{
+    code:v.code,coins:v.coins,isRedeemed:false
+  })));
+  return {ok:true,vouchers};
+}
+async function unusedVouchers(user,key){
+  const admins=(process.env.ADMIN_USER_IDS||'').split(',').map(x=>x.trim());
+  if(!admins.includes(user))return {ok:false,error:'Admin only'};
+  const found=await rows('vouchers',[order('$createdAt','desc'),lim(100)],key);
+  return {ok:true,vouchers:found.filter(x=>x.isRedeemed===false)
+    .map(x=>({code:x.code,coins:x.coins})),limit:100};
+}
+
 async function grantCoins(admin, b, key) {
   const allowed = (process.env.ADMIN_USER_IDS || "")
     .split(",").map(x => x.trim()).filter(Boolean);
@@ -812,6 +844,8 @@ export default async ({ req, res, error }) => {
     "grant_coins",
     "request_vc",
     "redeem_voucher",
+    "generate_vouchers",
+    "unused_vouchers",
     "my_entries",
     "my_history",
     "register_profile",
@@ -951,7 +985,15 @@ export default async ({ req, res, error }) => {
       }
     }
 
-if (action === "redeem_voucher") {
+if (action === "generate_vouchers") {
+    const x=await makeVouchers(user,b,key);
+    return send(res,x.ok?200:403,x);
+  }
+  if (action === "unused_vouchers") {
+    const x=await unusedVouchers(user,key);
+    return send(res,x.ok?200:403,x);
+  }
+  if (action === "redeem_voucher") {
       const result = await redeemVoucher(user, b, key);
       return send(res, result.ok ? 200 : 400, result);
     }
