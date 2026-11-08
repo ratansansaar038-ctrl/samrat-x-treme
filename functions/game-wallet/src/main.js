@@ -279,6 +279,64 @@ async function placeEntry(user, b, key) {
   };
 }
 
+
+async function redeemVoucher(user, b, key) {
+  const code = typeof b.code === "string"
+    ? b.code.trim().toUpperCase() : "";
+
+  if (!/^[A-Z0-9-]{8,64}$/.test(code))
+    return { ok: false, error: "Enter a valid voucher code" };
+
+  const found = await rows("vouchers", [
+    eq("code", code), lim(2)
+  ], key);
+
+  if (found.length !== 1)
+    return { ok: false, error: "Invalid or unavailable voucher" };
+
+  const voucher = found[0];
+  if (voucher.isRedeemed !== false)
+    return { ok: false, error: "Voucher already used or unavailable" };
+
+  if (!Number.isSafeInteger(voucher.coins) ||
+      voucher.coins < 1 || voucher.coins > 100000)
+    return { ok: false, error: "Voucher configuration invalid" };
+
+  const player = await profile(user, key);
+  const now = new Date().toISOString();
+
+  try {
+    await transact(key, [
+      op("create", "voucher_redemptions", voucher.$id, {
+        code,
+        userId: user,
+        coins: voucher.coins,
+        redeemedAt: now
+      }),
+      op("update", "vouchers", voucher.$id, {
+        isRedeemed: true,
+        redeemedBy: user,
+        redeemedAt: now
+      }),
+      op("increment", "user_profiles", player.$id, {
+        column: "wallet",
+        value: voucher.coins,
+        max: 900000000
+      })
+    ]);
+  } catch (e) {
+    if (e.status === 409)
+      return { ok: false, error: "Voucher already redeemed or wallet busy; please retry" };
+    throw e;
+  }
+
+  return {
+    ok: true,
+    message: "Virtual coins credited",
+    coinsAdded: voucher.coins
+  };
+}
+
 async function grantCoins(admin, b, key) {
   const allowed = (process.env.ADMIN_USER_IDS || "")
     .split(",").map(x => x.trim()).filter(Boolean);
@@ -755,6 +813,7 @@ export default async ({ req, res, error }) => {
     "place_entry",
     "grant_coins",
     "request_vc",
+    "redeem_voucher",
     "my_entries",
     "my_history",
     "register_profile",
@@ -894,7 +953,12 @@ export default async ({ req, res, error }) => {
       }
     }
 
-if (action === "grant_coins") {
+if (action === "redeem_voucher") {
+      const result = await redeemVoucher(user, b, key);
+      return send(res, result.ok ? 200 : 400, result);
+    }
+
+    if (action === "grant_coins") {
       const x = await grantCoins(user, b, key);
       return send(res, x.ok ? 200 : 403, x);
     }
