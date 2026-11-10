@@ -1,0 +1,75 @@
+name: Install Samrat Recovery - Backend Only
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-install-number-draw-recovery
+  cancel-in-progress: false
+
+jobs:
+  install-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Samrat X-Treme
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Apply existing tested recovery patch to backend only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import textwrap
+
+          original = Path('.github/workflows/install-samrat-number-draw-recovery.yml')
+          if not original.is_file():
+              raise SystemExit('Original installer workflow not found; stopping safely.')
+          source = original.read_text(encoding='utf-8')
+
+          def extract_heredoc(filename, terminator):
+              start = f"          cat > /tmp/{filename} <<'{terminator}'\n"
+              end = f"\n          {terminator}\n"
+              if source.count(start) != 1:
+                  raise SystemExit(f'Expected one tested {filename} script in the original installer.')
+              block = source.split(start, 1)[1]
+              if end not in block:
+                  raise SystemExit(f'Missing end of tested {filename} script.')
+              content = textwrap.dedent(block.split(end, 1)[0]) + '\n'
+              path = Path('/tmp') / filename
+              path.write_text(content, encoding='utf-8')
+              return str(path)
+
+          patch_script = extract_heredoc('samrat_patch_number_recovery.py', 'PY')
+          mock_script = extract_heredoc('samrat_recovery_mock_test.cjs', 'JS')
+
+          # The existing, previously tested patch also edits the cron locally.
+          # This installer stages ONLY the backend file, never a workflow YAML.
+          subprocess.run(['python3', patch_script], check=True)
+          subprocess.run(['node', '--check', 'functions/game-wallet/src/main.js'], check=True)
+          subprocess.run(['node', mock_script], check=True)
+          PY
+
+      - name: Commit backend recovery without modifying workflow permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- functions/game-wallet/src/main.js
+          if git diff --cached --quiet; then
+            echo 'RECOVERY_BACKEND_ALREADY_INSTALLED'
+          else
+            git commit -m 'Install bounded recovery for missed Samrat number draw rounds'
+            git push
+            echo 'RECOVERY_BACKEND_INSTALLED'
+          fi
+          echo 'NOTE: Cron schedule NOT changed by this installer.'
+          echo 'NEXT: Confirm new Appwrite game-wallet deployment is active before enabling recovery.'
