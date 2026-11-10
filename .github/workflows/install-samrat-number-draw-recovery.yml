@@ -1,0 +1,253 @@
+name: Install Samrat Number Draw Safe Recovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-install-number-draw-recovery
+  cancel-in-progress: false
+
+jobs:
+  install-recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Samrat X-Treme
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch game-wallet and align GitHub draw schedule
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_patch_number_recovery.py <<'PY'
+          from pathlib import Path
+          
+          backend_path = Path('functions/game-wallet/src/main.js')
+          cron_path = Path('.github/workflows/automatic-draw.yml')
+          backend = backend_path.read_text(encoding='utf-8')
+          cron = cron_path.read_text(encoding='utf-8')
+          
+          def replace_one(src, old, new, label):
+              c = src.count(old)
+              if c != 1:
+                  raise AssertionError(f'{label}: expected exactly one anchor; found {c}. No changes written.')
+              return src.replace(old, new, 1)
+          
+          recovery = '''// RECOVERY V1: Recover only expired rounds containing pending entries.
+          // Existing settled winning numbers are never changed; processing is bounded.
+          async function recoverPendingRounds(key, justProcessedRoundId) {
+            const entries = await rows("game_entries", [
+              eq("status", "pending"), lim(100)
+            ], key);
+            const cutoff = Date.now() - 10000;
+            const candidates = new Map();
+          
+            for (const entry of entries) {
+              const rid = entry.roundId;
+              const match = typeof rid === "string" && /^r_(\\d{17})$/.exec(rid);
+              if (!match || rid === justProcessedRoundId) continue;
+              const digits = match[1];
+              const y = +digits.slice(0, 4), m = +digits.slice(4, 6);
+              const d = +digits.slice(6, 8), h = +digits.slice(8, 10);
+              const minute = +digits.slice(10, 12), sec = +digits.slice(12, 14);
+              const millis = +digits.slice(14, 17);
+              const startMs = Date.UTC(y, m - 1, d, h, minute, sec, millis);
+              if (!Number.isFinite(startMs)) continue;
+              const round = roundFor(startMs);
+              if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff) continue;
+              candidates.set(rid, round);
+            }
+          
+            let recoveredRounds = 0, recoveredEntries = 0;
+            const flaggedRounds = [];
+            for (const round of [...candidates.values()]
+                .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 2)) {
+              let saved = await stored(round.roundId, key);
+              if (!saved) {
+                try {
+                  saved = await request("POST", tablePath("game_rounds"), key, {
+                    rowId: round.roundId,
+                    data: {
+                      roundId: round.roundId,
+                      startAt: round.startsAt,
+                      endsAt: round.endsAt,
+                      settleAt: new Date().toISOString(),
+                      status: "settled",
+                      winningNumber: randomInt(1, 10)
+                    }
+                  });
+                } catch (e) {
+                  if (e.status !== 409) throw e;
+                  saved = await stored(round.roundId, key);
+                }
+              }
+              if (!valid(saved)) {
+                flaggedRounds.push(round.roundId);
+                continue;
+              }
+              recoveredEntries += await settleRound(saved, key);
+              recoveredRounds++;
+            }
+            return {
+              ok: true, checkedPending: entries.length,
+              scanLimitReached: entries.length === 100,
+              recoveredRounds, recoveredEntries,
+              flaggedRounds
+            };
+          }
+          
+          '''
+          
+          if 'async function recoverPendingRounds(' not in backend:
+              old = '''  const settled = valid(r) ? await settleRound(r, key) : 0;
+            return {
+              ok: true,
+              available: valid(r),
+              roundId: previous.roundId,
+              winningNumber: valid(r) ? r.winningNumber : null,
+              settledEntries: settled
+            };
+          }
+          
+          async function placeEntry('''
+              new = '''  const settled = valid(r) ? await settleRound(r, key) : 0;
+            let recovery;
+            try {
+              recovery = await recoverPendingRounds(key, previous.roundId);
+            } catch (e) {
+              console.error("Number draw recovery failed: " + e.message);
+              recovery = { ok: false, error: "Recovery temporarily unavailable" };
+            }
+            return {
+              ok: true,
+              available: valid(r),
+              roundId: previous.roundId,
+              winningNumber: valid(r) ? r.winningNumber : null,
+              settledEntries: settled,
+              recovery
+            };
+          }
+          
+          ''' + recovery + '''async function placeEntry('''
+              backend = replace_one(backend, old, new, 'Number Draw lastResult')
+              print('Prepared bounded recovery for expired pending rounds')
+          else:
+              print('Recovery already installed; skipping backend change')
+          
+          if 'cron: "0,20,40 * * * *"' in cron:
+              cron = replace_one(cron, 'cron: "0,20,40 * * * *"', 'cron: "11,31,51 * * * *"', 'GitHub cron alignment')
+              print('Aligned GitHub draw trigger 1 minute after UTC round boundaries')
+          elif 'cron: "11,31,51 * * * *"' in cron:
+              print('GitHub cron already aligned')
+          else:
+              raise AssertionError('Unknown cron expression: refusing to overwrite')
+          
+          assert 'recoverPendingRounds(key, previous.roundId)' in backend
+          assert 'get_last_result' in backend and 'place_entry' in backend
+          assert 'tablePath("game_rounds")' in backend
+          assert 'cron: "11,31,51 * * * *"' in cron
+          
+          backend_path.write_text(backend, encoding='utf-8')
+          cron_path.write_text(cron, encoding='utf-8')
+          print('Patch prepared. No Appwrite API/database requests made by installer.')
+          PY
+          python3 /tmp/samrat_patch_number_recovery.py
+      - name: Validate backend syntax and run safe mock tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          cat > /tmp/samrat_recovery_mock_test.cjs <<'JS'
+          // Sandbox-only test: no external API or real wallet access.
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const source = fs.readFileSync('functions/game-wallet/src/main.js', 'utf8');
+          const begin = source.indexOf('async function recoverPendingRounds(');
+          const end = source.indexOf('\nasync function placeEntry(', begin);
+          assert.ok(begin >= 0 && end > begin, 'Recovery function must exist');
+          const code = source.slice(begin, end);
+          const ROUND_MS = 1200000, OFFSET = 19800000;
+          const now = Date.parse('2026-11-10T06:40:00Z');
+          class TestDate extends Date { static now() { return now; } }
+          function roundFor(t) {
+            const start = Math.floor((t + OFFSET) / ROUND_MS) * ROUND_MS - OFFSET;
+            return {roundId: 'r_' + new Date(start).toISOString().replace(/[-:.TZ]/g, ''),
+              startsAt: new Date(start).toISOString(), endsAt: new Date(start + ROUND_MS).toISOString()};
+          }
+          const oldA = roundFor(Date.parse('2026-11-10T05:50:00Z'));
+          const oldB = roundFor(Date.parse('2026-11-10T06:10:00Z'));
+          const current = roundFor(Date.parse('2026-11-10T06:30:00Z'));
+          let rowsData = [], rounds = [], credited = 0, winningInsertions = 0, settleCalls = 0;
+          const eq = (attribute, value) => ({attribute, value});
+          const lim = n => ({limit:n});
+          const valid = r => r?.status === 'settled' && Number.isInteger(r.winningNumber) && r.winningNumber>=1 && r.winningNumber<=9;
+          const rows = async (_table, queries) => rowsData.filter(e => e.status === 'pending').slice(0,100);
+          const stored = async id => rounds.find(x=>x.roundId===id)||null;
+          const request = async (_method, _path, _key, body) => {
+            assert.equal(body.data.status,'settled');
+            if (rounds.find(x=>x.roundId===body.data.roundId)) {const e=Error('duplicate');e.status=409;throw e;}
+            const result = {...body.data};rounds.push(result);winningInsertions++;return result;
+          };
+          const tablePath = () => '/mock/game_rounds';
+          const randomInt = () => 5;
+          const settleRound = async (round) => {settleCalls++;let count=0;
+            for(const entry of rowsData.filter(e=>e.roundId===round.roundId&&e.status==='pending')) {
+              const win = entry.number===round.winningNumber;
+              entry.status=win?'won':'lost';entry.payoutVC=win?entry.stake*8:0;
+              credited+=entry.payoutVC;count++;
+            }
+            return count;
+          };
+          const recover = Function('dep',`const {Date,rows,eq,lim,roundFor,stored,request,tablePath,randomInt,valid,settleRound}=dep;${code}\nreturn recoverPendingRounds;`)({
+            Date:TestDate,rows,eq,lim,roundFor,stored,request,tablePath,randomInt,valid,settleRound
+          });
+          const check=(name,p)=>{assert.ok(p,name);console.log('PASS '+name)};
+          (async()=>{
+            rowsData=[
+              {roundId:oldA.roundId,status:'pending',number:5,stake:20},
+              {roundId:oldA.roundId,status:'pending',number:7,stake:50},
+              {roundId:oldB.roundId,status:'pending',number:5,stake:50},
+              {roundId:current.roundId,status:'pending',number:5,stake:100},
+              {roundId:'malformed',status:'pending',number:5,stake:20}
+            ];
+            const first=await recover('test-key',current.roundId);
+            check('recover only expired rounds',first.recoveredRounds===2&&first.recoveredEntries===3);
+            check('winning pays 8x; losing pays zero',credited===20*8+50*8);
+            check('current round stays untouched',rowsData.find(x=>x.roundId===current.roundId).status==='pending');
+            check('invalid round ID stays untouched',rowsData.find(x=>x.roundId==='malformed').status==='pending');
+            check('one result per recovered round',winningInsertions===2);
+            const repeat=await recover('test-key',current.roundId);
+            check('re-running never double credits',repeat.recoveredEntries===0&&credited===560);
+            // Test an existing settled result without changing its number.
+            rowsData=[{roundId:oldA.roundId,status:'pending',number:7,stake:20}];
+            rounds.find(x=>x.roundId===oldA.roundId).winningNumber=7;
+            const previousInserts=winningInsertions;
+            await recover('test-key',current.roundId);
+            check('existing winning number never overwritten',rounds.find(x=>x.roundId===oldA.roundId).winningNumber===7&&winningInsertions===previousInserts);
+            check('existing result used for payout',credited===720);
+            // Existing unresolved status intentionally skipped, not replaced.
+            rounds.find(x=>x.roundId===oldA.roundId).status='open';
+            rowsData=[{roundId:oldA.roundId,status:'pending',number:7,stake:20}];
+            const blocked=await recover('test-key',current.roundId);
+            check('unsettled existing result flagged for review',blocked.flaggedRounds.includes(oldA.roundId)&&rowsData[0].status==='pending');
+            console.log('RECOVERY_MOCK_TESTS: PASS (no real database writes)');
+          })().catch(e=>{console.error(e.stack);process.exit(1)});
+          JS
+          node /tmp/samrat_recovery_mock_test.cjs
+      - name: Commit safe recovery update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js .github/workflows/automatic-draw.yml
+          if git diff --cached --quiet; then
+            echo "Number Draw Recovery already installed."
+          else
+            git commit -m "Add bounded recovery for missed number draw rounds and align schedule"
+            git push
+          fi
+          echo "INSTALL_COMPLETE: GitHub code changed; check active Appwrite game-wallet deployment."
