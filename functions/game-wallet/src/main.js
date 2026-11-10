@@ -649,7 +649,7 @@ async function adminDecideVCRequest(user, b, key) {
 
 // Speed Tap and Memory X games
 
-const GAME_IDS = ["speed_tap", "memory_x", "memory_x_24"];
+const GAME_IDS = ["speed_tap", "memory_x", "memory_x_24", "math_challenge"];
 
 const SYMBOLS = [
   "🌟", "⚡", "💎", "🔥", "🚀", "👑",
@@ -675,6 +675,37 @@ function shuffle(items) {
   return a;
 }
 
+function makeMathQuestion() {
+  const a = randomInt(1, 16), b = randomInt(1, 13), kind = randomInt(3);
+  const answer = kind === 0 ? a + b : kind === 1 ? a * b : Math.abs(a - b);
+  const label = kind === 0 ? a + ' + ' + b + ' = ?' :
+    kind === 1 ? a + ' × ' + b + ' = ?' :
+      Math.max(a, b) + ' − ' + Math.min(a, b) + ' = ?';
+  const options = new Set([answer]);
+  while (options.size < 4) options.add(Math.max(0, answer + randomInt(17) - 8));
+  return { label, options: shuffle([...options]), answer };
+}
+
+function verifyMath(questions, events, elapsedMs) {
+  if (!Array.isArray(questions) || questions.length !== 10 ||
+      !Array.isArray(events) || events.length > 10 ||
+      !Number.isInteger(elapsedMs) || elapsedMs < 1000 || elapsedMs > 90000)
+    return null;
+  let score = 0, previous = -1;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i], q = questions[i];
+    if (!q || !Array.isArray(q.options) || q.options.length !== 4 ||
+        !Number.isInteger(q.answer) ||
+        !Array.isArray(e) || e.length !== 2 ||
+        !Number.isInteger(e[0]) || e[0] < 0 || e[0] >= 4 ||
+        !Number.isInteger(e[1]) || e[1] < 0 || e[1] > elapsedMs ||
+        e[1] < previous) return null;
+    previous = e[1];
+    if (q.options[e[0]] === q.answer) score++;
+  }
+  return { score, durationMs: elapsedMs };
+}
+
 async function startGame(user, b, key) {
   if (!GAME_IDS.includes(b.gameId))
     return { ok: false, error: "Invalid game" };
@@ -698,6 +729,8 @@ async function startGame(user, b, key) {
     challenge = {
       deck: shuffle([...oldSymbols, ...oldSymbols])
     };
+  } else if (gameId === 'math_challenge') {
+    challenge = { questions: Array.from({ length: 10 }, makeMathQuestion) };
   } else {
     challenge = {
       targets: Array.from(
@@ -710,7 +743,7 @@ async function startGame(user, b, key) {
   const sessionId = "g_" + randomBytes(15).toString("hex");
   const startedAt = new Date(now).toISOString();
   const expiresAt = new Date(
-    now + (gameId === "speed_tap" ? 40000 : 70000)
+    now + (gameId === "speed_tap" ? 40000 : gameId === "math_challenge" ? 120000 : 70000)
   ).toISOString();
 
   await request("POST", tablePath("game_sessions"), key, {
@@ -730,7 +763,9 @@ async function startGame(user, b, key) {
     sessionId,
     gameId,
     level,
-    challenge,
+    challenge: gameId === 'math_challenge' ? {
+      questions: challenge.questions.map(({label, options}) => ({label, options}))
+    } : challenge,
     startedAt,
     expiresAt
   };
@@ -894,6 +929,8 @@ async function finishGame(user, b, key) {
     verified = verifySpeed(
       challenge, b.events, elapsedMs
     );
+  } else if (session.gameid === "math_challenge") {
+    verified = verifyMath(challenge.questions, b.events, elapsedMs);
   }
 
   if (!verified)
@@ -969,7 +1006,7 @@ async function getLeaderboard(gameId, key) {
       rank: i + 1,
       player: "Player " + userId.slice(0, 6),
       score: value.score,
-      durationMs: gameId.startsWith("memory_x")
+      durationMs: gameId.startsWith("memory_x") || gameId === "math_challenge"
         ? value.durationMs : null
     }));
 
