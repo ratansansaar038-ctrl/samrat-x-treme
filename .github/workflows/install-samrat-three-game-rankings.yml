@@ -1,0 +1,265 @@
+name: Upgrade Samrat Three-Game Rankings
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-three-rankings
+  cancel-in-progress: false
+
+jobs:
+  update-rankings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Samrat X-Treme
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install Math Challenge ranking and simplify Player Profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_three_game_patch.py <<'PY'
+          from pathlib import Path
+          
+          backend_path=Path('functions/game-wallet/src/main.js')
+          profile_path=Path('player-profile.html')
+          backend=backend_path.read_text(encoding='utf8')
+          profile=profile_path.read_text(encoding='utf8')
+          
+          def one(source,old,new,label):
+              count=source.count(old)
+              if count!=1:
+                  raise AssertionError(f'{label}: expected 1 matching anchor, got {count}')
+              return source.replace(old,new,1)
+          
+          if 'function makeMathQuestion()' not in backend:
+              backend=one(backend,'const GAME_IDS = ["speed_tap", "memory_x", "memory_x_24"];','const GAME_IDS = ["speed_tap", "memory_x", "memory_x_24", "math_challenge"];','game id')
+          
+              math_helpers = '''function makeMathQuestion() {
+            const a = randomInt(1, 16), b = randomInt(1, 13), kind = randomInt(3);
+            const answer = kind === 0 ? a + b : kind === 1 ? a * b : Math.abs(a - b);
+            const label = kind === 0 ? a + ' + ' + b + ' = ?' :
+              kind === 1 ? a + ' × ' + b + ' = ?' :
+                Math.max(a, b) + ' − ' + Math.min(a, b) + ' = ?';
+            const options = new Set([answer]);
+            while (options.size < 4) options.add(Math.max(0, answer + randomInt(17) - 8));
+            return { label, options: shuffle([...options]), answer };
+          }
+          
+          function verifyMath(questions, events, elapsedMs) {
+            if (!Array.isArray(questions) || questions.length !== 10 ||
+                !Array.isArray(events) || events.length > 10 ||
+                !Number.isInteger(elapsedMs) || elapsedMs < 1000 || elapsedMs > 90000)
+              return null;
+            let score = 0, previous = -1;
+            for (let i = 0; i < events.length; i++) {
+              const e = events[i], q = questions[i];
+              if (!q || !Array.isArray(q.options) || q.options.length !== 4 ||
+                  !Number.isInteger(q.answer) ||
+                  !Array.isArray(e) || e.length !== 2 ||
+                  !Number.isInteger(e[0]) || e[0] < 0 || e[0] >= 4 ||
+                  !Number.isInteger(e[1]) || e[1] < 0 || e[1] > elapsedMs ||
+                  e[1] < previous) return null;
+              previous = e[1];
+              if (q.options[e[0]] === q.answer) score++;
+            }
+            return { score, durationMs: elapsedMs };
+          }
+          
+          '''
+              backend=one(backend,'async function startGame(user, b, key) {',math_helpers+'async function startGame(user, b, key) {','helper insertion')
+              backend=one(backend,"  } else {\n    challenge = {\n      targets: Array.from(","  } else if (gameId === 'math_challenge') {\n    challenge = { questions: Array.from({ length: 10 }, makeMathQuestion) };\n  } else {\n    challenge = {\n      targets: Array.from(",'math challenge creation')
+              backend=one(backend,'now + (gameId === "speed_tap" ? 40000 : 70000)','now + (gameId === "speed_tap" ? 40000 : gameId === "math_challenge" ? 120000 : 70000)','math expiry')
+              backend=one(backend,'    challenge,\n    startedAt,\n    expiresAt\n  };',"    challenge: gameId === 'math_challenge' ? {\n      questions: challenge.questions.map(({label, options}) => ({label, options}))\n    } : challenge,\n    startedAt,\n    expiresAt\n  };",'private math answers')
+              backend=one(backend,'''  } else if (session.gameid === "speed_tap" &&
+                       Object.hasOwn(speedLevels, challenge.level)) {
+              verified = verifySpeed(
+                challenge, b.events, elapsedMs
+              );
+            }
+          ''','''  } else if (session.gameid === "speed_tap" &&
+                       Object.hasOwn(speedLevels, challenge.level)) {
+              verified = verifySpeed(
+                challenge, b.events, elapsedMs
+              );
+            } else if (session.gameid === "math_challenge") {
+              verified = verifyMath(challenge.questions, b.events, elapsedMs);
+            }
+          ''','finish branch')
+              backend=one(backend,'durationMs: gameId.startsWith("memory_x")\n        ? value.durationMs : null','durationMs: gameId.startsWith("memory_x") || gameId === "math_challenge"\n        ? value.durationMs : null','leaderboard duration')
+          
+          if 'id="boardmath"' not in profile:
+              profile=one(profile,'<div class="row"><div>🧠 Memory X Classic<div class="muted">Fastest local completion</div></div><div class="score" id="memory8">—</div></div>', '<div class="row"><div>🔢 Math Challenge<div class="muted">Best Score</div></div><div class="score" id="mathBest">—</div></div>', 'profile best')
+              profile=one(profile,'<h2>🌍 Verified Online Leaderboards</h2><p class="muted">ये रैंकिंग Appwrite में Server-Verified स्कोर से आती है। पीले रंग में आपका अकाउंट दिखेगा, यदि Top 10 में है।</p>', '<h2>🏆 Top Players</h2><p class="muted">हर गेम के सबसे अच्छे खिलाड़ी। Top 10 में आपका स्कोर होगा तो हाइलाइट दिखेगा।</p>', 'profile title')
+              profile=one(profile,'<div class="gamehead">🧠 Memory X Classic (8 pairs)</div><div class="notice" id="board8">Loading...</div>', '<div class="gamehead">🔢 Math Challenge (10 questions)</div><div class="notice" id="boardmath">Loading...</div>', 'profile third board')
+              profile=one(profile,'↻ Refresh Online Rankings','↻ Refresh Rankings','refresh label')
+              profile=one(profile,'<p class="muted">Personal Best इस मोबाइल का रिकॉर्ड है; Online Leaderboard अलग, Verified रिकॉर्ड दिखाता है।</p>','<p class="muted">पीले रंग में आपकी Ranking हाइलाइट होगी।</p>','technical text')
+              profile=one(profile,'<a class="btn" href="memory-x.html">PLAY MEMORY X EXTREME</a>', '<a class="btn" href="memory-x.html">PLAY MEMORY X EXTREME</a><a class="btn" href="math-challenge.html">PLAY MATH CHALLENGE</a>', 'play math link')
+              profile=one(profile,"$('memory8').textContent=seconds('samrat_memory_x_best_seconds');", "const mathRaw=get('samrat_math_best_v1'),bestMath=Number(mathRaw);$('mathBest').textContent=mathRaw!==null&&Number.isFinite(bestMath)&&bestMath>=0?Math.floor(bestMath)+'/10':'—';", 'math best script')
+              profile=one(profile,"+(total?'/'+total+' pairs':' points')+time", "+(gameId==='math_challenge'?'/10 correct':total?'/'+total+' pairs':' points')+time", 'board score text')
+              profile=one(profile,"loadBoard('speed_tap','boardspeed',0),loadBoard('memory_x','board8',8)", "loadBoard('speed_tap','boardspeed',0),loadBoard('math_challenge','boardmath',0)", 'load three boards')
+          
+          assert 'Memory X Classic' not in profile
+          assert 'Appwrite में Server-Verified' not in profile
+          assert "loadBoard('math_challenge','boardmath',0)" in profile
+          assert 'href="number-draw.html"' in profile
+          assert 'makeMathQuestion' in backend and 'verifyMath(' in backend
+          backend_path.write_text(backend,encoding='utf8')
+          profile_path.write_text(profile,encoding='utf8')
+          print('Updated player profile and game-wallet; existing Number Draw, Memory X, Speed Tap preserved.')
+          PY
+          python3 /tmp/samrat_three_game_patch.py
+          cat > math-challenge.html <<'HTML'
+          <!doctype html>
+          <html lang="hi">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <meta name="theme-color" content="#120621">
+          <title>Math Challenge | Samrat X-Treme</title>
+          <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+          <style>
+          *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#4a1a73,#17072b 52%,#07020c);color:#fff;font:15px system-ui,Arial}
+          main{max-width:520px;margin:auto;padding:20px 16px 55px}a{color:#f2d3ff}.brand{text-align:center;font:900 30px Georgia,serif;color:#ffe17c;margin:20px 0 8px}.sub{text-align:center;letter-spacing:2px;color:#e3baff;font-size:18px;font-weight:900}
+          .panel{background:linear-gradient(145deg,#24103e,#351454);border:1px solid #8655c9;border-radius:20px;padding:19px;margin:17px 0;box-shadow:0 8px 28px #0006}h2{text-align:center;color:#ffe17c;font-size:21px}
+          .guide{background:#160b2b;border:1px solid #9861d6;border-radius:14px;padding:13px;line-height:1.7;color:#eee0ff}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:15px 0}.stat{background:#180a2e;border-radius:12px;padding:12px 4px;text-align:center}.stat b{display:block;color:#ffe17c;font-size:23px}.stat small{color:#d5bdf3;font-size:11px}
+          #question{font-size:31px;font-weight:900;text-align:center;min-height:72px;padding:13px 0}.answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.answers button,.mainbtn{padding:15px;border:0;border-radius:13px;font:800 18px system-ui,Arial;cursor:pointer;background:#ffdd5a;color:#27103c}.answers button:disabled{opacity:.55}.mainbtn{width:100%;margin-top:14px;background:linear-gradient(90deg,#ffe545,#ffa332,#ff45a0)}.mainbtn:disabled{opacity:.5}
+          .muted{color:#dbc2ee;line-height:1.6;font-size:13px}.rank{padding:10px 3px;border-bottom:1px solid #785199;font-size:14px}.rank:last-child{border:0}.status{min-height:36px;color:#ffe59c;text-align:center;line-height:1.4;margin-top:15px}.hide{display:none!important}
+          </style>
+          </head>
+          <body><main>
+          <a href="index.html">← Samrat X-Treme Home</a><div class="brand">SAMRAT X-TREME</div><div class="sub">🔢 MATH CHALLENGE</div>
+          <section class="panel"><h2>10 Questions · 90 Seconds</h2>
+          <div class="guide">सही उत्तर चुनिए और अधिक से अधिक अंक बनाइए। हर सही उत्तर पर 1 अंक। Coins नहीं कटेंगे। सिर्फ Online Game के अंक Ranking में जुड़ते हैं।</div>
+          <p id="mode" class="muted">Checking login...</p>
+          <div class="stats"><div class="stat"><b id="time">90</b><small>SECONDS</small></div><div class="stat"><b id="progress">0/10</b><small>QUESTIONS</small></div><div class="stat"><b id="score">—</b><small>BEST</small></div></div>
+          <div id="question">Ready?</div><div class="answers" id="answers"></div>
+          <div class="status" id="message" role="status">START GAME दबाइए</div>
+          <button class="mainbtn" id="start" type="button">▶ START GAME</button>
+          </section>
+          <section class="panel"><h2>🏆 Math Challenge · Top 10</h2><div id="leaderboard" class="muted">Loading...</div><button class="mainbtn" id="refresh" type="button">↻ Refresh Ranking</button></section>
+          <p class="muted" style="text-align:center">Free skill game · No coin deduction · No cash rewards</p>
+          </main>
+          <script>
+          'use strict';
+          const ENDPOINT='https://sgp.cloud.appwrite.io/v1',PROJECT='6a7f2add0011a7bfc21a',FUNCTION_ID='6ae1bcc500208a5a7efb';
+          const $=id=>document.getElementById(id);
+          const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
+          const account=new Appwrite.Account(client),functions=new Appwrite.Functions(client);
+          let user=null,session=null,questions=[],index=0,events=[],started=0,deadline=0,clock=null,playing=false,sending=false,practice=false,localCorrect=0;
+          let best=0;try{best=Number(localStorage.getItem('samrat_math_best_v1'))||0}catch{}$('score').textContent=best+'/10';
+          async function api(action,extra={}){
+           const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...extra}),async:false});
+           let d;try{d=JSON.parse(r.responseBody||'{}')}catch{throw Error('Server response unavailable')}
+           if(r.status!=='completed'||r.responseStatusCode!==200||!d.ok)throw Error(d.error||'Server unavailable');
+           return d;
+          }
+          function practiceQuestions(){
+           const result=[];for(let n=0;n<10;n++){
+            const a=Math.floor(Math.random()*15)+1,b=Math.floor(Math.random()*12)+1,op=Math.floor(Math.random()*3);
+            const answer=op===0?a+b:op===1?a*b:Math.abs(a-b);
+            const label=op===0?a+' + '+b+' = ?':op===1?a+' × '+b+' = ?':Math.max(a,b)+' − '+Math.min(a,b)+' = ?';
+            const choices=new Set([answer]);while(choices.size<4)choices.add(Math.max(0,answer+Math.floor(Math.random()*17)-8));
+            const options=[...choices];for(let i=options.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[options[i],options[j]]=[options[j],options[i]]}
+            result.push({label,options,answer});
+           }
+           return result;
+          }
+          function render(){
+           $('progress').textContent=index+'/10';const area=$('answers');area.replaceChildren();
+           if(!playing||index>=questions.length){$('question').textContent='';return}
+           const q=questions[index];$('question').textContent=q.label;
+           q.options.forEach((value,choice)=>{const b=document.createElement('button');b.type='button';b.textContent=value;b.onclick=()=>select(choice);area.append(b)});
+          }
+          function tick(){if(!playing)return;const remain=Math.max(0,Math.ceil((deadline-performance.now())/1000));$('time').textContent=remain;if(remain===0)finish()}
+          function select(choice){
+           if(!playing||index>=questions.length)return;
+           const elapsed=Math.floor(performance.now()-started);
+           if(elapsed>=90000){finish();return}
+           const q=questions[index];if(!Number.isInteger(choice)||choice<0||choice>=q.options.length)return;
+           events.push([choice,elapsed]);if(practice&&q.options[choice]===q.answer)localCorrect++;
+           index++;$('message').textContent='उत्तर सेव हुआ';if(index===10){finish();return}render();
+          }
+          async function finish(){
+           if(!playing)return;playing=false;clearInterval(clock);clock=null;
+           const elapsed=Math.min(90000,Math.max(1000,Math.floor(performance.now()-started)));
+           $('time').textContent=Math.max(0,Math.ceil((90000-elapsed)/1000));$('answers').replaceChildren();$('question').textContent='Game Complete';$('progress').textContent=index+'/10';
+           sending=true;$('start').disabled=true;$('message').textContent=practice?'Practice completed: '+localCorrect+'/10 (ranking में नहीं)':'आपके उत्तर जाँचे जा रहे हैं…';
+           try{
+            if(session&&!practice){
+             const result=await api('finish_game',{sessionId:session,events,elapsedMs:elapsed});
+             const finalScore=result.score;
+             if(finalScore>best){best=finalScore;try{localStorage.setItem('samrat_math_best_v1',String(best))}catch{}$('score').textContent=best+'/10'}
+             $('message').textContent='✓ Score: '+finalScore+'/10 · Ranking अपडेट';await leaderboard();
+            }
+           }catch(e){$('message').textContent='Online score सेव नहीं हुआ: '+e.message+' · Recheck से पहले नया गेम शुरू न करें।'}
+           finally{session=null;sending=false;$('start').textContent='↻ PLAY AGAIN';$('start').disabled=false}
+          }
+          async function leaderboard(){
+           const area=$('leaderboard');area.textContent='Loading...';
+           try{const d=await api('get_leaderboard',{gameId:'math_challenge'});area.replaceChildren();
+            if(!d.entries?.length){area.textContent='अभी कोई Ranking नहीं';return}
+            for(const e of d.entries){const line=document.createElement('div');line.className='rank';line.textContent='#'+e.rank+' · '+e.player+' · '+e.score+'/10 सही';area.append(line)}
+           }catch(e){area.textContent='Ranking उपलब्ध नहीं: '+e.message}
+          }
+          async function start(){
+           if(playing||sending)return;$('start').disabled=true;$('message').textContent='नया गेम शुरू हो रहा है…';
+           try{
+            user=await account.get();session=null;practice=false;index=0;events=[];localCorrect=0;
+            try{const r=await api('start_game',{gameId:'math_challenge'});
+             if(!r.sessionId||!Array.isArray(r.challenge?.questions)||r.challenge.questions.length!==10||r.challenge.questions.some(q=>typeof q.label!=='string'||!Array.isArray(q.options)||q.options.length!==4||'answer' in q))throw Error('Math session invalid');
+             session=r.sessionId;questions=r.challenge.questions;$('mode').textContent='Online Ranked Game';
+            }catch(e){practice=true;questions=practiceQuestions();$('mode').textContent='Practice mode · No online Ranking';$('message').textContent='Online unavailable: '+e.message}
+            playing=true;started=performance.now();deadline=started+90000;$('time').textContent='90';$('start').textContent='GAME IN PROGRESS';render();clock=setInterval(tick,150);tick();
+           }catch(e){$('mode').textContent='Please login to play';$('message').textContent='Login required: '+e.message}
+           finally{$('start').disabled=playing}
+          }
+          $('start').onclick=start;$('refresh').onclick=leaderboard;
+          account.get().then(u=>{user=u;$('mode').textContent='Signed in · Ready for online game';}).catch(()=>{location.replace('login.html?next=math-challenge.html')});
+          leaderboard();
+          </script></body></html>
+          HTML
+      - name: Verify JavaScript and layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          for page in ['player-profile.html','math-challenge.html']:
+              content=Path(page).read_text(encoding='utf8')
+              scripts=re.findall(r'<script[^>]*>(.*?)</script>',content,re.S)
+              scripts=[s for s in scripts if s.strip()]
+              assert scripts, f'No inline JavaScript in {page}'
+              for i,script in enumerate(scripts):
+                  Path(f'/tmp/samrat_{page}_{i}.js').write_text(script)
+              print('Validated script extraction for',page)
+          profile=Path('player-profile.html').read_text()
+          assert 'number-draw.html' in profile
+          for target in ['board24','boardspeed','boardmath']:
+              assert f'id="{target}"' in profile
+          assert 'board8' not in profile
+          math=Path('math-challenge.html').read_text()
+          assert 'finish_game' in math and "gameId:'math_challenge'" in math
+          backend=Path('functions/game-wallet/src/main.js').read_text()
+          assert 'function verifyMath(' in backend and 'math_challenge' in backend
+          PY
+          for f in /tmp/samrat_player-profile.html_*.js /tmp/samrat_math-challenge.html_*.js; do node --check "$f"; done
+      - name: Commit three-game ranking update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add player-profile.html math-challenge.html functions/game-wallet/src/main.js
+          if git diff --cached --quiet; then
+            echo "Three-game rankings already installed."
+          else
+            git commit -m "Rank Math Challenge with Speed Tap and Memory X on player profile"
+            git push
+          fi
