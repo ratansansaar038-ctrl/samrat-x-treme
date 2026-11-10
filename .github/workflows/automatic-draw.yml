@@ -3,7 +3,7 @@ name: Samrat Automatic Draw
 
 on:
   schedule:
-    - cron: "0,20,40 * * * *"
+    - cron: "11,31,51 * * * *"
   workflow_dispatch:
 
 jobs:
