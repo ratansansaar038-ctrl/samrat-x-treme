@@ -211,12 +211,83 @@ async function lastResult(key) {
   }
 
   const settled = valid(r) ? await settleRound(r, key) : 0;
+  let recovery;
+  try {
+    recovery = await recoverPendingRounds(key, previous.roundId);
+  } catch (e) {
+    console.error("Number draw recovery failed: " + e.message);
+    recovery = { ok: false, error: "Recovery temporarily unavailable" };
+  }
   return {
     ok: true,
     available: valid(r),
     roundId: previous.roundId,
     winningNumber: valid(r) ? r.winningNumber : null,
-    settledEntries: settled
+    settledEntries: settled,
+    recovery
+  };
+}
+
+// RECOVERY V1: Recover only expired rounds containing pending entries.
+// Existing settled winning numbers are never changed; processing is bounded.
+async function recoverPendingRounds(key, justProcessedRoundId) {
+  const entries = await rows("game_entries", [
+    eq("status", "pending"), lim(100)
+  ], key);
+  const cutoff = Date.now() - 10000;
+  const candidates = new Map();
+
+  for (const entry of entries) {
+    const rid = entry.roundId;
+    const match = typeof rid === "string" && /^r_(\d{17})$/.exec(rid);
+    if (!match || rid === justProcessedRoundId) continue;
+    const digits = match[1];
+    const y = +digits.slice(0, 4), m = +digits.slice(4, 6);
+    const d = +digits.slice(6, 8), h = +digits.slice(8, 10);
+    const minute = +digits.slice(10, 12), sec = +digits.slice(12, 14);
+    const millis = +digits.slice(14, 17);
+    const startMs = Date.UTC(y, m - 1, d, h, minute, sec, millis);
+    if (!Number.isFinite(startMs)) continue;
+    const round = roundFor(startMs);
+    if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff) continue;
+    candidates.set(rid, round);
+  }
+
+  let recoveredRounds = 0, recoveredEntries = 0;
+  const flaggedRounds = [];
+  for (const round of [...candidates.values()]
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 2)) {
+    let saved = await stored(round.roundId, key);
+    if (!saved) {
+      try {
+        saved = await request("POST", tablePath("game_rounds"), key, {
+          rowId: round.roundId,
+          data: {
+            roundId: round.roundId,
+            startAt: round.startsAt,
+            endsAt: round.endsAt,
+            settleAt: new Date().toISOString(),
+            status: "settled",
+            winningNumber: randomInt(1, 10)
+          }
+        });
+      } catch (e) {
+        if (e.status !== 409) throw e;
+        saved = await stored(round.roundId, key);
+      }
+    }
+    if (!valid(saved)) {
+      flaggedRounds.push(round.roundId);
+      continue;
+    }
+    recoveredEntries += await settleRound(saved, key);
+    recoveredRounds++;
+  }
+  return {
+    ok: true, checkedPending: entries.length,
+    scanLimitReached: entries.length === 100,
+    recoveredRounds, recoveredEntries,
+    flaggedRounds
   };
 }
 
