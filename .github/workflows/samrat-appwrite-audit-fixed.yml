@@ -1,0 +1,138 @@
+name: Samrat Number Draw Read-Only Audit FIXED
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read pending draw entries and round status (no writes)
+        env:
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_AUDIT_KEY }}
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          import json
+          import urllib.parse
+          import urllib.request
+          import urllib.error
+          from collections import defaultdict
+          from datetime import datetime, timezone
+
+          endpoint = 'https://sgp.cloud.appwrite.io/v1'
+          database_id = '6a7f2d1d0035d9815939'
+          project = os.environ.get('APPWRITE_PROJECT', '').strip()
+          key = os.environ.get('APPWRITE_API_KEY', '').strip()
+          if not project or not key:
+              print('AUDIT_ERROR: Missing APPWRITE_PROJECT or APPWRITE_AUDIT_KEY GitHub secret')
+              sys.exit(1)
+
+          def query(method, attribute=None, values=None):
+              data = {'method': method}
+              if attribute is not None:
+                  data['attribute'] = attribute
+              if values is not None:
+                  data['values'] = values
+              return data
+
+          def get_rows(table, q):
+              parameters = urllib.parse.urlencode([
+                  ('queries[]', json.dumps(x, separators=(',', ':'))) for x in q
+              ])
+              path = f'/tablesdb/{database_id}/tables/{table}/rows'
+              url = endpoint + path + '?' + parameters
+              request = urllib.request.Request(url, headers={
+                  'X-Appwrite-Project': project,
+                  'X-Appwrite-Key': key,
+                  'Accept': 'application/json'
+              }, method='GET')
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      data = json.load(response)
+              except urllib.error.HTTPError as e:
+                  # Do not log request headers or sensitive response bodies.
+                  raise RuntimeError(f'{table}: HTTP {e.code}') from None
+              if not isinstance(data.get('rows'), list):
+                  raise RuntimeError(f'{table}: missing rows array')
+              return data
+
+          cap = 5000
+          pending = []
+          cursor = None
+          reported_total = None
+          try:
+              while len(pending) < cap:
+                  queries = [query('equal', 'status', ['pending']), query('limit', values=[100])]
+                  if cursor:
+                      queries.append(query('cursorAfter', values=[cursor]))
+                  data = get_rows('game_entries', queries)
+                  if reported_total is None:
+                      reported_total = data.get('total')
+                  batch = data['rows']
+                  if not batch:
+                      break
+                  pending.extend(batch)
+                  if len(batch) < 100:
+                      break
+                  next_cursor = batch[-1].get('$id')
+                  if not next_cursor or next_cursor == cursor:
+                      raise RuntimeError('Pagination cursor unavailable')
+                  cursor = next_cursor
+
+              groups = defaultdict(lambda: {'entries': 0, 'stakedVC': 0, 'oldest': None})
+              for entry in pending:
+                  rid = entry.get('roundId') or '(missing roundId)'
+                  group = groups[rid]
+                  group['entries'] += 1
+                  stake = entry.get('stakeVc')
+                  if isinstance(stake, int) and not isinstance(stake, bool) and stake >= 0:
+                      group['stakedVC'] += stake
+                  created = entry.get('$createdAt')
+                  if isinstance(created, str) and (group['oldest'] is None or created < group['oldest']):
+                      group['oldest'] = created
+
+              print('SAMRAT_NUMBER_DRAW_READ_ONLY_AUDIT')
+              print('AUDIT_UTC=' + datetime.now(timezone.utc).isoformat())
+              print('PENDING_ENTRIES_FOUND=' + str(len(pending)))
+              print('API_PENDING_TOTAL=' + str(reported_total))
+              print('PENDING_ROUNDS_FOUND=' + str(len(groups)))
+              print('PENDING_VC_TOTAL=' + str(sum(g['stakedVC'] for g in groups.values())))
+              print('TRUNCATED=' + ('true' if len(pending) >= cap else 'false'))
+              print('No player IDs, names, emails, API keys, or vouchers printed.')
+
+              for rid, group in sorted(groups.items(), key=lambda x: x[1]['oldest'] or '')[:30]:
+                  status = 'unknown'
+                  winning = 'none'
+                  if rid.startswith('r_') and len(rid) <= 36:
+                      round_data = get_rows('game_rounds', [
+                          query('equal', 'roundId', [rid]), query('limit', values=[2])
+                      ])
+                      matches = round_data['rows']
+                      if len(matches) == 0:
+                          status = 'not_recorded'
+                      elif len(matches) == 1:
+                          status = str(matches[0].get('status') or 'unknown')
+                          num = matches[0].get('winningNumber')
+                          if isinstance(num, int) and 1 <= num <= 9:
+                              winning = str(num)
+                      else:
+                          status = 'duplicate_rounds'
+                  print('PENDING_ROUND=' + rid + ' | entries=' + str(group['entries']) +
+                        ' | stakedVC=' + str(group['stakedVC']) +
+                        ' | roundStatus=' + status +
+                        ' | winningNumber=' + winning +
+                        ' | oldest=' + str(group['oldest']))
+              if len(groups) > 30:
+                  print('PENDING_ROUND_DETAILS_TRUNCATED=' + str(len(groups) - 30))
+              print('AUDIT_COMPLETE: GET requests only; no wallet or draw records modified.')
+          except Exception as exc:
+              print('AUDIT_ERROR: ' + str(exc))
+              sys.exit(1)
+          PY
