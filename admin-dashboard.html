@@ -49,6 +49,13 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <section class="panel"><h2>Voucher history</h2><p class="hint">Latest 60 vouchers. Used and unused status. Never share these codes publicly.</p>
 <div id="vouchers"></div></section>
 <section class="panel"><h2>Recent Number Draws</h2><p class="hint">Latest 8 recorded rounds. The result comes from stored game data.</p><div id="rounds"></div></section>
+<section class="panel" id="winReportPanel">
+<h2>🎯 Winning Number Report</h2>
+<p class="hint">Draw complete होने के बाद Winning Players, VC और Wallet Payout देखें। Recent Number Draws से कोई Round चुनें।</p>
+<p class="hint" id="winReportStatus" role="status">Loading last winning draw…</p>
+<div id="winReportMetrics" class="metrics"></div>
+<div id="winReportPlayers"></div>
+</section>
 <section class="panel"><h2>Mini Game activity</h2><p class="hint">Latest 8 recorded scores, subject to backend verification.</p><div id="games"></div></section>
 </div>
 </section>
@@ -78,12 +85,50 @@ function renderPlayers(items){const dst=el('players');dst.replaceChildren();if(!
 function renderVouchers(items){const dst=el('vouchers');dst.replaceChildren();if(!items?.length){dst.append(node('p','No vouchers found.','blank'));return;}
  for(const v of items){const used=Boolean(v.isRedeemed);item(dst,v.code,(used?'REDEEMED':'UNUSED')+' · Created '+date(v.createdAt)+(used&&v.redeemedBy?'\nUser: '+v.redeemedBy:''),fmt(v.coins)+' VC',used?'state used':'state');}}
 function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!items?.length){dst.append(node('p','No rounds found.','blank'));return;}
- for(const r of items){item(dst,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');}}
+ for(const r of items){
+   const wrap=node('div'),button=node('button','View Winning Report');
+   item(wrap,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');
+   button.type='button';button.disabled=r.status!=='settled'||!Number.isInteger(r.winningNumber);
+   button.style.marginTop='8px';button.onclick=()=>loadWinningReport(r.roundId);
+   wrap.append(button);dst.append(wrap);
+ }}
+async function loadWinningReport(roundId){
+ const status=el('winReportStatus'),metrics=el('winReportMetrics'),players=el('winReportPlayers');
+ status.textContent='Loading '+roundId+'…';metrics.replaceChildren();players.replaceChildren();
+ try{
+   const d=await api('admin_round_report',{roundId});
+   status.textContent='Round '+d.roundId+' · End '+date(d.endsAt)+(d.pendingEntries?' · Settlement pending':' · Settlement checked');
+   for(const [label,value] of [
+     ['Winning Number',d.winningNumber],['Winning Players',d.winningPlayers],
+     ['Winning Entries',d.winningEntries],['VC on Winning Number',d.winningStakedVC+' VC'],
+     ['Expected Payout',d.expectedPayoutVC+' VC'],['Credited Payout',d.creditedPayoutVC+' VC'],
+     ['Awaiting / Check Payout',d.unpaidPayoutVC+' VC'],['Pending Entries (all numbers)',d.pendingEntries],
+     ['Total Players',d.totalPlayers],['Total VC Staked',d.totalStakedVC+' VC']
+   ]){
+     const card=node('div',null,'metric');card.append(node('small',label),node('strong',String(value)));metrics.append(card);
+   }
+   players.append(node('h3','Winning players & payout'));
+   if(!d.players?.length)players.append(node('p','इस Round में किसी ने Winning Number नहीं चुना।','blank'));
+   for(const p of d.players||[]){
+     const remaining=p.expectedPayoutVC-p.creditedPayoutVC;
+     const state=p.issues?'CHECK':p.pendingEntries?'PENDING':remaining===0?'CREDITED':'CHECK';
+     item(players,'Player '+p.userId.slice(0,8),
+       'ID: '+p.userId+' · '+p.entries+' winning entries · '+p.stakedVC+' VC staked · '+state,
+       p.creditedPayoutVC+'/'+p.expectedPayoutVC+' VC');
+   }
+   if(d.detailsTruncated)players.append(node('p','Only first 100 winning players shown; totals include everyone.','hint'));
+   if(d.inconsistencies)players.append(node('p','⚠ '+d.inconsistencies+' entries need settlement review.','error'));
+ }catch(e){status.textContent='Report unavailable: '+e.message;}
+}
+
 function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
  for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
 async function refresh(){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
  try{const d=await api('admin_dashboard');text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
- renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);const partial=d.warnings?.length?' Some sections unavailable: '+d.warnings.join(', '):'';message('Dashboard updated. '+date(new Date().toISOString())+partial);}
+ renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
+ const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
+ if(latest)loadWinningReport(latest.roundId);
+ else {el('winReportStatus').textContent='No completed draw available yet.';el('winReportMetrics').replaceChildren();el('winReportPlayers').replaceChildren();}const partial=d.warnings?.length?' Some sections unavailable: '+d.warnings.join(', '):'';message('Dashboard updated. '+date(new Date().toISOString())+partial);}
  catch(e){message('Dashboard unavailable: '+e.message,true);}finally{el('refresh').disabled=false;}}
 el('refresh').addEventListener('click',refresh);
 el('searchForm').addEventListener('submit',async e=>{e.preventDefault();if(!verified)return;const userId=el('playerId').value.trim();if(!/^[a-zA-Z0-9._-]{1,36}$/.test(userId)){text('searchStatus','Enter a valid exact Player ID.');return;}

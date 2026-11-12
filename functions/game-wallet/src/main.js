@@ -506,6 +506,104 @@ async function adminDashboard(user, key) {
   };
 }
 
+// ADMIN WINNING REPORT V1. Read-only; never changes draw results or wallet balances.
+async function adminRoundReport(user, b, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: "Admin access denied" };
+
+  const roundId = typeof b.roundId === "string" ? b.roundId.trim() : "";
+  if (!/^r_\d{17}$/.test(roundId))
+    return { ok: false, error: "Invalid round ID" };
+
+  const round = await stored(roundId, key);
+  if (!valid(round))
+    return { ok: false, error: "Winning result unavailable for this round" };
+
+  // Read every page for exact counts; refuse incomplete reports instead of guessing.
+  const all = [];
+  let cursor = null;
+  for (let page = 0; page < 31; page++) {
+    const queries = [
+      eq("roundId", roundId),
+      order("$createdAt", "asc"),
+      lim(100)
+    ];
+    if (cursor) queries.push({ method: "cursorAfter", values: [cursor] });
+    const batch = await rows("game_entries", queries, key);
+    if (all.length + batch.length > 3000)
+      return { ok: false, error: "Report exceeds 3000 entries; use a paginated export" };
+    all.push(...batch);
+    if (batch.length < 100) break;
+    const next = batch[batch.length - 1]?.$id;
+    if (!next || next === cursor)
+      return { ok: false, error: "Report pagination incomplete; retry" };
+    cursor = next;
+    if (page === 30)
+      return { ok: false, error: "Report pagination limit reached" };
+  }
+
+  const winner = round.winningNumber;
+  const allPlayerIds = new Set();
+  const winners = new Map();
+  let totalStakedVC = 0, winningEntries = 0, winningStakedVC = 0;
+  let expectedPayoutVC = 0, creditedPayoutVC = 0;
+  let pendingEntries = 0, winningPendingEntries = 0, inconsistencies = 0;
+
+  for (const entry of all) {
+    const stake = entry.stakeVc;
+    if (!Number.isSafeInteger(stake) || stake < 1 ||
+        !Number.isInteger(entry.selectNumber) ||
+        entry.selectNumber < 1 || entry.selectNumber > 9 ||
+        typeof entry.userId !== "string" || !entry.userId)
+      return { ok: false, error: "Invalid entry data; report needs review" };
+
+    totalStakedVC += stake;
+    allPlayerIds.add(entry.userId);
+    if (entry.status === "pending") pendingEntries++;
+    const won = entry.selectNumber === winner;
+    if (!won) {
+      if (entry.status !== "lost" && entry.status !== "pending") inconsistencies++;
+      continue;
+    }
+
+    winningEntries++;
+    winningStakedVC += stake;
+    const payout = stake * 8;
+    expectedPayoutVC += payout;
+    if (!winners.has(entry.userId)) winners.set(entry.userId, {
+      userId: entry.userId, entries: 0, stakedVC: 0,
+      expectedPayoutVC: 0, creditedPayoutVC: 0,
+      pendingEntries: 0, issues: 0
+    });
+    const player = winners.get(entry.userId);
+    player.entries++;
+    player.stakedVC += stake;
+    player.expectedPayoutVC += payout;
+    if (entry.status === "won" && entry.payoutVc === payout) {
+      creditedPayoutVC += payout;
+      player.creditedPayoutVC += payout;
+    } else if (entry.status === "pending") {
+      winningPendingEntries++;
+      player.pendingEntries++;
+    } else {
+      inconsistencies++;
+      player.issues++;
+    }
+  }
+
+  const players = [...winners.values()].sort((a, b) =>
+    b.expectedPayoutVC - a.expectedPayoutVC || a.userId.localeCompare(b.userId));
+  return {
+    ok: true, roundId, winningNumber: winner, endsAt: round.endsAt,
+    totalPlayers: allPlayerIds.size, totalEntries: all.length, totalStakedVC,
+    winningPlayers: players.length, winningEntries, winningStakedVC,
+    expectedPayoutVC, creditedPayoutVC,
+    unpaidPayoutVC: expectedPayoutVC - creditedPayoutVC,
+    pendingEntries, winningPendingEntries, inconsistencies,
+    players: players.slice(0, 100), detailsTruncated: players.length > 100
+  };
+}
+
 async function adminFindPlayer(user, b, key) {
   if (!dashboardIsAdmin(user))
     return { ok: false, error: 'Admin access denied' };
@@ -1130,6 +1228,7 @@ export default async ({ req, res, error }) => {
     "redeem_voucher",
     "generate_vouchers",
     "admin_dashboard",
+    "admin_round_report",
     "admin_find_player",
     "unused_vouchers",
     "my_entries",
@@ -1272,6 +1371,10 @@ export default async ({ req, res, error }) => {
 
 if (action === "admin_dashboard") {
   const d = await adminDashboard(user, key);
+  return send(res, d.ok ? 200 : 403, d);
+}
+if (action === "admin_round_report") {
+  const d = await adminRoundReport(user, b, key);
   return send(res, d.ok ? 200 : 403, d);
 }
 if (action === "admin_find_player") {
