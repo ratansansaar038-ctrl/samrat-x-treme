@@ -89,7 +89,12 @@ function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!it
    const wrap=node('div'),button=node('button','View Winning Report');
    item(wrap,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');
    button.type='button';button.disabled=r.status!=='settled'||!Number.isInteger(r.winningNumber);
-   button.style.marginTop='8px';button.onclick=()=>loadWinningReport(r.roundId);
+   button.style.marginTop='8px';
+   button.onclick=()=>{
+     loadWinningReport(r.roundId);
+     const panel=el('winReportPanel');
+     panel.scrollIntoView({behavior:'smooth',block:'start'});
+   };
    wrap.append(button);dst.append(wrap);
  }}
 async function loadWinningReport(roundId){
@@ -108,7 +113,7 @@ async function loadWinningReport(roundId){
      const card=node('div',null,'metric');card.append(node('small',label),node('strong',String(value)));metrics.append(card);
    }
    players.append(node('h3','Winning players & payout'));
-   if(!d.players?.length)players.append(node('p','इस Round में किसी ने Winning Number नहीं चुना।','blank'));
+   if(!d.players?.length)players.append(node('p',d.totalEntries===0?'इस Round में कोई Entry नहीं लगी।':'इस Round में किसी ने Winning Number नहीं चुना।','blank'));
    for(const p of d.players||[]){
      const remaining=p.expectedPayoutVC-p.creditedPayoutVC;
      const state=p.issues?'CHECK':p.pendingEntries?'PENDING':remaining===0?'CREDITED':'CHECK';
