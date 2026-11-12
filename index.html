@@ -29,9 +29,6 @@
       margin: 14px 0;
       box-shadow: 0 9px 30px #0005;
     }
-    .game { padding: 23px 18px; text-align: center; }
-    .game h2 { font-size: 20px; margin: 8px 0; color: #ffe48b; }
-    .game .emoji { font-size: 34px; }
     .btn {
       width: 100%;
       display: block;
@@ -54,7 +51,7 @@
     }
     .row { display: flex; gap: 10px; }
     .row > * { flex: 1; min-width: 0; }
-    input {
+    input, select {
       width: 100%;
       padding: 13px;
       margin: 7px 0;
@@ -69,6 +66,7 @@
       color: #ffe38b;
       font-size: 13px;
       margin: 7px 0;
+      line-height: 1.5;
     }
     .hide { display: none !important; }
     .links {
@@ -93,56 +91,32 @@
     }
     h3 { margin: 0 0 10px; color: #ffe28a; }
     button:disabled { opacity: .5; }
+    .guide-box {
+      background: #140824;
+      border: 1px dashed #7b4fb8;
+      border-radius: 12px;
+      padding: 11px;
+      font-size: 12px;
+      color: #e4d2fa;
+      text-align: left;
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+    .skill-grid { display:grid; gap:16px; margin:20px 0; }
+    .skill-card {
+      display:flex; align-items:center; gap:18px; padding:24px 18px;
+      min-height:160px; border-radius:22px; text-decoration:none;
+      color:white; border:1px solid #8054ba; box-shadow:0 12px 30px #0007;
+    }
+    .skill-card.speed { background:linear-gradient(120deg,#51218b,#17102c); }
+    .skill-card.memory { background:linear-gradient(120deg,#174777,#17102c); }
+    .skill-card.math { background:linear-gradient(120deg,#79501f,#26102d); }
+    .skill-icon { font-size:48px; }
+    .skill-card h2 { font-size:21px; color:#ffe58a; margin:8px 0; }
+    .skill-card p { font-size:13px; color:#ddd0ee; }
+    .skill-card small { color:#89ffb4; font-weight:800; }
+    .skill-card strong { color:#ffdf63; font-size:13px; }
   </style>
-
-<style>
-.skill-grid {
-  display:grid;
-  gap:16px;
-  margin:20px 0;
-}
-.skill-card {
-  display:flex;
-  align-items:center;
-  gap:18px;
-  padding:24px 18px;
-  min-height:160px;
-  border-radius:22px;
-  text-decoration:none;
-  color:white;
-  border:1px solid #8054ba;
-  box-shadow:0 12px 30px #0007;
-}
-.skill-card.speed {
-  background:linear-gradient(120deg,#51218b,#17102c);
-}
-.skill-card.memory {
-  background:linear-gradient(120deg,#174777,#17102c);
-}
-.skill-card.math {
-  background:linear-gradient(120deg,#79501f,#26102d);
-}
-.skill-icon {
-  font-size:48px;
-}
-.skill-card h2 {
-  font-size:21px;
-  color:#ffe58a;
-  margin:8px 0;
-}
-.skill-card p {
-  font-size:13px;
-  color:#ddd0ee;
-}
-.skill-card small {
-  color:#89ffb4;
-  font-weight:800;
-}
-.skill-card strong {
-  color:#ffdf63;
-  font-size:13px;
-}
-</style>
 </head>
 
 <body>
@@ -186,23 +160,31 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
-  <!-- 🪙 VIRTUAL COINS STORE & VOUCHER REDEEM PANEL -->
+  <!-- 🪙 VIRTUAL COINS STORE (AMAZON PAY E-VOUCHER) -->
   <section class="panel" style="text-align:center; border: 1px solid #ffd15c;">
     <h3 style="color:#ffe080; margin-bottom:4px;">🪙 GET VIRTUAL COINS</h3>
     <p class="small" style="margin-top:0;">
-      Instant Game Tokens • <strong>500 VC for ₹50</strong>
+      Instant Game Tokens via <strong>Amazon Pay E-Voucher</strong>
     </p>
 
-    <a class="btn" href="https://imojo.in/9xpzaQ" target="_blank" style="background: linear-gradient(100deg, #00e676, #00b0ff); color:#081c15;">
-      💳 BUY 500 VC (₹50) VIA UPI
-    </a>
-
-    <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #643d8c;">
-      <p class="small" style="margin-bottom:6px;">Payment ke baad mila Voucher Code yahan daalein:</p>
-      <input id="voucherCode" placeholder="Enter Voucher Code (e.g. MOJO...)" style="text-align:center; text-transform:uppercase;">
-      <button class="btn secondary" id="redeemBtn" style="margin-top:4px;">REDEEM VOUCHER</button>
-      <div class="status" id="voucherMsg"></div>
+    <div class="guide-box">
+      <strong style="color:#ffe080;">How to get Voucher PIN (10 Sec):</strong><br>
+      1. Open <b>PhonePe, Paytm, or GPay</b> → Search <b>Amazon Pay E-Voucher</b>.<br>
+      2. Buy voucher of your chosen amount.<br>
+      3. Copy the <b>14-Character PIN</b> (e.g. <code>C6MR-R4XFRA-DMPF</code>) and submit below.
     </div>
+
+    <select id="voucherSlab">
+      <option value="10|100">₹10 Voucher = 100 VC</option>
+      <option value="50|500" selected>₹50 Voucher = 500 VC</option>
+      <option value="100|1000">₹100 Voucher = 1,000 VC</option>
+      <option value="200|2000">₹200 Voucher = 2,000 VC</option>
+      <option value="500|5000">₹500 Voucher = 5,000 VC</option>
+    </select>
+
+    <input id="voucherCode" maxlength="18" placeholder="Enter 14-Char PIN (XXXX-XXXXXX-XXXX)" style="text-align:center; text-transform:uppercase; letter-spacing:1px;">
+    <button class="btn" id="redeemBtn" style="margin-top:8px;">SUBMIT VOUCHER PIN</button>
+    <div class="status" id="voucherMsg"></div>
   </section>
 
   <section class="panel" id="permanentApkDownload" style="text-align:center">
@@ -216,7 +198,6 @@
   </section>
 
   <section class="skill-grid">
-
     <a class="skill-card speed" href="speed-tap.html">
       <span class="skill-icon">⚡</span>
       <div>
@@ -246,7 +227,6 @@
         <strong>PLAY NOW →</strong>
       </div>
     </a>
-
   </section>
 
   <nav class="links">
@@ -256,10 +236,7 @@
     <a href="reward.html">Rewards</a>
   </nav>
 
-  <div class="policy-links" style="
-    display:flex;justify-content:center;
-    gap:12px;flex-wrap:wrap;margin:16px 0;
-    font-size:12px">
+  <div class="policy-links" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0;font-size:12px">
     <a href="terms.html">Terms & Conditions</a>
     <a href="privacy.html">Privacy Policy</a>
     <a href="fair-play.html">Fair Play Policy</a>
@@ -313,10 +290,8 @@ async function api(action, extra = {}) {
 async function refreshUser() {
   try {
     const user = await account.get();
-
     $('authPanel').classList.add('hide');
     $('signedPanel').classList.remove('hide');
-
     msg('signedName', user.name || user.email);
   } catch {
     $('authPanel').classList.remove('hide');
@@ -330,7 +305,6 @@ $('login').onclick = async () => {
       email: $('email').value.trim(),
       password: $('password').value
     });
-
     await refreshUser();
   } catch (error) {
     msg('authMsg', error.message);
@@ -343,21 +317,10 @@ $('signup').onclick = async () => {
     const email = $('email').value.trim();
     const password = $('password').value;
 
-    if (!name) {
-      throw Error('Enter your name');
-    }
+    if (!name) throw Error('Enter your name');
 
-    await account.create({
-      userId: ID.unique(),
-      email,
-      password,
-      name
-    });
-
-    await account.createEmailPasswordSession({
-      email,
-      password
-    });
+    await account.create({ userId: ID.unique(), email, password, name });
+    await account.createEmailPasswordSession({ email, password });
 
     try {
       await api('register_profile', { name, email });
@@ -373,30 +336,39 @@ $('signup').onclick = async () => {
 
 $('logout').onclick = async () => {
   try {
-    await account.deleteSession({
-      sessionId: 'current'
-    });
-
+    await account.deleteSession({ sessionId: 'current' });
     await refreshUser();
   } catch (error) {
     msg('signedMsg', error.message);
   }
 };
 
-// Voucher Redeem Handler
+// Amazon Pay Gift Card PIN Handler
 $('redeemBtn').onclick = async () => {
-  const code = $('voucherCode').value.trim();
-  if (!code) {
-    msg('voucherMsg', 'Please enter a valid voucher code.');
+  const rawPin = $('voucherCode').value.trim().toUpperCase();
+  const cleanPin = rawPin.replace(/[^A-Z0-9]/g, '');
+  const [amount, coins] = $('voucherSlab').value.split('|').map(Number);
+
+  if (cleanPin.length !== 14) {
+    msg('voucherMsg', 'Please enter a valid 14-character PIN (not the 16-digit card number).');
     return;
   }
-  msg('voucherMsg', 'Verifying voucher...');
+
+  $('redeemBtn').disabled = true;
+  msg('voucherMsg', 'Submitting voucher PIN for verification...');
+
   try {
-    await api('redeem_voucher', { code });
-    msg('voucherMsg', 'Success! 500 VC added to your balance.');
+    await api('submit_gift_card', {
+      code: cleanPin,
+      amount: amount,
+      coins: coins
+    });
+    msg('voucherMsg', `✅ PIN Submitted! ${coins} VC will be added within 2-5 mins after verification.`);
     $('voucherCode').value = '';
   } catch (err) {
-    msg('voucherMsg', err.message || 'Invalid or already used voucher.');
+    msg('voucherMsg', err.message || 'Error submitting voucher PIN.');
+  } finally {
+    $('redeemBtn').disabled = false;
   }
 };
 
