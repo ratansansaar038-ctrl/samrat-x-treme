@@ -1,0 +1,324 @@
+name: Install Samrat Admin Winning Number Report
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-install-admin-winning-report
+  cancel-in-progress: false
+
+jobs:
+  install-winning-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Samrat X-Treme
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Add admin-only winning number report (backend and UI)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_admin_winning_report_patch.py <<'PATCH_PY'
+          from pathlib import Path
+
+          backend_path=Path('functions/game-wallet/src/main.js')
+          dashboard_path=Path('admin-dashboard.html')
+          backend=backend_path.read_text(encoding='utf-8')
+          dashboard=dashboard_path.read_text(encoding='utf-8')
+
+          def one(src,old,new,label):
+              count=src.count(old)
+              if count!=1:
+                  raise AssertionError(f'{label}: expected one anchor, found {count}. No files written.')
+              return src.replace(old,new,1)
+
+          report_function=r'''// ADMIN WINNING REPORT V1. Read-only; never changes draw results or wallet balances.
+          async function adminRoundReport(user, b, key) {
+            if (!dashboardIsAdmin(user))
+              return { ok: false, error: "Admin access denied" };
+
+            const roundId = typeof b.roundId === "string" ? b.roundId.trim() : "";
+            if (!/^r_\d{17}$/.test(roundId))
+              return { ok: false, error: "Invalid round ID" };
+
+            const round = await stored(roundId, key);
+            if (!valid(round))
+              return { ok: false, error: "Winning result unavailable for this round" };
+
+            // Read every page for exact counts; refuse incomplete reports instead of guessing.
+            const all = [];
+            let cursor = null;
+            for (let page = 0; page < 31; page++) {
+              const queries = [
+                eq("roundId", roundId),
+                order("$createdAt", "asc"),
+                lim(100)
+              ];
+              if (cursor) queries.push({ method: "cursorAfter", values: [cursor] });
+              const batch = await rows("game_entries", queries, key);
+              if (all.length + batch.length > 3000)
+                return { ok: false, error: "Report exceeds 3000 entries; use a paginated export" };
+              all.push(...batch);
+              if (batch.length < 100) break;
+              const next = batch[batch.length - 1]?.$id;
+              if (!next || next === cursor)
+                return { ok: false, error: "Report pagination incomplete; retry" };
+              cursor = next;
+              if (page === 30)
+                return { ok: false, error: "Report pagination limit reached" };
+            }
+
+            const winner = round.winningNumber;
+            const allPlayerIds = new Set();
+            const winners = new Map();
+            let totalStakedVC = 0, winningEntries = 0, winningStakedVC = 0;
+            let expectedPayoutVC = 0, creditedPayoutVC = 0;
+            let pendingEntries = 0, winningPendingEntries = 0, inconsistencies = 0;
+
+            for (const entry of all) {
+              const stake = entry.stakeVc;
+              if (!Number.isSafeInteger(stake) || stake < 1 ||
+                  !Number.isInteger(entry.selectNumber) ||
+                  entry.selectNumber < 1 || entry.selectNumber > 9 ||
+                  typeof entry.userId !== "string" || !entry.userId)
+                return { ok: false, error: "Invalid entry data; report needs review" };
+
+              totalStakedVC += stake;
+              allPlayerIds.add(entry.userId);
+              if (entry.status === "pending") pendingEntries++;
+              const won = entry.selectNumber === winner;
+              if (!won) {
+                if (entry.status !== "lost" && entry.status !== "pending") inconsistencies++;
+                continue;
+              }
+
+              winningEntries++;
+              winningStakedVC += stake;
+              const payout = stake * 8;
+              expectedPayoutVC += payout;
+              if (!winners.has(entry.userId)) winners.set(entry.userId, {
+                userId: entry.userId, entries: 0, stakedVC: 0,
+                expectedPayoutVC: 0, creditedPayoutVC: 0,
+                pendingEntries: 0, issues: 0
+              });
+              const player = winners.get(entry.userId);
+              player.entries++;
+              player.stakedVC += stake;
+              player.expectedPayoutVC += payout;
+              if (entry.status === "won" && entry.payoutVc === payout) {
+                creditedPayoutVC += payout;
+                player.creditedPayoutVC += payout;
+              } else if (entry.status === "pending") {
+                winningPendingEntries++;
+                player.pendingEntries++;
+              } else {
+                inconsistencies++;
+                player.issues++;
+              }
+            }
+
+            const players = [...winners.values()].sort((a, b) =>
+              b.expectedPayoutVC - a.expectedPayoutVC || a.userId.localeCompare(b.userId));
+            return {
+              ok: true, roundId, winningNumber: winner, endsAt: round.endsAt,
+              totalPlayers: allPlayerIds.size, totalEntries: all.length, totalStakedVC,
+              winningPlayers: players.length, winningEntries, winningStakedVC,
+              expectedPayoutVC, creditedPayoutVC,
+              unpaidPayoutVC: expectedPayoutVC - creditedPayoutVC,
+              pendingEntries, winningPendingEntries, inconsistencies,
+              players: players.slice(0, 100), detailsTruncated: players.length > 100
+            };
+          }
+
+          '''
+
+          if 'async function adminRoundReport(' not in backend:
+              backend=one(backend,'async function adminFindPlayer(user, b, key) {',report_function+'async function adminFindPlayer(user, b, key) {','add admin report')
+              backend=one(backend,'    "admin_dashboard",\n    "admin_find_player",', '    "admin_dashboard",\n    "admin_round_report",\n    "admin_find_player",','allow admin report action')
+              backend=one(backend,'''if (action === "admin_dashboard") {
+            const d = await adminDashboard(user, key);
+            return send(res, d.ok ? 200 : 403, d);
+          }
+          ''','''if (action === "admin_dashboard") {
+            const d = await adminDashboard(user, key);
+            return send(res, d.ok ? 200 : 403, d);
+          }
+          if (action === "admin_round_report") {
+            const d = await adminRoundReport(user, b, key);
+            return send(res, d.ok ? 200 : 403, d);
+          }
+          ''','admin report handler')
+          else:
+              assert '"admin_round_report"' in backend, 'Incomplete existing backend report'
+
+          if 'id="winReportPanel"' not in dashboard:
+              # Extra action links are intentionally unchanged; profile and number challenge stay as-is.
+              dashboard=one(dashboard,'<section class="panel"><h2>Mini Game activity</h2>', '''<section class="panel" id="winReportPanel">
+          <h2>🎯 Winning Number Report</h2>
+          <p class="hint">Draw complete होने के बाद Winning Players, VC और Wallet Payout देखें। Recent Number Draws से कोई Round चुनें।</p>
+          <p class="hint" id="winReportStatus" role="status">Loading last winning draw…</p>
+          <div id="winReportMetrics" class="metrics"></div>
+          <div id="winReportPlayers"></div>
+          </section>
+          <section class="panel"><h2>Mini Game activity</h2>''','admin report section')
+              dashboard=one(dashboard,'''function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!items?.length){dst.append(node('p','No rounds found.','blank'));return;}
+           for(const r of items){item(dst,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');}}''','''function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!items?.length){dst.append(node('p','No rounds found.','blank'));return;}
+           for(const r of items){
+             const wrap=node('div'),button=node('button','View Winning Report');
+             item(wrap,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');
+             button.type='button';button.disabled=r.status!=='settled'||!Number.isInteger(r.winningNumber);
+             button.style.marginTop='8px';button.onclick=()=>loadWinningReport(r.roundId);
+             wrap.append(button);dst.append(wrap);
+           }}
+          async function loadWinningReport(roundId){
+           const status=el('winReportStatus'),metrics=el('winReportMetrics'),players=el('winReportPlayers');
+           status.textContent='Loading '+roundId+'…';metrics.replaceChildren();players.replaceChildren();
+           try{
+             const d=await api('admin_round_report',{roundId});
+             status.textContent='Round '+d.roundId+' · End '+date(d.endsAt)+(d.pendingEntries?' · Settlement pending':' · Settlement checked');
+             for(const [label,value] of [
+               ['Winning Number',d.winningNumber],['Winning Players',d.winningPlayers],
+               ['Winning Entries',d.winningEntries],['VC on Winning Number',d.winningStakedVC+' VC'],
+               ['Expected Payout',d.expectedPayoutVC+' VC'],['Credited Payout',d.creditedPayoutVC+' VC'],
+               ['Awaiting / Check Payout',d.unpaidPayoutVC+' VC'],['Pending Entries (all numbers)',d.pendingEntries],
+               ['Total Players',d.totalPlayers],['Total VC Staked',d.totalStakedVC+' VC']
+             ]){
+               const card=node('div',null,'metric');card.append(node('small',label),node('strong',String(value)));metrics.append(card);
+             }
+             players.append(node('h3','Winning players & payout'));
+             if(!d.players?.length)players.append(node('p','इस Round में किसी ने Winning Number नहीं चुना।','blank'));
+             for(const p of d.players||[]){
+               const remaining=p.expectedPayoutVC-p.creditedPayoutVC;
+               const state=p.issues?'CHECK':p.pendingEntries?'PENDING':remaining===0?'CREDITED':'CHECK';
+               item(players,'Player '+p.userId.slice(0,8),
+                 'ID: '+p.userId+' · '+p.entries+' winning entries · '+p.stakedVC+' VC staked · '+state,
+                 p.creditedPayoutVC+'/'+p.expectedPayoutVC+' VC');
+             }
+             if(d.detailsTruncated)players.append(node('p','Only first 100 winning players shown; totals include everyone.','hint'));
+             if(d.inconsistencies)players.append(node('p','⚠ '+d.inconsistencies+' entries need settlement review.','error'));
+           }catch(e){status.textContent='Report unavailable: '+e.message;}
+          }
+          ''','render report UI')
+              dashboard=one(dashboard,'renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);', '''renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
+           const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
+           if(latest)loadWinningReport(latest.roundId);
+           else {el('winReportStatus').textContent='No completed draw available yet.';el('winReportMetrics').replaceChildren();el('winReportPlayers').replaceChildren();}''','auto last round report')
+          else:
+              assert "admin_round_report" in dashboard, 'Existing UI report missing request'
+
+          assert 'href="number-draw.html"' in dashboard, 'Number Draw location changed'
+          assert 'admin_round_report' in backend and 'admin_round_report' in dashboard
+          backend_path.write_text(backend,encoding='utf-8')
+          dashboard_path.write_text(dashboard,encoding='utf-8')
+          print('WINNING_REPORT_INSTALLED: Backend admin-only read-only report and dashboard panel added.')
+          PATCH_PY
+          python3 /tmp/samrat_admin_winning_report_patch.py
+      - name: Validate JS and winning report mock tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          python3 - <<'CHECK_PY'
+          from pathlib import Path
+          import re
+          src=Path('admin-dashboard.html').read_text(encoding='utf-8')
+          inline=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',src,re.S)
+          assert inline, 'Admin dashboard scripts missing'
+          for i,code in enumerate(inline):
+              if code.strip():
+                  Path(f'/tmp/samrat_admin_dashboard_{i}.js').write_text(code,encoding='utf-8')
+          assert 'id="winReportPanel"' in src
+          assert 'href="number-draw.html"' in src
+          assert 'admin_round_report' in src
+          print('Admin dashboard HTML checks passed.')
+          CHECK_PY
+          for f in /tmp/samrat_admin_dashboard_*.js; do node --check "$f"; done
+          cat > /tmp/samrat_admin_winning_report_tests.cjs <<'TEST_JS'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const s=fs.readFileSync('functions/game-wallet/src/main.js','utf8');
+          const begin=s.indexOf('async function adminRoundReport('),end=s.indexOf('\nasync function adminFindPlayer(',begin);
+          assert.ok(begin>=0&&end>begin,'adminRoundReport code is present');
+          const code=s.slice(begin,end);
+          let status='settled',winningNumber=7,roundLookup=0,queries=0;
+          let entries=[];
+          const dashboardIsAdmin=u=>u==='admin-user';
+          const stored=async()=>{roundLookup++;return {status,winningNumber,endsAt:'2026-11-12T06:30:00Z'}};
+          const valid=r=>r?.status==='settled'&&Number.isInteger(r.winningNumber)&&r.winningNumber>=1&&r.winningNumber<=9;
+          const eq=(attribute,value)=>({method:'equal',attribute,values:[value]});
+          const lim=n=>({method:'limit',values:[n]});
+          const order=(attribute,direction)=>({method:'orderAsc',attribute});
+          async function rows(table,clauses){
+            queries++;
+            assert.equal(table,'game_entries');
+            assert.ok(clauses.some(q=>q.method==='equal'&&q.attribute==='roundId'));
+            const start=clauses.find(x=>x.method==='cursorAfter');
+            let from=0;
+            if(start){from=entries.findIndex(x=>x.$id===start.values[0])+1;assert.ok(from>0);}
+            return entries.slice(from,from+100);
+          }
+          const report=Function('deps',`const {dashboardIsAdmin,stored,valid,eq,lim,order,rows}=deps;${code};return adminRoundReport;`)({dashboardIsAdmin,stored,valid,eq,lim,order,rows});
+          const check=(label,value)=>{assert.ok(value,label);console.log('PASS '+label)};
+          const ID='r_20261112061000000';
+          async function main(){
+           let x=await report('visitor',{roundId:ID},'mock');
+           check('Non-admin cannot access the winning report',!x.ok && x.error==='Admin access denied'&&roundLookup===0);
+           x=await report('admin-user',{roundId:'not-a-round'},'mock');
+           check('Invalid round ID is rejected',!x.ok&&roundLookup===0);
+           status='open';x=await report('admin-user',{roundId:ID},'mock');
+           check('No details before a settled result',!x.ok&&queries===0);
+           status='settled';
+           entries=[
+            {$id:'a',roundId:ID,userId:'A',selectNumber:7,stakeVc:20,payoutVc:160,status:'won'},
+            {$id:'b',roundId:ID,userId:'B',selectNumber:7,stakeVc:50,payoutVc:0,status:'pending'},
+            {$id:'c',roundId:ID,userId:'C',selectNumber:7,stakeVc:100,payoutVc:800,status:'won'},
+            {$id:'d',roundId:ID,userId:'A',selectNumber:8,stakeVc:50,payoutVc:0,status:'lost'},
+            {$id:'e',roundId:ID,userId:'C',selectNumber:2,stakeVc:20,payoutVc:0,status:'pending'}
+           ];
+           x=await report('admin-user',{roundId:ID},'mock');
+           check('Winning number and unique winners',x.ok&&x.winningNumber===7&&x.winningPlayers===3);
+           check('Five total entries, three total players',x.totalEntries===5&&x.totalPlayers===3);
+           check('Total 240 VC staked including losing numbers',x.totalStakedVC===240);
+           check('170 VC on winning number and 3 winning entries',x.winningEntries===3&&x.winningStakedVC===170);
+           check('8x payout expected 1360 VC',x.expectedPayoutVC===1360);
+           check('Only settled winners counted as credited',x.creditedPayoutVC===960&&x.unpaidPayoutVC===400);
+           check('Pending counts include winner and losing bets',x.pendingEntries===2&&x.winningPendingEntries===1);
+           check('No inconsistencies for normal records',x.inconsistencies===0);
+           const p=x.players.find(p=>p.userId==='B');
+           check('Per-user pending payouts visible',p.pendingEntries===1&&p.creditedPayoutVC===0&&p.expectedPayoutVC===400);
+           const before=JSON.stringify(entries);await report('admin-user',{roundId:ID},'mock');
+           check('Report is read-only (no wallet or entry writes)',JSON.stringify(entries)===before);
+           entries=Array.from({length:201},(_,i)=>({$id:`i${i}`,roundId:ID,userId:`user${i}`,selectNumber:7,stakeVc:20,payoutVc:160,status:'won'}));
+           x=await report('admin-user',{roundId:ID},'mock');
+           check('Pagination counts all 201 records',x.ok&&x.totalEntries===201&&x.winningPlayers===201);
+           check('Player detail limited to first 100 only',x.players.length===100&&x.detailsTruncated===true);
+           entries=Array.from({length:3001},(_,i)=>({$id:`x${i}`,roundId:ID,userId:`user${i}`,selectNumber:7,stakeVc:20,payoutVc:160,status:'won'}));
+           x=await report('admin-user',{roundId:ID},'mock');
+           check('Too-large report rejected instead of falsely undercounted',!x.ok&&x.error.includes('3000 entries'));
+           entries=[{$id:'broken',roundId:ID,userId:'A',selectNumber:7,stakeVc:-20,payoutVc:0,status:'pending'}];
+           x=await report('admin-user',{roundId:ID},'mock');
+           check('Invalid stake data stops reporting',!x.ok&&x.error.includes('Invalid entry data'));
+           console.log('ADMIN_WINNING_REPORT_TESTS: PASS');
+          }
+          main().catch(e=>{console.error(e.stack);process.exit(1)});
+          TEST_JS
+          node /tmp/samrat_admin_winning_report_tests.cjs
+      - name: Commit backend and dashboard only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js admin-dashboard.html
+          if git diff --cached --quiet; then
+            echo 'WINNING_REPORT_ALREADY_INSTALLED'
+          else
+            git commit -m "Add admin-only winning number players and VC payout report"
+            git push
+            echo 'WINNING_REPORT_CODE_INSTALLED'
+          fi
+          echo 'NOTE: Appwrite game-wallet new deployment must be activated separately.'
