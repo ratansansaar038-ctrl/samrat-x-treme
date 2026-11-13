@@ -29,6 +29,17 @@
       margin: 14px 0;
       box-shadow: 0 9px 30px #0005;
     }
+    .welcome-badge {
+      background: linear-gradient(90deg, #ffdf6322, #fc4ca822);
+      border: 1px solid #ffd15c;
+      color: #ffe38b;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 12px;
+    }
     .btn {
       width: 100%;
       display: block;
@@ -132,7 +143,7 @@
 
   <section class="panel" id="authPanel">
     <h3>Player Login / Signup</h3>
-    <p class="small">Sign up once, then use Login on your next visit.</p>
+    <div class="welcome-badge">🎁 New Players: Sign up now & get FREE Welcome VC to start playing!</div>
 
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
     <input id="password" type="password" placeholder="Password (8+ characters)">
@@ -266,6 +277,8 @@ const account = new Account(client);
 const functions = new Functions(client);
 const FUNCTION_ID = '6ae1bcc500208a5a7efb';
 
+let currentUser = null;
+
 async function api(action, extra = {}) {
   const result = await functions.createExecution({
     functionId: FUNCTION_ID,
@@ -289,11 +302,12 @@ async function api(action, extra = {}) {
 
 async function refreshUser() {
   try {
-    const user = await account.get();
+    currentUser = await account.get();
     $('authPanel').classList.add('hide');
     $('signedPanel').classList.remove('hide');
-    msg('signedName', user.name || user.email);
+    msg('signedName', currentUser.name || currentUser.email);
   } catch {
+    currentUser = null;
     $('authPanel').classList.remove('hide');
     $('signedPanel').classList.add('hide');
   }
@@ -345,6 +359,12 @@ $('logout').onclick = async () => {
 
 // Amazon Pay Gift Card PIN Handler
 $('redeemBtn').onclick = async () => {
+  if (!currentUser) {
+    msg('voucherMsg', '⚠️ Please Login or Sign Up first before submitting a voucher PIN.');
+    $('authPanel').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
   const rawPin = $('voucherCode').value.trim().toUpperCase();
   const cleanPin = rawPin.replace(/[^A-Z0-9]/g, '');
   const [amount, coins] = $('voucherSlab').value.split('|').map(Number);
