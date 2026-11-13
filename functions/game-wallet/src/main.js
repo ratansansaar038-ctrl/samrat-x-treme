@@ -1625,6 +1625,91 @@ async function getLeaderboard(gameId, key) {
   };
 }
 
+// 🔴 LIVE SCROLLING TICKER: FETCHES 100% REAL RECENT ACTIVITY FROM DATABASE
+async function getRecentActivity(key) {
+  const [playersRes, winsRes, roundsRes, scoresRes] = await Promise.allSettled([
+    rows("user_profiles", [order("$createdAt", "desc"), lim(8)], key),
+    rows(
+      "game_entries",
+      [eq("status", "won"), order("$createdAt", "desc"), lim(5)],
+      key
+    ),
+    rows(
+      "game_rounds",
+      [eq("status", "settled"), order("$createdAt", "desc"), lim(2)],
+      key
+    ),
+    rows(
+      "game_scores",
+      [eq("verified", true), order("$createdAt", "desc"), lim(5)],
+      key
+    ),
+  ]);
+
+  const players = playersRes.status === "fulfilled" ? playersRes.value : [];
+  const wins = winsRes.status === "fulfilled" ? winsRes.value : [];
+  const rounds = roundsRes.status === "fulfilled" ? roundsRes.value : [];
+  const scores = scoresRes.status === "fulfilled" ? scoresRes.value : [];
+
+  const nameByUserId = new Map();
+  for (const p of players) {
+    if (p.userId && p.name) {
+      const firstName = String(p.name).trim().split(/\s+/)[0].slice(0, 18);
+      if (firstName) nameByUserId.set(p.userId, firstName);
+    }
+  }
+
+  const displayName = (uid) =>
+    nameByUserId.get(uid) ||
+    (typeof uid === "string" ? "Player #" + uid.slice(0, 4) : "A player");
+
+  const items = [];
+
+  for (const w of wins) {
+    if (Number.isInteger(w.payoutVc) && w.payoutVc > 0) {
+      items.push(
+        `🎉 ${displayName(w.userId)} won ${w.payoutVc} VC (8×) on Lucky Number #${w.selectNumber}!`
+      );
+    }
+  }
+
+  if (rounds.length > 0 && valid(rounds[0])) {
+    items.push(
+      `🎯 Last 20-Min Lucky Draw Winning Number: #${rounds[0].winningNumber} (Next draw runs every 20 mins!)`
+    );
+  }
+
+  const gameTitles = {
+    speed_tap: "Speed Tap Arena",
+    memory_x: "Memory X",
+    memory_x_24: "Memory X (24 Cards)",
+    math_challenge: "Math Challenge",
+  };
+
+  for (const s of scores.slice(0, 3)) {
+    if (Number.isInteger(s.score) && s.score > 0) {
+      const title = gameTitles[s.gameId] || "Skill Arena";
+      items.push(`🏆 ${displayName(s.userId)} scored ${s.score} pts in ${title}!`);
+    }
+  }
+
+  for (const p of players.slice(0, 3)) {
+    const firstName = String(p.name || "").trim().split(/\s+/)[0].slice(0, 18);
+    if (firstName) {
+      items.push(`⚡ ${firstName} just joined Samrat X-Treme!`);
+    }
+  }
+
+  // Always include genuine platform highlights alongside live user activity
+  items.push("🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!");
+  items.push("📢 Join @samratxtremegame on Telegram for live draw results!");
+
+  return {
+    ok: true,
+    items: items.slice(0, 10),
+  };
+}
+
 export default async ({ req, res, error }) => {
   if (req.method !== "POST")
     return send(res, 405, {
@@ -1679,6 +1764,7 @@ export default async ({ req, res, error }) => {
       "get_wallet",
       "get_round",
       "get_last_result",
+      "get_recent_activity",
       "place_entry",
       "grant_coins",
       "request_vc",
@@ -1706,7 +1792,12 @@ export default async ({ req, res, error }) => {
 
   if (
     !user &&
-    !["get_round", "get_last_result", "get_leaderboard"].includes(action)
+    ![
+      "get_round",
+      "get_last_result",
+      "get_leaderboard",
+      "get_recent_activity",
+    ].includes(action)
   )
     return send(res, 401, {
       ok: false,
@@ -1714,6 +1805,10 @@ export default async ({ req, res, error }) => {
     });
 
   try {
+    if (action === "get_recent_activity") {
+      return send(res, 200, await getRecentActivity(key));
+    }
+
     if (action === "start_game") {
       const x = await startGame(user, b, key);
       return send(res, x.ok ? 200 : 400, x);
