@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090315">
   <link rel="manifest" href="manifest.json">
-  <title>Samrat X-Treme | Play 3 Games</title>
+  <title>Samrat X-Treme | Play 3 Games & Live Draw</title>
   <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
 
   <style>
@@ -17,7 +17,7 @@
       font: 15px system-ui, Arial;
     }
     .app { max-width: 520px; margin: auto; padding: 18px 15px 50px; }
-    .hero { text-align: center; padding: 22px 0; }
+    .hero { text-align: center; padding: 22px 0 14px; }
     .brand { font: 900 43px Georgia, serif; color: #ffe080; }
     .sub { font-size: 23px; letter-spacing: 5px; color: #e7c2ff; font-weight: 800; }
     .small { font-size: 12px; color: #d7c0f5; line-height: 1.7; }
@@ -59,6 +59,11 @@
       background: #492768;
       color: #fff;
       border: 1px solid #976bce;
+    }
+    .tg-btn {
+      background: linear-gradient(100deg, #24a1de, #1c88bd);
+      color: #fff;
+      border: 1px solid #5bc0f8;
     }
     .row { display: flex; gap: 10px; }
     .row > * { flex: 1; min-width: 0; }
@@ -116,12 +121,13 @@
     .skill-grid { display:grid; gap:16px; margin:20px 0; }
     .skill-card {
       display:flex; align-items:center; gap:18px; padding:24px 18px;
-      min-height:160px; border-radius:22px; text-decoration:none;
+      min-height:150px; border-radius:22px; text-decoration:none;
       color:white; border:1px solid #8054ba; box-shadow:0 12px 30px #0007;
     }
     .skill-card.speed { background:linear-gradient(120deg,#51218b,#17102c); }
     .skill-card.memory { background:linear-gradient(120deg,#174777,#17102c); }
     .skill-card.math { background:linear-gradient(120deg,#79501f,#26102d); }
+    .skill-card.draw { background:linear-gradient(120deg,#7b1854,#1f0d2e); border-color:#ff6eb4; }
     .skill-icon { font-size:48px; }
     .skill-card h2 { font-size:21px; color:#ffe58a; margin:8px 0; }
     .skill-card p { font-size:13px; color:#ddd0ee; }
@@ -137,8 +143,11 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      3 FREE SKILL GAMES • NO CASH VALUE
+      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • NO CASH VALUE
     </p>
+    <a class="btn tg-btn" href="https://t.me/samratxtremegame" target="_blank" style="max-width:290px; margin:10px auto 0; padding:11px 16px;">
+      📢 JOIN OFFICIAL TELEGRAM CHANNEL
+    </a>
   </header>
 
   <section class="panel" id="authPanel">
@@ -168,6 +177,9 @@
         LOG OUT
       </button>
     </div>
+    <a class="btn" href="player-profile.html" style="margin-top:12px;">
+      👤 OPEN MY PROFILE & LIVE DRAW
+    </a>
     <div class="status" id="signedMsg"></div>
   </section>
 
@@ -198,17 +210,17 @@
     <div class="status" id="voucherMsg"></div>
   </section>
 
-  <section class="panel" id="permanentApkDownload" style="text-align:center">
-    <h3>📱 DOWNLOAD ANDROID APP</h3>
-    <a class="btn" href="https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk">
-      ⬇ DOWNLOAD APK
-    </a>
-    <p class="small">
-      Official Samrat X-Treme Android App
-    </p>
-  </section>
-
   <section class="skill-grid">
+    <a class="skill-card draw" href="player-profile.html">
+      <span class="skill-icon">🎯</span>
+      <div>
+        <small style="color:#ff9cd2;">● EVERY 20 MINUTES</small>
+        <h2>LUCKY NUMBER LIVE DRAW</h2>
+        <p>Pick 1–9 • Win 8× Virtual Coins</p>
+        <strong>ENTER VIA PROFILE →</strong>
+      </div>
+    </a>
+
     <a class="skill-card speed" href="speed-tap.html">
       <span class="skill-icon">⚡</span>
       <div>
@@ -240,11 +252,22 @@
     </a>
   </section>
 
+  <section class="panel" id="permanentApkDownload" style="text-align:center">
+    <h3>📱 DOWNLOAD ANDROID APP</h3>
+    <a class="btn" href="https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk">
+      ⬇ DOWNLOAD APK
+    </a>
+    <p class="small">
+      Official Samrat X-Treme Android App
+    </p>
+  </section>
+
   <nav class="links">
     <a href="index.html">Home</a>
     <a href="player-profile.html">My Profile</a>
     <a href="referral.html">Referral</a>
     <a href="reward.html">Rewards</a>
+    <a href="https://t.me/samratxtremegame" target="_blank">📢 Telegram</a>
   </nav>
 
   <div class="policy-links" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0;font-size:12px">
