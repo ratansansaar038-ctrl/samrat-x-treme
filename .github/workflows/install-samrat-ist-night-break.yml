@@ -1,0 +1,344 @@
+name: Install Samrat IST Night Break Lock
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-ist-night-break
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout the current project
+        uses: actions/checkout@v4
+      - name: Install server enforced IST night lock and preserve existing design
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_patch_night_break.py <<'PATCH_PY'
+          #!/usr/bin/env python3
+          """Install the Samrat X-Treme IST night lock in the existing three files.
+          Only existing source files are patched; no Appwrite connection or database mutation.
+          """
+          from pathlib import Path
+          import re
+          
+          ROOT = Path('.')
+          BACKEND = ROOT / 'functions/game-wallet/src/main.js'
+          DRAW = ROOT / 'number-draw.html'
+          HOME = ROOT / 'index.html'
+          
+          
+          def once(text, before, after, label):
+              n = text.count(before)
+              if n != 1:
+                  raise AssertionError(f'{label}: expected one original anchor; found {n}')
+              return text.replace(before, after, 1)
+          
+          
+          def section(text, start, end, new, label):
+              a = text.find(start)
+              if a < 0 or text.find(start, a + 1) != -1:
+                  raise AssertionError(f'{label}: missing or duplicate section start')
+              b = text.find(end, a + len(start))
+              if b < 0:
+                  raise AssertionError(f'{label}: missing section end')
+              return text[:a] + new + text[b:]
+          
+          
+          def patch_backend(source):
+              if 'function nightBreakInfo(' in source:
+                  print('Backend night lock already installed')
+                  return source
+              gate = '''// Samrat Night Break is ALWAYS calculated on the Appwrite server in IST.
+          const IST_OFFSET_MS = 330 * 60 * 1000;
+          function nightBreakInfo(nowMs = Date.now()) {
+            const local = new Date(nowMs + IST_OFFSET_MS);
+            const hour = local.getUTCHours();
+            const closed = hour >= 22 || hour < 9;
+            if (!closed) return { closed: false, nextOpensAt: null };
+            const localMidnightUTC = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - IST_OFFSET_MS;
+            const nextOpenMs = localMidnightUTC + (hour >= 22 ? 86400000 : 0) + 9 * 3600000;
+            return { closed: true, nextOpensAt: new Date(nextOpenMs).toISOString() };
+          }
+          function roundIsDaytime(round) {
+            const start = Date.parse(round.startsAt), end = Date.parse(round.endsAt);
+            return Number.isFinite(start) && Number.isFinite(end) &&
+              end > start && !nightBreakInfo(start).closed && !nightBreakInfo(end - 1).closed;
+          }
+          
+          '''
+              source = once(source, 'function roundFor(t) {', gate + 'function roundFor(t) {', 'backend helpers')
+              source = once(
+                  source,
+                  '  const previous = roundFor(Date.now() - ROUND_MS);\n  let r = await stored(previous.roundId, key);',
+                  '''  const previous = roundFor(Date.now() - ROUND_MS);
+            // No new overnight winning result. Still allow settlement of the last
+            // daytime round after 22:00 and recovery of older daytime entries.
+            if (!roundIsDaytime(previous)) {
+              let recovery;
+              try { recovery = await recoverPendingRounds(key, previous.roundId); }
+              catch (e) { console.error('Night recovery failed: ' + e.message); recovery = { ok: false }; }
+              return { ok: true, available: false, roundId: previous.roundId,
+                winningNumber: null, settledEntries: 0, nightBreak: nightBreakInfo(), recovery };
+            }
+            let r = await stored(previous.roundId, key);''',
+                  'prevent overnight result',
+              )
+              source = once(
+                  source,
+                  '    if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff) continue;',
+                  '    if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff || !roundIsDaytime(round)) continue;',
+                  'recovery only daytime',
+              )
+              source = once(
+                  source,
+                  '  const current = roundFor(Date.now());\n\n  if (current.status !== "open" || b.roundId !== current.roundId)',
+                  '''  const current = roundFor(Date.now());
+            const night = nightBreakInfo();
+            if (night.closed || !roundIsDaytime(current))
+              return { ok: false, error: 'Night Break (10:00 PM – 9:00 AM IST). Entry opens at 9:00 AM.',
+                nightBreak: true, nextOpensAt: night.nextOpensAt };
+          
+            if (current.status !== "open" || b.roundId !== current.roundId)''',
+                  'placeEntry first night check',
+              )
+              marker = '''  try {
+              await transact(key, [
+                op("create", "game_entries", id, {'''
+              source = once(
+                  source, marker,
+                  '''  // Re-check immediately before wallet transaction: prevents a slow
+            // request started before the lock from being accepted after the cutoff.
+            const beforeCommit = Date.now();
+            const commitRound = roundFor(beforeCommit);
+            if (nightBreakInfo(beforeCommit).closed || !roundIsDaytime(commitRound) ||
+                commitRound.roundId !== current.roundId || commitRound.status !== "open")
+              return { ok: false, error: 'Round closed or Night Break started. Refresh.' };
+          
+          ''' + marker,
+                  'placeEntry before commit night check',
+              )
+              old_get_round = '''      const current = roundFor(Date.now());
+                const r = await stored(current.roundId, key);
+                return send(res, 200, {
+                  ok: true,
+                  ...current,
+                  serverTime: new Date().toISOString(),
+                  acceptingEntries:
+                    current.status === "open" && (!r || r.status === "open"),
+                  mode: "free_virtual_coins",
+                });'''
+              new_get_round = '''      const current = roundFor(Date.now());
+                const night = nightBreakInfo();
+                const r = night.closed ? null : await stored(current.roundId, key);
+                return send(res, 200, {
+                  ok: true,
+                  ...current,
+                  status: night.closed ? 'night_break' : current.status,
+                  serverTime: new Date().toISOString(),
+                  nightBreak: night.closed,
+                  nextOpensAt: night.nextOpensAt,
+                  acceptingEntries: !night.closed && roundIsDaytime(current) &&
+                    current.status === "open" && (!r || r.status === "open"),
+                  mode: "free_virtual_coins",
+                });'''
+              source = once(source, old_get_round, new_get_round, 'get_round server lock')
+              assert 'recoverPendingRounds(key, previous.roundId)' in source
+              assert 'admin_round_report' in source and 'submit_gift_card' in source
+              return source
+          
+          
+          def patch_draw(source):
+              if 'id="nightBreakBanner"' in source:
+                  print('Draw UI night banner already installed')
+                  return source
+              style = '''.night-banner{border:1px solid #b28ad9;background:linear-gradient(140deg,#251237,#121b38);text-align:center}
+          .night-banner strong{display:block;color:#ffe18c;line-height:1.6}
+          .night-banner .night-clock{font-size:24px;color:#a4ffda;font-weight:900;margin-top:10px;font-variant-numeric:tabular-nums}'''
+              source = once(source, '</style></head><body>', style + '</style></head><body>', 'draw CSS')
+              nav_end = '</a></nav><section class="panel"><div class="flex"><div><h3>20-Minute Live Draw</h3>'
+              insert = '''</a></nav><section class="panel night-banner hide" id="nightBreakBanner" role="status" aria-live="polite"><strong>🌙 Night Break (10:00 PM – 9:00 AM). Next Lucky Draw opens sharply at 9:00 AM IST!</strong><div class="small">Reopens in</div><div class="night-clock" id="nightCountdown">--:--:--</div></section><section class="panel"><div class="flex"><div><h3>20-Minute Live Draw</h3>'''
+              source = once(source, nav_end, insert, 'draw banner HTML')
+              source = once(source, '<button class="btn" id="submitEntry">', '<button class="btn" id="submitEntry" disabled>', 'initially disabled entry')
+              source = section(source, 'function updateCountdown(){', 'async function refreshRound(){', '''// Server-time-corrected clock; Appwrite remains the final authority.
+          let lastNightState = null;
+          function currentNightInfo(){
+            const ms = Date.now() + serverDelta;
+            const ist = new Date(ms + 19800000);
+            const hour = ist.getUTCHours();
+            const closed = hour >= 22 || hour < 9;
+            const localMidnightUTC = Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),ist.getUTCDate())-19800000;
+            return {closed,now:ms,nextOpen:localMidnightUTC+(hour>=22?86400000:0)+9*3600000};
+          }
+          function clockHHMMSS(ms){const sec=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(sec/3600)).padStart(2,'0')}:${String(Math.floor((sec%3600)/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`}
+          function updateCountdown(){
+            if(!round)return;
+            const n=currentNightInfo();
+            $('nightBreakBanner').classList.toggle('hide',!n.closed);
+            $('roundStatus').textContent=n.closed?'NIGHT BREAK':round.acceptingEntries?'OPEN':'LOCKED';
+            $('submitEntry').disabled=n.closed||!round.acceptingEntries;
+            $('guestPlay').disabled=n.closed;
+            for(const id of ['playerNums','guestNums'])for(const b of $(id).children)b.disabled=n.closed;
+            if(n.closed){$('nightCountdown').textContent=clockHHMMSS(n.nextOpen-n.now);$('countdown').textContent='--:--';}
+            else {
+              const ms=new Date(round.endsAt).getTime()-n.now;
+              const sec=Math.max(0,Math.ceil(ms/1000));
+              $('countdown').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+              // A stale round cannot reopen betting while awaiting server refresh.
+              if(ms<=60000)$('submitEntry').disabled=true;
+            }
+            if(lastNightState!==null&&lastNightState!==n.closed)void refreshRound();
+            lastNightState=n.closed;
+          }
+          ''', 'draw night countdown function')
+              source = once(source, "$('submitEntry').disabled=!round.acceptingEntries;updateCountdown()", 'updateCountdown()', 'refreshRound status')
+              source = once(source, "$('guestPlay').onclick=()=>{if(!guestNumber)", "$('guestPlay').onclick=()=>{if(currentNightInfo().closed)return msg('guestMsg','Night Break. Guest prediction resumes at 9:00 AM IST.');if(!guestNumber)", 'guest night gate')
+              source = once(source, "$('submitEntry').onclick=async()=>{if(!playerNumber)", "$('submitEntry').onclick=async()=>{if(currentNightInfo().closed)return msg('entryMsg','Night Break (10 PM–9 AM IST). Try at 9 AM.');if(!playerNumber)", 'entry night gate')
+              source = once(source, "finally{btn.disabled=!round?.acceptingEntries}};", "finally{btn.disabled=currentNightInfo().closed||!round?.acceptingEntries}};", 'entry final disable')
+              assert "api('place_entry'" in source
+              assert "api('get_last_result'" in source
+              return source
+          
+          
+          def patch_home(source):
+              if 'id="homeNightBreak"' in source:
+                  print('Homepage night break already installed')
+                  return source
+              # Preserve existing card and live bar; add a small independent notice.
+              source = once(source, '<div class="live-bar">', '<div class="live-bar" id="homeDrawLiveBar">', 'home livebar id')
+              anchor = '''    <div class="timer-box" id="drawCountdown">00:00</div>
+            </div>'''
+              replace = '''    <div class="timer-box" id="drawCountdown">00:00</div>
+            </div>
+            <div class="panel hide" id="homeNightBreak" role="status" aria-live="polite" style="text-align:center;border-color:#9869cb;background:linear-gradient(145deg,#201536,#13213e)">
+              <strong style="color:#ffe080">🌙 Night Break (10:00 PM – 9:00 AM). Next Lucky Draw opens sharply at 9:00 AM IST!</strong>
+              <div class="small" style="margin-top:8px">Reopens in</div>
+              <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
+            </div>'''
+              source = once(source, anchor, replace, 'homepage banner')
+              source = once(source, '🎯 Lucky Number Live Draw runs every 20 minutes — Win up to 8× VC!', '🎯 Lucky Number Live Draw: every 20 minutes, 9 AM–10 PM IST — Win up to 8× VC!', 'ticker night notice')
+              source = once(source, '● EVERY 20 MINUTES</small>', '● EVERY 20 MINUTES · 9 AM–10 PM IST</small>', 'draw card hours')
+              # EXACT requested sentence, with verification caveat to avoid suggesting automatic approval.
+              source = once(source, '''    <button class="btn" id="redeemBtn" style="margin-top:8px;">SUBMIT VOUCHER PIN</button>''', '''    <p class="small" style="color:#ffe080;border:1px solid #80619e;border-radius:10px;padding:9px;margin:10px 0;">10 PM ke baad submit kiye gaye Amazon Gift Cards subah 9:00 AM ke draw se pehle approve ho jayenge.</p>
+              <p class="small" style="margin:4px 0 10px">*Approval requires Admin verification; submission alone does not credit VC automatically.</p>
+              <button class="btn" id="redeemBtn" style="margin-top:8px;">SUBMIT VOUCHER PIN</button>''', 'gift card note')
+              start = source.find('function startDrawTimer() {')
+              end = source.find('// 🔴 Load Real Activity',start)
+              if start<0 or end<0: raise AssertionError('home timer function not found')
+              replacement = '''// Homepage IST clock. Actual coin entry is locked by Appwrite server.
+          function startDrawTimer() {
+            function tick() {
+              const now=Date.now();
+              const ist=new Date(now+19800000);
+              const hour=ist.getUTCHours(),mins=ist.getUTCMinutes(),secs=ist.getUTCSeconds();
+              const closed=hour>=22||hour<9;
+              $('homeDrawLiveBar').classList.toggle('hide',closed);
+              $('homeNightBreak').classList.toggle('hide',!closed);
+              if(closed){
+                const midnight=Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),ist.getUTCDate())-19800000;
+                const until=midnight+(hour>=22?86400000:0)+9*3600000-now;
+                const n=Math.max(0,Math.ceil(until/1000));
+                $('homeNightClock').textContent=`${String(Math.floor(n/3600)).padStart(2,'0')}:${String(Math.floor((n%3600)/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
+              } else {
+                const remaining=20*60-(mins%20)*60-secs;
+                $('drawCountdown').textContent=`${String(Math.floor(remaining/60)).padStart(2,'0')}m : ${String(remaining%60).padStart(2,'0')}s`;
+              }
+            }
+            tick();setInterval(tick,1000);
+          }
+          
+          '''
+              source=source[:start]+replacement+source[end:]
+              assert "api('submit_gift_card'" in source
+              return source
+          
+          
+          def main():
+              paths=(BACKEND,DRAW,HOME)
+              original=[path.read_text(encoding='utf8') for path in paths]
+              updated=[patch_backend(original[0]),patch_draw(original[1]),patch_home(original[2])]
+              # All mutations occur only after all validations and patches are successful.
+              for path,content in zip(paths,updated):
+                  path.write_text(content,encoding='utf8')
+                  print('UPDATED',path,'bytes=',len(content.encode('utf8')))
+              print('NIGHT_BREAK_PATCH_COMPLETE: Appwrite IDs, voucher submission and wallet logic preserved.')
+          
+          if __name__ == '__main__':
+              main()
+          PATCH_PY
+          python3 /tmp/samrat_patch_night_break.py
+      - name: Verify backend and browser script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          python3 - <<'SCRIPT_PY'
+          import re, pathlib
+          for filename in ("number-draw.html", "index.html"):
+              s=pathlib.Path(filename).read_text(encoding="utf8")
+              inline=[x for x in re.findall(r"<script[^>]*>(.*?)</script>",s,re.S) if x.strip()]
+              if not inline: raise RuntimeError("Missing inline JS in "+filename)
+              for idx,js in enumerate(inline):
+                  pathlib.Path(f"/tmp/samrat_night_{filename}_{idx}.js").write_text(js,encoding="utf8")
+          SCRIPT_PY
+          for file in /tmp/samrat_night_*.js; do node --check "$file"; done
+      - name: Run boundary and backend safety tests (no live Appwrite writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_night_tests.cjs <<'TEST_JS'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const s = fs.readFileSync('functions/game-wallet/src/main.js','utf8');
+          const i=s.indexOf('const IST_OFFSET_MS ='),j=s.indexOf('function roundFor(t) {',i);
+          assert.ok(i>=0&&j>i,'Server lock helpers must exist');
+          const gate = new Function(s.slice(i,j)+';return {nightBreakInfo,roundIsDaytime}')();
+          const at=s=>Date.parse(s);
+          const test=(name,truth)=>{assert.ok(truth,name);console.log('PASS '+name)};
+          test('21:59:59 IST still daytime',!gate.nightBreakInfo(at('2026-11-14T21:59:59+05:30')).closed);
+          test('22:00:00 IST is night',gate.nightBreakInfo(at('2026-11-14T22:00:00+05:30')).closed);
+          test('08:59:59 IST remains night',gate.nightBreakInfo(at('2026-11-15T08:59:59+05:30')).closed);
+          test('09:00:00 IST opens',!gate.nightBreakInfo(at('2026-11-15T09:00:00+05:30')).closed);
+          test('midnight is night',gate.nightBreakInfo(at('2026-11-15T00:00:00+05:30')).closed);
+          test('22:00 next open 09:00 next morning',gate.nightBreakInfo(at('2026-11-14T22:00:00+05:30')).nextOpensAt==='2026-11-15T03:30:00.000Z');
+          test('08:59 next open 09:00 same morning',gate.nightBreakInfo(at('2026-11-15T08:59:00+05:30')).nextOpensAt==='2026-11-15T03:30:00.000Z');
+          const round=(from,to)=>({startsAt:from,endsAt:to});
+          test('21:40 to 22:00 last daytime round can settle',gate.roundIsDaytime(round('2026-11-14T16:10:00Z','2026-11-14T16:30:00Z')));
+          test('22:00 to 22:20 cannot create overnight result',!gate.roundIsDaytime(round('2026-11-14T16:30:00Z','2026-11-14T16:50:00Z')));
+          test('08:40 to 09:00 cannot create overnight result',!gate.roundIsDaytime(round('2026-11-15T03:10:00Z','2026-11-15T03:30:00Z')));
+          test('09:00 to 09:20 first daytime round valid',gate.roundIsDaytime(round('2026-11-15T03:30:00Z','2026-11-15T03:50:00Z')));
+          test('Server get_round has break lock',s.includes('acceptingEntries: !night.closed && roundIsDaytime(current)'));
+          test('Server entry rechecks before wallet transact',s.includes('const beforeCommit = Date.now();'));
+          test('Night settlement recovers old entries',s.includes('if (!roundIsDaytime(previous))')&&s.includes('recoverPendingRounds(key, previous.roundId)'));
+          const draw=fs.readFileSync('number-draw.html','utf8');
+          test('Draw UI banner and countdown',draw.includes('id="nightBreakBanner"')&&draw.includes('id="nightCountdown"'));
+          test('Draw UI entry blocked on night',draw.includes("$('submitEntry').onclick=async()=>{if(currentNightInfo().closed)"));
+          const home=fs.readFileSync('index.html','utf8');
+          test('Homepage banner and clock',home.includes('id="homeNightBreak"')&&home.includes('id="homeNightClock"'));
+          test('Amazon gift card verification note',home.includes('10 PM ke baad submit kiye gaye Amazon Gift Cards subah 9:00 AM ke draw se pehle approve ho jayenge.'));
+          test('Existing Appwrite and gift card paths preserved',s.includes('async function submitGiftCard(')&&home.includes("api('submit_gift_card'"));
+          console.log('NIGHT_BREAK_TESTS_PASS (no live Appwrite writes)');
+          TEST_JS
+          node /tmp/samrat_night_tests.cjs
+      - name: Commit only three source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html index.html
+          if git diff --cached --quiet; then
+            echo "NIGHT_BREAK_ALREADY_INSTALLED"
+          else
+            git commit -m "Lock Number Draw 10 PM to 9 AM IST on server and pages"
+            git push
+            echo "NIGHT_BREAK_CODE_INSTALLED"
+          fi
+          echo "IMPORTANT: Activate the new Appwrite game-wallet deployment to enforce entry lock."
