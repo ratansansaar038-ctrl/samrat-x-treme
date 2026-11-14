@@ -1,0 +1,409 @@
+name: Install Samrat Safe Gift Card VC Wallet
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-safe-gift-wallet
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout current Samrat project
+        uses: actions/checkout@v4
+      - name: Install atomic Amazon gift-card wallet logic
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_gift_patch.py <<'PATCH_PY'
+          #!/usr/bin/env python3
+          """Patch checked Samrat X-Treme sources. Run from repository root.
+
+          Requires Appwrite user_profiles nullable/defaulted columns:
+            canWithdraw BOOLEAN default true
+            unverifiedVC INTEGER default 0
+          vc_requests.status VARCHAR must accept 'instant_pending'.
+
+          Unverified +100 VC is visible in wallet but *reserved*, not spendable.
+          """
+          from pathlib import Path
+          import re
+
+          BACKEND = Path('functions/game-wallet/src/main.js')
+          HOME = Path('index.html')
+          DRAW = Path('number-draw.html')
+          ADMIN = Path('admin-vc-requests.html')
+
+
+          def once(s, old, new, label):
+              n=s.count(old)
+              if n != 1:
+                  raise AssertionError(f'{label}: expected one anchor, found {n}')
+              return s.replace(old,new,1)
+
+
+          def replace_between(s,start,end,new,label):
+              a=s.find(start)
+              if a<0 or s.find(start,a+1)>=0: raise AssertionError(f'{label}: unique start not found')
+              b=s.find(end,a+len(start))
+              if b<0: raise AssertionError(f'{label}: end not found')
+              return s[:a]+new+'\n\n'+s[b:]
+
+
+          def patch_backend(s):
+              if 'SAMRAT INSTANT-GIFT-CREDIT V1' in s:
+                  print('Backend already patched')
+                  return s
+              helper='''// SAMRAT INSTANT-GIFT-CREDIT V1
+          // A format-valid Amazon PIN is NOT a verified PIN. Display 100 VC immediately,
+          // reserve them until the admin verifies the actual gift card.
+          const INSTANT_GIFT_STATUS = "instant_pending";
+          const isInstantGiftRequest = (entry) =>
+            entry?.status === INSTANT_GIFT_STATUS &&
+            /^gc_[a-f0-9]{28}$/.test(entry.$id || "") && entry.amount === 100;
+          function safeReservedVC(player) {
+            const n = player?.unverifiedVC;
+            if (n == null) return 0;
+            if (!Number.isSafeInteger(n) || n < 0) throw Error("Invalid reserved VC balance");
+            return n;
+          }
+          function giftDecisionOps(entry, decision, player, table) {
+            const instant = entry.status === INSTANT_GIFT_STATUS;
+            if (instant && !isInstantGiftRequest(entry))
+              throw Error("Instant gift request details invalid");
+            if (!instant && entry.status !== "pending")
+              throw Error("Request already handled");
+            const ops = [op("update", table, entry.$id, { status: decision })];
+            if (instant) {
+              if (!player) throw Error("Gift card player missing");
+              const reserved = safeReservedVC(player);
+              if (reserved < 100 || player.wallet < 100)
+                throw Error("Gift card reserve mismatch; manual review required");
+              ops.push(op("decrement", "user_profiles", player.$id,
+                { column: "unverifiedVC", value: 100, min: 0 }));
+              if (decision === "rejected")
+                ops.push(op("decrement", "user_profiles", player.$id,
+                  { column: "wallet", value: 100, min: 0 }));
+              if (reserved === 100)
+                ops.push(op("update", "user_profiles", player.$id, { canWithdraw: true }));
+            } else if (decision === "approved") {
+              if (!player) throw Error("Player missing");
+              ops.push(op("increment", "user_profiles", player.$id,
+                { column: "wallet", value: entry.amount, max: 900000000 }));
+            }
+            return ops;
+          }
+          '''
+              s=once(s,'async function redeemVoucher(user, b, key) {',helper+'\nasync function redeemVoucher(user, b, key) {','backend helpers')
+              s=once(s,
+          '''  const p = await profile(user, key);
+            if (p.wallet < b.stakeVC)
+              return {
+                ok: false,
+                error: "Not enough VC. Add coins via Gift Voucher.",
+              };''',
+          '''  const p = await profile(user, key);
+            const spendable = p.wallet - safeReservedVC(p);
+            if (spendable < b.stakeVC)
+              return {
+                ok: false,
+                error: 'Not enough verified VC. Amazon ₹10 VC are visible but locked until admin verifies the PIN.',
+              };''','block spending unverified VC')
+              submit='''async function submitGiftCard(user, b, key) {
+            const rawCode = typeof b.code === "string" ? b.code.trim().toUpperCase() : "";
+            const cleanPin = rawCode.replace(/[^A-Z0-9]/g, "");
+            if (cleanPin.length !== 14 || !/^[A-Z0-9]{14}$/.test(cleanPin))
+              return { ok: false, error: "Please enter a valid 14-character PIN format" };
+
+            const SLABS = { 10: 100, 50: 500, 100: 1000, 200: 2000, 500: 5000 };
+            const amountInr = Number(b.amount);
+            const coins = SLABS[amountInr];
+            if (!coins) return { ok: false, error: "Invalid gift card amount" };
+
+            const table = vcRequestTable();
+            const player = await profile(user, key);
+            const requestId = 'gc_' + createHash('sha256').update(cleanPin).digest('hex').slice(0, 28);
+            const instant = amountInr === 10;
+            let row;
+            try {
+              if (instant) {
+                // One pending instant-credit PIN per player. Format alone is not proof of value.
+                if (safeReservedVC(player) !== 0)
+                  return { ok: false, error: 'Existing ₹10 instant credit is awaiting admin verification.' };
+                // Both columns MUST exist with defaults before enabling the feature.
+                if (typeof player.canWithdraw !== 'boolean' ||
+                    !Number.isSafeInteger(player.unverifiedVC))
+                  return { ok: false, error: 'Admin setup required: add canWithdraw and unverifiedVC columns in user_profiles.' };
+                await transact(key, [
+                  op('create', table, requestId,
+                    { userId: user, amount: coins, status: INSTANT_GIFT_STATUS }),
+                  op('increment', 'user_profiles', player.$id,
+                    { column: 'wallet', value: 100, max: 900000000 }),
+                  op('increment', 'user_profiles', player.$id,
+                    { column: 'unverifiedVC', value: 100, max: 900000000 }),
+                  op('update', 'user_profiles', player.$id, { canWithdraw: false }),
+                ]);
+                row = { $id: requestId };
+              } else {
+                row = await request('POST', tablePath(table), key, {
+                  rowId: requestId,
+                  data: { userId: user, amount: coins, status: 'pending' },
+                });
+              }
+            } catch (e) {
+              if (e.status === 409)
+                return { ok: false, error: 'Gift Card PIN already submitted or wallet busy; please refresh.' };
+              throw e;
+            }
+
+            const formattedPin = cleanPin.slice(0, 4) + '-' + cleanPin.slice(4, 10) + '-' + cleanPin.slice(10);
+            const message = [
+              '🎁 AMAZON PAY GIFT CARD VERIFICATION',
+              'Request ID: ' + vcClean(row.$id),
+              'Player: ' + vcClean(player.name) + ' (' + vcClean(player.email) + ')',
+              'Player ID: ' + vcClean(user),
+              'Claimed pack: ₹' + amountInr + ' => ' + coins + ' VC',
+              '14-Char PIN: ' + formattedPin,
+              instant ? '100 VC VISIBLE, LOCKED from gameplay until verified.' : 'PENDING: NO VC credited yet.',
+              'Claim and authenticate the real PIN before approval.',
+            ].join('\\n');
+            const replyMarkup = {
+              inline_keyboard: [[
+                { text: instant ? '✅ Verify ₹10 (UNLOCK VC)' : '✅ Approve (+' + coins + ' VC)',
+                  callback_data: 'vc_approve:' + row.$id },
+                { text: instant ? '❌ Reject (REVERSE VC)' : '❌ Reject',
+                  callback_data: 'vc_reject:' + row.$id },
+              ]],
+            };
+            const telegramNotified = await sendVCTelegram(message, replyMarkup);
+            return {
+              ok: true, requestId: row.$id, coins, instantCredited: instant,
+              reservedVC: instant ? 100 : 0, telegramNotified,
+              message: instant
+                ? '100 VC visible in wallet, locked until Gift Card is verified.'
+                : '₹50+ packs subah 9:00 AM se pehle verify hokar wallet mein add honge',
+            };
+          }'''
+              s=replace_between(s,'async function submitGiftCard(user, b, key) {',
+                 '// Handles Telegram Inline Button Press (Approve / Reject)',submit,'gift card handler')
+              s=once(s,'''  if (entry.status !== "pending") {
+              statusLine = "\\n\\n⚠️ Already " + entry.status.toUpperCase();
+            } else {
+              const operations = [op("update", table, entry.$id, { status: decision })];
+              if (decision === "approved") {
+                const player = await profile(entry.userId, key);
+                operations.push(
+                  op("increment", "user_profiles", player.$id, {
+                    column: "wallet",
+                    value: entry.amount,
+                    max: 900000000,
+                  })
+                );
+              }
+              await transact(key, operations);
+              statusLine =
+                decision === "approved"
+                  ? "\\n\\n✅ APPROVED (+" + entry.amount + " VC credited)"
+                  : "\\n\\n❌ REJECTED (No coins credited)";
+            }''',
+          '''  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status)) {
+              statusLine = "\\n\\n⚠️ Already " + entry.status.toUpperCase();
+            } else {
+              const instant = isInstantGiftRequest(entry);
+              const player = (instant || decision === "approved")
+                ? await profile(entry.userId, key) : null;
+              const operations = giftDecisionOps(entry, decision, player, table);
+              await transact(key, operations);
+              statusLine = instant
+                ? (decision === "approved"
+                  ? "\\n\\n✅ VERIFIED: 100 previously credited VC unlocked; no double credit."
+                  : "\\n\\n❌ REJECTED: 100 locked VC reversed.")
+                : (decision === "approved"
+                  ? "\\n\\n✅ APPROVED (+" + entry.amount + " VC credited)"
+                  : "\\n\\n❌ REJECTED (No coins credited)");
+            }''','telegram decision handling')
+              s=once(s,'pending: requests.filter((r) => r.status === "pending").length,',
+                     'pending: requests.filter((r) => ["pending", INSTANT_GIFT_STATUS].includes(r.status)).length,',
+                     'admin pending count')
+              s=once(s,'''  if (entry.status !== "pending")
+              return { ok: false, error: "Request already handled: " + entry.status };''',
+          '''  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status))
+              return { ok: false, error: "Request already handled: " + entry.status };''','admin status check')
+              s=once(s,'''  const operations = [op("update", table, entry.$id, { status: decision })];
+            if (decision === "approved") {
+              const player = await profile(entry.userId, key);
+              operations.push(
+                op("increment", "user_profiles", player.$id, {
+                  column: "wallet",
+                  value: entry.amount,
+                  max: 900000000,
+                })
+              );
+            }
+
+            try {
+              await transact(key, operations);''',
+          '''  const instant = isInstantGiftRequest(entry);
+            const player = (instant || decision === "approved")
+              ? await profile(entry.userId, key) : null;
+            const operations = giftDecisionOps(entry, decision, player, table);
+
+            try {
+              await transact(key, operations);''','admin decision operations')
+              s=once(s,'''      decision === "approved"
+                  ? "Coins credited once in the same database transaction."
+                  : "No coins credited.",''',
+          '''      instant
+                  ? (decision === "approved"
+                    ? "100 earlier credited VC unlocked; no second credit."
+                    : "Previously locked 100 VC reversed.")
+                  : (decision === "approved"
+                    ? "Coins credited once in the same database transaction."
+                    : "No coins credited."),''','admin telegram text')
+              s=once(s,'''    wallet: p.wallet,
+                  wins: p.wins || 0,''',
+          '''    wallet: p.wallet,
+                  unverifiedVC: safeReservedVC(p),
+                  spendableVC: p.wallet - safeReservedVC(p),
+                  canWithdraw: p.canWithdraw === true && safeReservedVC(p) === 0,
+                  wins: p.wins || 0,''','wallet read display')
+              return s
+
+
+          def patch_home(s):
+              if 'instantCredited' in s: return s
+              s=once(s,
+          '''    <p class="small" style="margin:4px 0 10px">*Approval requires Admin verification; submission alone does not credit VC automatically.</p>''',
+          '''    <p class="small" style="margin:4px 0 10px">*₹10 pack: 100 VC instantly shown in wallet but locked until PIN verification. ₹50+ packs: no instant credit. No Amazon code is confirmed valid by its format alone.</p>''','home note')
+              s=once(s,
+          '''    await api('submit_gift_card', {
+                code: cleanPin,
+                amount: amount,
+                coins: coins
+              });
+              msg('voucherMsg', `✅ PIN Submitted! ${coins} VC will be added within 2-5 mins after verification.`);''',
+          '''    const result = await api('submit_gift_card', {
+                code: cleanPin,
+                amount: amount,
+                coins: coins
+              });
+              msg('voucherMsg', result.instantCredited
+                ? '✅ 100 VC wallet mein turant add hue, lekin admin verification tak locked rahenge. Koi withdrawal ya game entry mein ye 100 VC use nahin honge.'
+                : '₹50+ packs subah 9:00 AM se pehle verify hokar wallet mein add honge' +
+                  (result.telegramNotified ? ' · Admin alerted on Telegram.' : ' · Admin notification not confirmed.'));''','gift frontend')
+              s=once(s,'''    $('voucherCode').value = '';''',
+          '''    $('voucherCode').value = '';''','home clear pin')
+              return s
+
+
+          def patch_draw(s):
+              if 'walletVerificationStatus' in s: return s
+              s=once(s,'''<div class="wallet"><span id="wallet">0</span> VC</div><div class="small" id="userName"></div>''',
+          '''<div class="wallet"><span id="wallet">0</span> VC</div><div class="small" id="walletVerificationStatus"></div><div class="small" id="userName"></div>''','wallet UI note')
+              s=once(s,'''msg('wallet',p.wallet);msg('wins',p.wins);''',
+          '''msg('wallet',p.wallet);msg('walletVerificationStatus',p.unverifiedVC>0
+            ? `${p.unverifiedVC} VC pending Gift Card verification · ${p.spendableVC} VC available for games`
+            : '');msg('wins',p.wins);''','wallet UI refresh')
+              return s
+
+
+          def patch_admin(s):
+              if 'instant_pending' in s: return s
+              s=once(s,"requests.filter(x=>x.status==='pending').length",
+                     "requests.filter(x=>['pending','instant_pending'].includes(x.status)).length",'admin pending metric')
+              s=once(s,"const filtered=requests.filter(x=>$('filter').value==='all'||x.status===$('filter').value);",
+                     "const filtered=requests.filter(x=>$('filter').value==='all'||( $('filter').value==='pending' ? ['pending','instant_pending'].includes(x.status) : x.status===$('filter').value));",'admin filter')
+              s=once(s,"r.status==='pending'?'':' done'",
+                     "['pending','instant_pending'].includes(r.status)?'':' done'",'admin pending badge')
+              s=once(s,"if(r.status==='pending'){",
+                     "if(['pending','instant_pending'].includes(r.status)){",'admin decision buttons')
+              return s
+
+
+          def main():
+              files=[(BACKEND,patch_backend),(HOME,patch_home),(DRAW,patch_draw),(ADMIN,patch_admin)]
+              updates=[]
+              for path,func in files:
+                  before=path.read_text(encoding='utf-8')
+                  after=func(before)
+                  updates.append((path,after))
+              for path,after in updates:
+                  path.write_text(after,encoding='utf-8')
+                  print('UPDATED',path, len(after))
+
+          if __name__=='__main__':main()
+          PATCH_PY
+          python3 /tmp/samrat_gift_patch.py
+      - name: Check JavaScript and security invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          cat > /tmp/samrat_gift_test.cjs <<'TEST_JS'
+          /* Read-only verification of the installed Samrat Gift Card patch. */
+          const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
+          const b=fs.readFileSync('functions/game-wallet/src/main.js','utf8');
+          const home=fs.readFileSync('index.html','utf8');
+          const draw=fs.readFileSync('number-draw.html','utf8');
+          const admin=fs.readFileSync('admin-vc-requests.html','utf8');
+          const start=b.indexOf('// SAMRAT INSTANT-GIFT-CREDIT V1');
+          const stop=b.indexOf('async function redeemVoucher(',start);
+          assert(start>=0&&stop>start,'Patch helper not installed');
+          const code=b.slice(start,stop)+'\n({isInstantGiftRequest,safeReservedVC,giftDecisionOps})';
+          const api=vm.runInNewContext(code,{op:(action,table,rowId,data)=>({action,table,rowId,data})});
+          let count=0;
+          const c=(ok,label)=>{assert.ok(ok,label);count++};
+          const entry=(status,amount=100)=>({$id:'gc_'+'a'.repeat(28),amount,status,userId:'player1'});
+          const player=(unverifiedVC,wallet=unverifiedVC)=>({$id:'player1',unverifiedVC,wallet,canWithdraw:false});
+          const approved=api.giftDecisionOps(entry('instant_pending'),'approved',player(100),'vc_requests');
+          c(approved.some(x=>x.action==='decrement'&&x.data.column==='unverifiedVC'&&x.data.value===100),'approve unlocks reserved 100 VC');
+          c(!approved.some(x=>x.action==='increment'&&x.data.column==='wallet'),'approve NEVER credits duplicate wallet VC');
+          c(approved.some(x=>x.action==='update'&&x.data.canWithdraw===true),'approve clears lock for last pending PIN');
+          const rejected=api.giftDecisionOps(entry('instant_pending'),'rejected',player(100),'vc_requests');
+          c(rejected.some(x=>x.action==='decrement'&&x.data.column==='wallet'&&x.data.value===100),'rejection reverses unverified wallet VC');
+          c(rejected.some(x=>x.action==='decrement'&&x.data.column==='unverifiedVC'),'rejection reverses reserve');
+          const multi=api.giftDecisionOps(entry('instant_pending'),'approved',player(200,200),'vc_requests');
+          c(!multi.some(x=>x.data?.canWithdraw===true),'multiple reserves must keep lock');
+          const legacy=api.giftDecisionOps(entry('pending'),'approved',player(0),'vc_requests');
+          c(legacy.some(x=>x.action==='increment'&&x.data.column==='wallet'),'legacy pending gift still credits on approval');
+          c(api.safeReservedVC({wallet:20})===0,'legacy profile without reservation remains spendable');
+          let invalid=false;try{api.giftDecisionOps({...entry('instant_pending'),amount:500},'approved',player(100),'vc_requests')}catch{invalid=true}
+          c(invalid,'invalid instant gift row fails closed');
+          c(b.includes('const spendable = p.wallet - safeReservedVC(p);'),'game entry checks reserved coins');
+          c(b.includes('const instant = amountInr === 10'),'only ₹10 uses instant credit');
+          c(b.includes('status: INSTANT_GIFT_STATUS'),'instant deposits distinct from legacy pending');
+          c(b.includes("const SLABS = { 10: 100, 50: 500, 100: 1000"),'pack mapping matches spec');
+          c(b.includes('op("update", "vouchers", voucher.$id, {\n        isRedeemed: true'),'atomic voucher redemption preserved');
+          c(b.includes('function nightBreakInfo('),'IST night break preserved');
+          c(home.includes('result.instantCredited'),'homepage has correct instant response');
+          c(draw.includes('walletVerificationStatus'),'draw shows verified vs pending wallet');
+          c(admin.includes("'instant_pending'"),'admin supports instant pending requests');
+          for(const html of ['index.html','number-draw.html','admin-vc-requests.html']){
+           const src=fs.readFileSync(html,'utf8');
+           const matches=[...src.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+           c(matches.length>0,html+' has inline script');
+           for(const m of matches) new vm.Script(m[1],{filename:html});
+          }
+          console.log(`PASS ${count} local non-network checks; no real Appwrite writes made`);
+          TEST_JS
+          node /tmp/samrat_gift_test.cjs
+          git diff --check
+      - name: Commit only relevant source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add functions/game-wallet/src/main.js index.html number-draw.html admin-vc-requests.html
+          if git diff --cached --quiet; then
+            echo 'No changes: patch already installed.'
+          else
+            git commit -m 'Add safe instant ₹10 Amazon VC verification reserve and preserve voucher redemption'
+            git push
+          fi
