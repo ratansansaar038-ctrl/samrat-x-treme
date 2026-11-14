@@ -1,0 +1,284 @@
+name: Install Samrat 00-99 Two-Digit Draw
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-00-99-upgrade
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Samrat X-Treme project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Node.js for syntax checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply strict 00-99 backend and UI upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_two_digit_patch.py <<'SAMRAT_PATCH_EOF'
+          #!/usr/bin/env python3
+          """SAMRAT 00-99 upgrade. Strict on-disk patch of inspected 2026-11-14 GitHub version.
+          Fail closed (and never write partial files) if source layout has drifted.
+          """
+          from pathlib import Path
+          import re
+          import sys
+          
+          MARK='SAMRAT_TWO_DIGIT_00_99_V1'
+          REPO=Path(sys.argv[1]) if len(sys.argv)>1 else Path('.')
+          paths=['functions/game-wallet/src/main.js','number-draw.html','number-history.html','admin-dashboard.html','index.html']
+          files={k:(REPO/k).read_text(encoding='utf-8') for k in paths}
+          if MARK in files[paths[0]]:
+              print('Already upgraded, no additional changes made.')
+              sys.exit(0)
+          
+          def repl(file, old, new, n=1):
+              src=files[file]
+              found=src.count(old)
+              if found!=n:
+                  raise AssertionError(f'Expected {n} copy of {old[:110]!r} in {file}; got {found}. Source may have changed. No files touched.')
+              files[file]=src.replace(old,new)
+          
+          b='functions/game-wallet/src/main.js'
+          d='number-draw.html'
+          h='number-history.html'
+          a='admin-dashboard.html'
+          i='index.html'
+          
+          # Server-only winning RNG: crypto.randomInt returns [min,max), here 0-99.
+          repl(b,'// SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.',
+               f'// {MARK} — 100 uniform server-side possibilities (00..99); 50x standard, 1500 finale.\n'
+               '// SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.')
+          repl(b,'r.winningNumber >= 1 &&\n  r.winningNumber <= 9;', 'r.winningNumber >= 0 &&\n  r.winningNumber <= 99;')
+          repl(b,'const hits = Array(10).fill(0), distance = Array(10).fill(11);',
+               'const hits = Array(100).fill(0), distance = Array(100).fill(11);')
+          repl(b,'const numbers = Array.from({ length: 9 }, (_, i) => i + 1);',
+               'const numbers = Array.from({ length: 100 }, (_, i) => i);')
+          repl(b,'FREE_FINALE_WIN_VC = 160;', 'FREE_FINALE_WIN_VC = 1500;')
+          repl(b,'b.number<1 || b.number>9', 'b.number<0 || b.number>99')
+          repl(b,'Choose a number 1 to 9 first.', 'Choose a number 00 to 99 first.')
+          repl(b,'b.number < 1 ||\n    b.number > 9', 'b.number < 0 ||\n    b.number > 99')
+          repl(b,'entry.selectNumber < 1 ||\n      entry.selectNumber > 9',
+               'entry.selectNumber < 0 ||\n      entry.selectNumber > 99')
+          repl(b,'winningNumber: randomInt(1, 10)', 'winningNumber: randomInt(0, 100)', n=2)
+          repl(b,'entry.stakeVc * 8', 'entry.stakeVc * 50')
+          repl(b,'stake * 8;', 'stake * 50;')
+          # Historical won entries must not be reported as "underpaid" because of new multiplication.
+          # A settled old win retains its recorded 8x payout; pending/new wins expect 50x.
+          repl(b,
+            'const payout = samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 50;',
+            'const payout = entry.status === "won" && Number.isSafeInteger(entry.payoutVc) &&\n'
+            '      (entry.payoutVc === stake * 8 || (samratIsFreeEntry(entry,round) && entry.payoutVc === 160))\n'
+            '      ? entry.payoutVc\n'
+            '      : samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 50;')
+          # Historical near misses, current settled entries and existing voucher ledger remain intact.
+          repl(b,'(8×) on Lucky Number #${w.selectNumber}!',
+               'on Lucky Number #${String(w.selectNumber).padStart(2, "0")}!')
+          repl(b,'Lucky Draw Winning Number: #${rounds[0].winningNumber}',
+               'Lucky Draw Winning Number: #${String(rounds[0].winningNumber).padStart(2, "0")}')
+          
+          # The existing website has two different picker UIs, for guests and signed-in players.
+          # Use a text field (not number) so leading zeroes are visible and retained.
+          old='''let user=null,round=null,guestNumber=null,playerNumber=null,serverDelta=0;function drawNumbers(id,cb){$(id).replaceChildren();for(let i=1;i<=9;i++){const b=document.createElement('button');b.className='num';b.textContent=i;b.onclick=()=>{cb(i);for(const x of $(id).children)x.classList.toggle('active',Number(x.textContent)===i)};$(id).appendChild(b)}}drawNumbers('guestNums',n=>guestNumber=n);drawNumbers('playerNums',n=>playerNumber=n);// Server-time-corrected clock; Appwrite remains the final authority.'''
+          new='''let user=null,round=null,serverDelta=0;
+          // Always format numeric number keys as 00..99; the API still stores integers.
+          const fmt2=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=99?String(Number(n)).padStart(2,'0'):'—';
+          function readPick(id){const raw=$(id).value.trim();return /^\\d{1,2}$/.test(raw)?Number(raw):null;}
+          function initPick(id,randomId){
+            const input=$(id);
+            input.addEventListener('input',()=>{input.value=input.value.replace(/[^0-9]/g,'').slice(0,2);});
+            input.addEventListener('blur',()=>{const n=readPick(id);if(n!==null)input.value=fmt2(n);});
+            $(randomId).onclick=()=>{input.value=fmt2(Math.floor(Math.random()*100));input.focus();};
+          }
+          initPick('guestPick','guestRandom');initPick('playerPick','playerRandom');
+          // Server-time-corrected clock; Appwrite remains the final authority.'''
+          repl(d,old,new)
+          
+          picker_style='''/* SAMRAT_TWO_DIGIT_00_99_V1 — responsive full two-digit input */
+          .picker-row{display:flex;align-items:stretch;gap:10px;margin:10px 0 14px}
+          .picker-row input{flex:1;min-width:0;margin:0;font-size:30px;font-weight:900;letter-spacing:7px;text-align:center;color:#ffe28a;border:1px solid #b789e9;background:#190c2c;border-radius:13px}
+          .picker-row button{flex:0 0 42%;max-width:210px;min-width:0;margin:0;padding:10px 6px;border-radius:13px;background:linear-gradient(105deg,#7546a6,#e55491);border:1px solid #ae79de;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+          .picker-row button:disabled,.picker-row input:disabled{opacity:.5}
+          @media(max-width:375px){.picker-row button{font-size:12px}}
+          '''
+          repl(d,'</style></head><body>',picker_style+'</style></head><body>')
+          repl(d,'<div id="guestNums" class="nums"></div>',
+               '<div class="picker-row"><input id="guestPick" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="00" aria-label="Guest lucky number from 00 to 99"><button id="guestRandom" type="button">🎲 Random Lucky Pick</button></div>')
+          repl(d,'<div id="playerNums" class="nums"></div>',
+               '<div class="picker-row"><input id="playerPick" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="00" aria-label="Your lucky number from 00 to 99"><button id="playerRandom" type="button">🎲 Random Lucky Pick</button></div>')
+          repl(d,'Correct number pays 8× VC.', 'Exact match pays 50× VC. Pick from 00 to 99.')
+          repl(d,'Pick a number from 1–9 below.', 'Pick a number from 00–99 below.') if 'Pick a number from 1–9 below.' in files[d] else None
+          repl(d,'select number 1–9, then claim your free ticket.', 'select number 00–99, then claim your free ticket.')
+          repl(d,'if(!playerNumber) return msg(\'finaleMessage\',\'Choose a number 1–9 below first.\');',
+               'const playerNumber=readPick(\'playerPick\');\n  if(playerNumber===null) return msg(\'finaleMessage\',\'Choose a number 00–99 below first.\');')
+          repl(d,"'🎟️ FREE ticket confirmed! Number '+x.number+' • Cost 0 VC • Win 160 VC if correct.'",
+               "'🎟️ FREE ticket confirmed! Number '+fmt2(x.number)+' • Cost 0 VC • Win 1,500 VC if correct.'")
+          repl(d,'A free winning ticket pays 160 VC.', 'A free winning ticket pays 1,500 VC.')
+          repl(d,"for(const id of ['playerNums','guestNums'])for(const b of $(id).children)b.disabled=n.closed;",
+               "for(const id of ['playerPick','guestPick','playerRandom','guestRandom'])$(id).disabled=n.closed;")
+          repl(d,'n.textContent=x.number;', 'n.textContent=fmt2(x.number);')
+          repl(d,'msg(\'winningNumber\',String(1+Math.floor(Math.random()*9)));',
+               'msg(\'winningNumber\',fmt2(Math.floor(Math.random()*100)));')
+          repl(d,"msg('winningNumber',String(result.winningNumber));", "msg('winningNumber',fmt2(result.winningNumber));")
+          repl(d,"msg('winningNumber',d.winningNumber);", "msg('winningNumber',fmt2(d.winningNumber));")
+          repl(d,"$('guestPlay').onclick=()=>{if(currentNightInfo().closed)",
+               "$('guestPlay').onclick=()=>{const guestNumber=readPick('guestPick');if(currentNightInfo().closed)")
+          repl(d,"if(!guestNumber)return msg('guestMsg','Choose a number first.');",
+               "if(guestNumber===null)return msg('guestMsg','Choose a 00–99 number first.');")
+          repl(d,'`Number ${guestNumber} saved on this device for this round.`',
+               '`Number ${fmt2(guestNumber)} saved on this device for this round.`')
+          repl(d,"$('submitEntry').onclick=async()=>{if(currentNightInfo().closed)",
+               "$('submitEntry').onclick=async()=>{const playerNumber=readPick('playerPick');if(currentNightInfo().closed)")
+          repl(d,"if(!playerNumber)return msg('entryMsg','Choose a number first.');",
+               "if(playerNumber===null)return msg('entryMsg','Choose a number from 00 to 99 first.');")
+          repl(d,'`Entry saved! Number ${x.number}, ${x.stakeVC} VC deducted.`',
+               '`Entry saved! Number ${fmt2(x.number)}, ${x.stakeVC} VC deducted.`')
+          repl(d,'`Number ${x.number} • ${x.stakeVC} VC • ${x.status}',
+               '`Number ${fmt2(x.number)} • ${x.stakeVC} VC • ${x.status}')
+          # If number is entered 0, it must be considered a valid selection in both modes.
+          assert 'if(!playerNumber)' not in files[d] and 'if(!guestNumber)' not in files[d]
+          
+          # Game-history and admin screens also display two digits.
+          repl(h,'async function load(){',
+               'function fmt2(n){return Number.isInteger(n)&&n>=0&&n<=99?String(n).padStart(2,"0"):"—";}\n\nasync function load(){')
+          repl(h,'"Number "+entry.number+', '"Number "+fmt2(entry.number)')
+          repl(a,'function renderRounds(items){',
+               'function fmt2(n){return Number.isInteger(n)&&n>=0&&n<=99?String(n).padStart(2,"0"):"—";}\nfunction renderRounds(items){')
+          repl(a,"'Won: '+r.winningNumber", "'Won: '+fmt2(r.winningNumber)")
+          repl(a,"['Winning Number',d.winningNumber]", "['Winning Number',fmt2(d.winningNumber)]")
+          
+          # Homepage marketing must not show obsolete 1-9/8x rules.
+          repl(i,'Pick 1–9 • Win 8× Virtual Coins', 'Pick 00–99 • Win 50× Virtual Coins')
+          repl(i,'Next 8× Lucky Draw in:', 'Next 50× Lucky Draw in:')
+          repl(i,'Win up to 8× VC!', 'Win up to 50× VC!')
+          
+          for k, text in files.items():
+              if k==b:
+                  assert text.count('randomInt(0, 100)')==2
+                  assert 'FREE_FINALE_WIN_VC = 1500' in text
+                  assert 'entry.stakeVc * 50' in text
+                  assert 'r.winningNumber <= 99' in text
+                  assert 'b.number < 0' in text and 'b.number<0' in text
+                  assert 'entry.selectNumber < 0' in text
+                  assert 'Array(100)' in text
+              if k==d:
+                  for x in ['id="guestPick"','id="playerPick"','guestRandom','playerRandom','fmt2(d.winningNumber)','fmt2(Math.floor(Math.random()*100))']:
+                      assert x in text, x
+                  assert 'id="playerNums"' not in text and 'id="guestNums"' not in text
+          # Write all files only after strict matches and invariants pass.
+          for k, content in files.items():
+              (REPO/k).write_text(content,encoding='utf-8')
+          print('Patched '+', '.join(paths))
+          SAMRAT_PATCH_EOF
+          python3 /tmp/samrat_two_digit_patch.py .
+
+      - name: Verify backend JS and every updated HTML script
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          cat > /tmp/check_samrat_scripts.py <<'SAMRAT_INLINE_EOF'
+          #!/usr/bin/env python3
+          import re
+          from pathlib import Path
+          import subprocess
+          from tempfile import TemporaryDirectory
+          
+          for page in ['number-draw.html', 'number-history.html', 'admin-dashboard.html', 'index.html']:
+              content=Path(page).read_text(encoding='utf-8')
+              scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script\s*>',content,re.I|re.S)
+              if not scripts:
+                  raise SystemExit('No scripts found: '+page)
+              with TemporaryDirectory() as temp:
+                  for n,script in enumerate(scripts):
+                      if not script.strip():continue
+                      f=Path(temp)/(f'{page}-{n}.js')
+                      f.write_text(script,encoding='utf-8')
+                      subprocess.run(['node','--check',str(f)],check=True)
+              print('Inline JavaScript syntax OK:', page)
+          SAMRAT_INLINE_EOF
+          python3 /tmp/check_samrat_scripts.py
+
+      - name: Run number, payout, near-miss, streak and night tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_verify_00_99.cjs <<'SAMRAT_TEST_EOF'
+          'use strict';
+          const fs=require('fs'),vm=require('vm'),crypto=require('crypto');
+          const assert=require('assert');
+          const source=fs.readFileSync('functions/game-wallet/src/main.js','utf8');
+          const html=fs.readFileSync('number-draw.html','utf8');
+          const h1=fs.readFileSync('number-history.html','utf8');
+          const ad=fs.readFileSync('admin-dashboard.html','utf8');
+          const index=fs.readFileSync('index.html','utf8');
+          const ctx={Buffer,URL,URLSearchParams,console,process,Date,randomInt:crypto.randomInt,createHash:crypto.createHash,randomBytes:crypto.randomBytes};
+          const vmSource=source.replace(/^import .*;\s*$/gm,'').replace('export default async','const samratHandler = async');
+          const helpers=vm.runInNewContext(vmSource+'\n({valid, drawTrendStats, nearMissBonus, samratDay, samratIsFinale, roundFor, nightBreakInfo})',ctx,{timeout:1000});
+          const {valid,drawTrendStats,nearMissBonus,samratDay,samratIsFinale,roundFor,nightBreakInfo}=helpers;
+          let count=0;function check(cond,name){assert(cond,name);count++;console.log('PASS '+name);}
+          check(valid({status:'settled',winningNumber:0}), '00 accepted as winning number');
+          check(valid({status:'settled',winningNumber:99}), '99 accepted as winning number');
+          check(!valid({status:'settled',winningNumber:-1})&&!valid({status:'settled',winningNumber:100}), 'out-of-range winning numbers rejected');
+          check(!valid({status:'pending',winningNumber:42}), 'unsettled result rejected');
+          const winners=[0,0,99,42,42,0,98,65,19,73];
+          const results=winners.map((winningNumber,i)=>({winningNumber,status:'settled',endsAt:new Date(Date.parse('2026-11-14T14:00:00Z')-i*1200000).toISOString(),roundId:'r_'+i}));
+          const trend=drawTrendStats(results);
+          check(trend.sampleSize===10&&trend.hot[0].number===0&&trend.hot[0].times===3,'00 hot number tracked with 100 buckets');
+          check(trend.hot.some(x=>x.number===99)||trend.results.some(x=>x.number===99), '99 tracked in history');
+          check(trend.cold.every(x=>x.number>=0&&x.number<=99),'cold numbers stay 00..99');
+          check(nearMissBonus({selectNumber:41,$id:'a'},[{selectNumber:41,$id:'a'},{selectNumber:43,$id:'b'}],42)===10, '41 receives +10 when result is 42');
+          check(nearMissBonus({selectNumber:43,$id:'b'},[{selectNumber:41,$id:'a'},{selectNumber:43,$id:'b'}],42)===0,'same user receives at most one near-miss award');
+          check(nearMissBonus({selectNumber:0,$id:'a'},[{selectNumber:0,$id:'a'}],1)===10,'00 receives +10 when result is 01');
+          check(nearMissBonus({selectNumber:99,$id:'a'},[{selectNumber:99,$id:'a'}],98)===10,'99 receives +10 when result is 98');
+          check(nearMissBonus({selectNumber:0,$id:'a'},[{selectNumber:0,$id:'a'}],99)===0,'no 99-to-00 wraparound');
+          check(nearMissBonus({selectNumber:41,$id:'a'},[{selectNumber:41,$id:'a'},{selectNumber:42,$id:'b'}],42)===0,'near miss disabled when same player has a winning entry');
+          check(samratDay(Date.parse('2026-11-14T03:29:00Z')).day==='2026-11-13'&&samratDay(Date.parse('2026-11-14T03:30:00Z')).day==='2026-11-14','streak day still resets at 09:00 IST');
+          check(samratIsFinale(roundFor(Date.parse('2026-11-14T15:50:00Z'))),'21:20 IST finale unchanged');
+          check(!samratIsFinale(roundFor(Date.parse('2026-11-14T15:30:00Z'))),'other rounds not tagged finale');
+          check(nightBreakInfo(Date.parse('2026-11-14T16:30:00Z')).closed,'night break still starts 22:00 IST');
+          check(!nightBreakInfo(Date.parse('2026-11-14T03:30:00Z')).closed,'night break still ends 09:00 IST');
+          check(source.includes('winningNumber: randomInt(0, 100)')&&source.split('winningNumber: randomInt(0, 100)').length===3,'both server result creation paths use 00-99 CSPRNG');
+          check(source.includes('entry.stakeVc * 50')&&source.includes('FREE_FINALE_WIN_VC = 1500'),'50x and 1500 VC payout configured');
+          check(source.includes('DAILY_STREAK_')&&source.includes('samratDailyLoyalty'),'streak awarding untouched');
+          check(source.includes('NEAR_MISS_')&&source.includes('nearMissBonus'),'near-miss ledger untouched');
+          check(source.includes("p.wallet - safeReservedVC(p)"),'unverified VC wallet remains reserved');
+          check(html.includes('id="guestPick"')&&html.includes('id="playerPick"')&&html.includes('Random Lucky Pick'),'two-digit UI inputs and random buttons present');
+          check(!html.includes('id="playerNums"')&&!html.includes('id="guestNums"'),'obsolete 1-9 button grids removed');
+          check(html.includes('playerNumber===null')&&html.includes('guestNumber===null'),'zero is not treated as missing selection');
+          check(html.includes('fmt2(d.winningNumber)')&&html.includes('fmt2(result.winningNumber)'),'verified and revealed winning numbers padded');
+          check(html.includes('fmt2(x.number)')&&h1.includes('fmt2(entry.number)'),'ticket and history numbers padded');
+          check(ad.includes('fmt2(d.winningNumber)')&&ad.includes('fmt2(r.winningNumber)'),'admin results padded');
+          check(index.includes('Pick 00–99 • Win 50×'),'homepage updated to 00..99');
+          console.log('All '+count+' tests passed.');
+          SAMRAT_TEST_EOF
+          node /tmp/samrat_verify_00_99.cjs
+          git diff --check
+
+      - name: Commit upgraded backend and website safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html number-history.html admin-dashboard.html index.html
+          if git diff --cached --quiet; then
+            echo "No changes needed: 00-99 upgrade already present"
+          else
+            git commit -m "Upgrade Number Draw to 00-99 with 50x payout and 1500 VC finale"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
