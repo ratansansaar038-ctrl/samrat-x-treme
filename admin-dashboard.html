@@ -50,7 +50,7 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <div id="vouchers"></div></section>
 <section class="panel"><h2>Recent Number Draws</h2><p class="hint">Latest 8 recorded rounds. The result comes from stored game data.</p><div id="rounds"></div></section>
 <section class="panel" id="winReportPanel">
-<h2>🎯 Winning Number Report</h2>
+<!-- SAMRAT_ADMIN_NEAR_MISS_V1 --><h2>🎯 Winning Number Report</h2>
 <p class="hint">Draw complete होने के बाद Winning Players, VC और Wallet Payout देखें। Recent Number Draws से कोई Round चुनें।</p>
 <p class="hint" id="winReportStatus" role="status">Loading last winning draw…</p>
 <div id="winReportMetrics" class="metrics"></div>
@@ -107,6 +107,7 @@ async function loadWinningReport(roundId){
      ['Winning Number',d.winningNumber],['Winning Players',d.winningPlayers],
      ['Winning Entries',d.winningEntries],['VC on Winning Number',d.winningStakedVC+' VC'],
      ['Expected Payout',d.expectedPayoutVC+' VC'],['Credited Payout',d.creditedPayoutVC+' VC'],
+     ['Near-Miss Bonus Paid',String(d.nearMissPayoutVC??0)+' VC'],
      ['Awaiting / Check Payout',d.unpaidPayoutVC+' VC'],['Pending Entries (all numbers)',d.pendingEntries],
      ['Total Players',d.totalPlayers],['Total VC Staked',d.totalStakedVC+' VC']
    ]){

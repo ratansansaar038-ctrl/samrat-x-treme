@@ -154,6 +154,42 @@ async function transact(key, operations) {
   }
 }
 
+// SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.
+function drawTrendStats(rounds) {
+  const last10 = rounds.filter((r) => valid(r) && Number.isFinite(Date.parse(r.endsAt)))
+    .sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))
+    .slice(0, 10);
+  const hits = Array(10).fill(0), distance = Array(10).fill(11);
+  last10.forEach((r, i) => {
+    hits[r.winningNumber]++;
+    if (distance[r.winningNumber] === 11) distance[r.winningNumber] = i;
+  });
+  if (!last10.length) return { sampleSize: 0, hot: [], cold: [], results: [] };
+  const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+  const hot = [...numbers].sort((a, b) => hits[b] - hits[a] || distance[a] - distance[b] || a - b)
+    .filter((n) => hits[n] > 0).slice(0, 3)
+    .map((n) => ({ number: n, times: hits[n] }));
+  const cold = [...numbers].sort((a, b) => distance[b] - distance[a] || hits[a] - hits[b] || a - b)
+    .slice(0, 3).map((n) => ({ number: n, times: hits[n], drawsAgo: distance[n] === 11 ? null : distance[n] }));
+  return { sampleSize: last10.length, hot, cold,
+    results: last10.map((r) => ({ roundId: r.roundId, number: r.winningNumber, endsAt: r.endsAt })) };
+}
+
+async function getDrawTrends(key) {
+  // Sort by draw end time, not creation date: recovery can create an older result later.
+  const recent = await rows('game_rounds', [eq('status', 'settled'), order('$createdAt', 'desc'), lim(100)], key);
+  return { ok: true, ...drawTrendStats(recent) };
+}
+
+// Exactly one +10 VC bonus per player per round, only if they had no winning pick.
+function nearMissBonus(entry, userEntries, winningNumber) {
+  if (Math.abs(entry.selectNumber - winningNumber) !== 1 ||
+      userEntries.some((e) => e.selectNumber === winningNumber)) return 0;
+  const candidates = userEntries.filter((e) => Math.abs(e.selectNumber - winningNumber) === 1)
+    .sort((a, b) => a.selectNumber - b.selectNumber || String(a.$id).localeCompare(String(b.$id)));
+  return candidates[0]?.$id === entry.$id ? 10 : 0;
+}
+
 async function settleRound(round, key) {
   if (!valid(round)) return 0;
   let total = 0;
@@ -177,13 +213,14 @@ async function settleRound(round, key) {
         continue;
 
       const win = entry.selectNumber === round.winningNumber;
-      const payout = win ? entry.stakeVc * 8 : 0;
+      let payout = win ? entry.stakeVc * 8 : 0;
       const p = await profile(entry.userId, key);
       const previousEntries = await rows(
         "game_entries",
         [eq("roundId", round.roundId), eq("userId", entry.userId), lim(100)],
         key
       );
+      if (!win) payout = nearMissBonus(entry, previousEntries, round.winningNumber);
       const roundCounted = previousEntries.some(
         (x) => x.status === "won" || x.status === "lost"
       );
@@ -201,6 +238,15 @@ async function settleRound(round, key) {
         }),
       ];
 
+      if (!win && payout === 10) {
+        // Reuse the existing unique redemption ledger for bonus idempotency.
+        // A duplicate settlement transaction cannot create this award twice.
+        const rewardId = 'nm_' + createHash('sha256')
+          .update(entry.userId + '|' + round.roundId).digest('hex').slice(0, 30);
+        operations.push(op('create', 'voucher_redemptions', rewardId, {
+          code: 'NEAR_MISS_' + round.roundId, userId: entry.userId, coins: 10,
+        }));
+      }
       if (!roundCounted)
         operations.push(
           op("increment", "user_profiles", p.$id, {
@@ -703,6 +749,8 @@ async function adminRoundReport(user, b, key) {
   const winner = round.winningNumber;
   const allPlayerIds = new Set();
   const winners = new Map();
+  const nearMissPlayers = new Set();
+  let nearMissEntries = 0, nearMissPayoutVC = 0;
   let totalStakedVC = 0,
     winningEntries = 0,
     winningStakedVC = 0;
@@ -730,6 +778,10 @@ async function adminRoundReport(user, b, key) {
     if (entry.status === "pending") pendingEntries++;
     const won = entry.selectNumber === winner;
     if (!won) {
+      if (entry.status === "lost" && entry.payoutVc === 10 &&
+          Math.abs(entry.selectNumber - winner) === 1) {
+        nearMissEntries++; nearMissPayoutVC += 10; nearMissPlayers.add(entry.userId);
+      }
       if (entry.status !== "lost" && entry.status !== "pending")
         inconsistencies++;
       continue;
@@ -786,6 +838,9 @@ async function adminRoundReport(user, b, key) {
     unpaidPayoutVC: expectedPayoutVC - creditedPayoutVC,
     pendingEntries,
     winningPendingEntries,
+    nearMissEntries,
+    nearMissPayoutVC,
+    nearMissPlayers: nearMissPlayers.size,
     inconsistencies,
     players: players.slice(0, 100),
     detailsTruncated: players.length > 100,
@@ -1828,6 +1883,7 @@ export default async ({ req, res, error }) => {
       "get_round",
       "get_last_result",
       "get_recent_activity",
+      "get_draw_trends",
       "place_entry",
       "grant_coins",
       "request_vc",
@@ -1860,6 +1916,7 @@ export default async ({ req, res, error }) => {
       "get_last_result",
       "get_leaderboard",
       "get_recent_activity",
+      "get_draw_trends",
     ].includes(action)
   )
     return send(res, 401, {
@@ -1870,6 +1927,9 @@ export default async ({ req, res, error }) => {
   try {
     if (action === "get_recent_activity") {
       return send(res, 200, await getRecentActivity(key));
+    }
+    if (action === "get_draw_trends") {
+      return send(res, 200, await getDrawTrends(key));
     }
 
     if (action === "start_game") {

@@ -26,7 +26,7 @@ button{padding:12px;border:0;border-radius:10px;background:#6c42a0;color:white;f
 </head>
 <body>
 <main>
-<h1>SAMRAT X-TREME</h1>
+<!-- SAMRAT_HISTORY_NEAR_MISS_V1 --><h1>SAMRAT X-TREME</h1>
 <p class="sub">NUMBER CHALLENGE • MY HISTORY</p>
 <a class="btn" href="number-draw.html">BACK TO NUMBER CHALLENGE</a>
 <div class="card">
@@ -82,7 +82,7 @@ async function load(){
       const summary=element(
         "p",
         "Spent: "+round.spentVC+
-        " VC  |  Won: "+round.wonVC+" VC"
+        " VC  |  Credited: "+round.wonVC+" VC"
       );
       card.appendChild(summary);
 
@@ -97,10 +97,10 @@ async function load(){
 
         const result=element(
 "strong",
-entry.status.toUpperCase()+
-(entry.payoutVC
-  ? " • +"+entry.payoutVC+" VC"
-  : ""),
+(entry.status === 'lost' && entry.payoutVC === 10
+  ? '🔥 SO CLOSE! +10 VC BONUS'
+  : entry.status.toUpperCase()+
+    (entry.payoutVC ? " • +"+entry.payoutVC+" VC" : "")),
 entry.status
         );
         item.appendChild(result);
