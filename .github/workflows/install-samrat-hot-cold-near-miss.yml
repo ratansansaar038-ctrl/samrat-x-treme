@@ -1,0 +1,509 @@
+name: Install Samrat Hot Cold Suspense and Near Miss
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-number-draw-features
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Samrat X-Treme
+        uses: actions/checkout@v4
+      - name: Install three Number Draw features without altering existing Appwrite settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/patch_samrat_draw.py <<'SAMRAT_PATCH_PY'
+          #!/usr/bin/env python3
+          """Patch Samrat X-Treme source without replacing Appwrite settings or existing theme.
+
+          Run from repo root: python3 path/to/patch_samrat.py
+          Stops before writing if source anchor differs. Rerun safely on already installed sources.
+          """
+          from pathlib import Path
+          import sys
+
+          ROOT = Path('.')
+          BACKEND = ROOT / 'functions/game-wallet/src/main.js'
+          DRAW = ROOT / 'number-draw.html'
+          HISTORY = ROOT / 'number-history.html'
+          ADMIN = ROOT / 'admin-dashboard.html'
+          TAG = 'SAMRAT_HOT_COLD_NEAR_MISS_V1'
+
+
+          def one(s, old, new, label):
+              occurrences = s.count(old)
+              if occurrences != 1:
+                  raise RuntimeError(f'{label}: expected one matching anchor, got {occurrences}')
+              return s.replace(old, new, 1)
+
+
+          def section(s, start, end, new, label):
+              a = s.find(start)
+              if a < 0 or s.find(start, a + len(start)) >= 0:
+                  raise RuntimeError(f'{label}: start marker missing or duplicated')
+              b = s.find(end, a + len(start))
+              if b < 0:
+                  raise RuntimeError(f'{label}: end marker missing')
+              return s[:a] + new + s[b:]
+
+
+          HELPERS = '''// SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.
+          function drawTrendStats(rounds) {
+            const last10 = rounds.filter((r) => valid(r) && Number.isFinite(Date.parse(r.endsAt)))
+              .sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))
+              .slice(0, 10);
+            const hits = Array(10).fill(0), distance = Array(10).fill(11);
+            last10.forEach((r, i) => {
+              hits[r.winningNumber]++;
+              if (distance[r.winningNumber] === 11) distance[r.winningNumber] = i;
+            });
+            if (!last10.length) return { sampleSize: 0, hot: [], cold: [], results: [] };
+            const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+            const hot = [...numbers].sort((a, b) => hits[b] - hits[a] || distance[a] - distance[b] || a - b)
+              .filter((n) => hits[n] > 0).slice(0, 3)
+              .map((n) => ({ number: n, times: hits[n] }));
+            const cold = [...numbers].sort((a, b) => distance[b] - distance[a] || hits[a] - hits[b] || a - b)
+              .slice(0, 3).map((n) => ({ number: n, times: hits[n], drawsAgo: distance[n] === 11 ? null : distance[n] }));
+            return { sampleSize: last10.length, hot, cold,
+              results: last10.map((r) => ({ roundId: r.roundId, number: r.winningNumber, endsAt: r.endsAt })) };
+          }
+
+          async function getDrawTrends(key) {
+            // Sort by draw end time, not creation date: recovery can create an older result later.
+            const recent = await rows('game_rounds', [eq('status', 'settled'), order('$createdAt', 'desc'), lim(100)], key);
+            return { ok: true, ...drawTrendStats(recent) };
+          }
+
+          // Exactly one +10 VC bonus per player per round, only if they had no winning pick.
+          function nearMissBonus(entry, userEntries, winningNumber) {
+            if (Math.abs(entry.selectNumber - winningNumber) !== 1 ||
+                userEntries.some((e) => e.selectNumber === winningNumber)) return 0;
+            const candidates = userEntries.filter((e) => Math.abs(e.selectNumber - winningNumber) === 1)
+              .sort((a, b) => a.selectNumber - b.selectNumber || String(a.$id).localeCompare(String(b.$id)));
+            return candidates[0]?.$id === entry.$id ? 10 : 0;
+          }
+
+          '''
+
+
+          def patch_backend(s):
+              if TAG in s:
+                  print('backend: already installed')
+                  return s
+              s = one(s, 'async function settleRound(round, key) {', HELPERS + 'async function settleRound(round, key) {', 'backend helpers')
+              s = one(s,
+                  '      const payout = win ? entry.stakeVc * 8 : 0;',
+                  '      let payout = win ? entry.stakeVc * 8 : 0;', 'mutable payout')
+              s = one(s,
+                  '''      const roundCounted = previousEntries.some(
+                  (x) => x.status === "won" || x.status === "lost"
+                );''',
+                  '''      if (!win) payout = nearMissBonus(entry, previousEntries, round.winningNumber);
+                const roundCounted = previousEntries.some(
+                  (x) => x.status === "won" || x.status === "lost"
+                );''', 'award decision')
+              s = one(s,
+                  '''      if (!roundCounted)
+                  operations.push(''',
+                  '''      if (!win && payout === 10) {
+                  // Reuse the existing unique redemption ledger for bonus idempotency.
+                  // A duplicate settlement transaction cannot create this award twice.
+                  const rewardId = 'nm_' + createHash('sha256')
+                    .update(entry.userId + '|' + round.roundId).digest('hex').slice(0, 30);
+                  operations.push(op('create', 'voucher_redemptions', rewardId, {
+                    code: 'NEAR_MISS_' + round.roundId, userId: entry.userId, coins: 10,
+                  }));
+                }
+                if (!roundCounted)
+                  operations.push(''', 'unique bonus ledger')
+              s = one(s,
+                  '''      "get_recent_activity",
+                "place_entry",''',
+                  '''      "get_recent_activity",
+                "get_draw_trends",
+                "place_entry",''', 'action allowlist')
+              s = one(s,
+                  '''      "get_recent_activity",
+              ].includes(action)''',
+                  '''      "get_recent_activity",
+                "get_draw_trends",
+              ].includes(action)''', 'public trends action')
+              s = one(s,
+                  '''    if (action === "get_recent_activity") {
+                return send(res, 200, await getRecentActivity(key));
+              }''',
+                  '''    if (action === "get_recent_activity") {
+                return send(res, 200, await getRecentActivity(key));
+              }
+              if (action === "get_draw_trends") {
+                return send(res, 200, await getDrawTrends(key));
+              }''', 'trend route')
+              # Extend the existing admin report with audited Near-Miss bonus credits.
+              start=s.index('async function adminRoundReport(')
+              end=s.index('async function adminFindPlayer(',start)
+              report=s[start:end]
+              report=one(report, '  const winners = new Map();',
+                  '  const winners = new Map();\n  const nearMissPlayers = new Set();\n  let nearMissEntries = 0, nearMissPayoutVC = 0;',
+                  'admin report near-miss counters')
+              report=one(report,
+                  '    if (!won) {\n      if (entry.status !== "lost" && entry.status !== "pending")',
+                  '    if (!won) {\n      if (entry.status === "lost" && entry.payoutVc === 10 &&\n          Math.abs(entry.selectNumber - winner) === 1) {\n        nearMissEntries++; nearMissPayoutVC += 10; nearMissPlayers.add(entry.userId);\n      }\n      if (entry.status !== "lost" && entry.status !== "pending")',
+                  'admin report near-miss tracking')
+              report=one(report,
+                  '    winningPendingEntries,\n    inconsistencies,',
+                  '    winningPendingEntries,\n    nearMissEntries,\n    nearMissPayoutVC,\n    nearMissPlayers: nearMissPlayers.size,\n    inconsistencies,',
+                  'admin report fields')
+              s=s[:start]+report+s[end:]
+              return s
+
+          DRAW_STYLE = '''/* SAMRAT_HOT_COLD_NEAR_MISS_V1: matching the original purple/gold theme */
+          .draw-trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+          .draw-trend{background:#160b2b;border:1px solid #66418d;border-radius:14px;padding:12px;min-width:0}
+          .draw-trend strong{display:block;margin-bottom:7px;font-size:14px;color:#ffe68f}
+          .draw-trend .chip{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:36px;padding:7px 5px;margin:3px 3px 3px 0;border-radius:9px;font-size:19px;font-weight:900;background:#392052;border:1px solid #8354a5;color:#fff}
+          .draw-trend .chip small{font-size:10px;font-weight:500;color:#d9c2ff;margin-top:3px}
+          .draw-trend .trend-empty{color:#e0bff2;font-size:12px}
+          .slot-spinning{background:linear-gradient(120deg,#ffe55b,#f88bc8);color:#200b27!important;border-radius:14px;text-shadow:0 2px 10px #fff8;animation:slot-pulse .16s ease-in-out infinite alternate}
+          @keyframes slot-pulse{to{transform:scale(1.06)}}
+          @media(prefers-reduced-motion:reduce){.slot-spinning{animation:none}}
+          .near-win{border:1px solid #fdb44e;background:linear-gradient(135deg,#46220c,#381342);color:#ffefbd;border-radius:13px;padding:13px;text-align:center;font-weight:900;margin:13px 0}
+          @media(max-width:340px){.draw-trend-grid{grid-template-columns:1fr}}
+          '''
+
+          TREND_HTML = '''<section class="panel" id="drawTrendsPanel"><h3>🔥 Hot &amp; ❄️ Cold Numbers</h3><p class="small" id="drawTrendCount">Loading last 10 settled draws…</p><div class="draw-trend-grid"><div class="draw-trend"><strong>🔥 Hot Numbers</strong><div id="hotNumbers" class="trend-empty">Loading…</div></div><div class="draw-trend"><strong>❄️ Cold Numbers</strong><div id="coldNumbers" class="trend-empty">Loading…</div></div></div><p class="small">Past results do not change the odds of any number in the next draw.</p></section><div id="nearMissNotice" class="near-win hide" role="status" aria-live="polite">🔥 So Close! Bas 1 number se chook gaye! +10 VC Bonus credited.</div>'''
+
+          DRAW_LOGIC = '''// SAMRAT_HOT_COLD_NEAR_MISS_V1: suspense is visual only; server owns the result and wallet.
+          let suspenseRoundId=null, suspenseStarted=0, suspenseSpin=null, suspensePoll=null;
+          let verifiedReveal=null, observedLiveRound=null, lastBonusCheckedRoundId=null;
+          const suspenseSeen=new Set();
+          function renderTrendChips(id,items,cold){
+            const el=$(id);el.replaceChildren();
+            if(!items?.length){el.textContent='Not enough completed draws yet.';return;}
+            for(const x of items){
+              const chip=document.createElement('span');chip.className='chip';
+              const n=document.createElement('span');n.textContent=x.number;
+              const meta=document.createElement('small');meta.textContent=cold
+                ? (x.drawsAgo===null?'Not in last 10':x.drawsAgo===0?'Latest draw':x.drawsAgo+' draws ago')
+                : x.times+'×';
+              chip.append(n,meta);el.append(chip);
+            }
+          }
+          async function refreshDrawTrends(){
+            try{
+              const d=await api('get_draw_trends');
+              msg('drawTrendCount','Based on '+d.sampleSize+' most recent completed draws');
+              renderTrendChips('hotNumbers',d.hot,false);
+              renderTrendChips('coldNumbers',d.cold,true);
+            }catch(e){msg('drawTrendCount','Draw trends temporarily unavailable: '+e.message);}
+          }
+          function beginSuspense(roundId){
+            if(!roundId||suspenseSeen.has(roundId)||suspenseRoundId)return;
+            suspenseSeen.add(roundId);suspenseRoundId=roundId;verifiedReveal=null;suspenseStarted=Date.now();
+            $('winningNumber').classList.add('slot-spinning');
+            $('nearMissNotice').classList.add('hide');
+            msg('lastRound','🎰 Drawing the verified winning number…');
+            // The slot animation never selects or changes the winning number.
+            suspenseSpin=setInterval(()=>{
+              if(!suspenseRoundId)return;
+              if(Date.now()-suspenseStarted>90000){
+                clearInterval(suspenseSpin);clearInterval(suspensePoll);
+                suspenseSpin=null;suspensePoll=null;suspenseRoundId=null;verifiedReveal=null;
+                $('winningNumber').classList.remove('slot-spinning');
+                msg('winningNumber','—');
+                msg('lastRound','Verified result delayed. Refresh to check again.');
+                return;
+              }
+              msg('winningNumber',String(1+Math.floor(Math.random()*9)));
+              finishSuspenseIfReady();
+            },70);
+            void refreshResult();
+            suspensePoll=setInterval(()=>{
+              if(suspenseRoundId)void refreshResult();
+              else{clearInterval(suspensePoll);suspensePoll=null;}
+            },5000);
+          }
+          function finishSuspenseIfReady(){
+            if(!suspenseRoundId||!verifiedReveal||Date.now()-suspenseStarted<3000)return;
+            const result=verifiedReveal;
+            clearInterval(suspenseSpin);clearInterval(suspensePoll);
+            suspenseSpin=null;suspensePoll=null;suspenseRoundId=null;verifiedReveal=null;
+            $('winningNumber').classList.remove('slot-spinning');
+            msg('winningNumber',String(result.winningNumber));
+            msg('lastRound',result.roundId+' • Verified result');
+            void refreshDrawTrends();
+            if(user){void refreshWallet();void refreshEntry();void showNearMissForRound(result.roundId,result.winningNumber);}
+          }
+          async function showNearMissForRound(roundId,winningNumber){
+            try{
+              const d=await api('my_history');
+              const selected=d.rounds?.find(r=>r.roundId===roundId);
+              const received=selected?.entries?.some(e=>e.status==='lost'&&e.payoutVC===10&&Math.abs(e.number-winningNumber)===1);
+              $('nearMissNotice').classList.toggle('hide',!received);
+            }catch{ $('nearMissNotice').classList.add('hide'); }
+          }
+          '''
+
+          REFRESH_RESULT = '''async function refreshResult(){
+            try{
+              const d=await api('get_last_result');
+              if(suspenseRoundId){
+                if(d.available&&d.roundId===suspenseRoundId){verifiedReveal=d;finishSuspenseIfReady();}
+                return;
+              }
+              if(d.available){
+                msg('winningNumber',d.winningNumber);msg('lastRound',d.roundId);
+                if(user&&lastBonusCheckedRoundId!==d.roundId){
+                  lastBonusCheckedRoundId=d.roundId;void showNearMissForRound(d.roundId,d.winningNumber);
+                }
+                let saved=null;try{saved=JSON.parse(localStorage.getItem('samrat_guest_prediction')||'null')}catch{}
+                if(saved&&saved.roundId===d.roundId)
+                  msg('guestMsg',saved.number===d.winningNumber?'Your guest prediction was correct!':'Guest prediction did not match this round.');
+              }else if(!$('winningNumber').textContent||$('winningNumber').textContent==='—'){
+                msg('lastRound','No recent daytime draw available.');
+              }
+            }catch(e){if(!suspenseRoundId)msg('lastRound',e.message);}
+          }
+          '''
+
+          REFRESH_ROUND = '''async function refreshRound(){
+            try{
+              const previous=round;
+              const next=await api('get_round');
+              serverDelta=new Date(next.serverTime).getTime()-Date.now();
+              round=next;
+              msg('roundLabel',round.roundId);
+              msg('roundStatus',round.acceptingEntries?'OPEN':'LOCKED');
+              if(previous&&previous.roundId!==round.roundId&&observedLiveRound===previous.roundId){
+                beginSuspense(previous.roundId);
+              }
+              updateCountdown();
+            }catch(e){msg('roundLabel',e.message);msg('roundStatus','ERROR');$('submitEntry').disabled=true;}
+          }
+          '''
+
+
+          def patch_draw(s):
+              if TAG in s:
+                  print('draw: already installed')
+                  return s
+              s = one(s, '</style></head><body>', DRAW_STYLE + '</style></head><body>', 'draw css')
+              s = one(s,
+                  '<div class="small" id="lastRound">Result pending</div></section><section class="panel hide" id="guestPanel">',
+                  '<div class="small" id="lastRound">Result pending</div></section>' + TREND_HTML + '<section class="panel hide" id="guestPanel">',
+                  'draw trends markup')
+              s = one(s,
+                  'function updateCountdown(){\n  if(!round)return;\n  const n=currentNightInfo();',
+                  'function updateCountdown(){\n  if(!round)return;\n  const n=currentNightInfo();\n  const msUntilEnd=Date.parse(round.endsAt)-n.now;\n  if(!n.closed&&msUntilEnd>0)observedLiveRound=round.roundId;\n  if(msUntilEnd<=0&&observedLiveRound===round.roundId)beginSuspense(round.roundId);',
+                  'suspense at 00:00')
+              s = one(s,
+                  'async function refreshRound(){try{round=await api(\'get_round\');serverDelta=new Date(round.serverTime).getTime()-Date.now();msg(\'roundLabel\',round.roundId);msg(\'roundStatus\',round.acceptingEntries?\'OPEN\':\'LOCKED\');updateCountdown()}catch(e){msg(\'roundLabel\',e.message);msg(\'roundStatus\',\'ERROR\');$(\'submitEntry\').disabled=true}}',
+                  REFRESH_ROUND, 'round refresh transition')
+              s = section(s, 'async function refreshResult(){', 'async function refreshWallet(){', DRAW_LOGIC + REFRESH_RESULT, 'result display')
+              s = one(s,
+                  "${x.status}${x.payoutVC?' • Won '+x.payoutVC+' VC':''}",
+                  "${x.status}${x.payoutVC?(x.status==='lost'?' • Near-Miss Bonus +':' • Won ')+x.payoutVC+' VC':''}",
+                  'current entry payout wording')
+              s = one(s,
+                  "await Promise.all([refreshRound(),refreshResult(),loadUser()]);",
+                  "await Promise.all([refreshRound(),refreshResult(),loadUser(),refreshDrawTrends()]);",
+                  'initial trends load')
+              return s
+
+
+          def patch_history(s):
+              if 'SAMRAT_HISTORY_NEAR_MISS_V1' in s:
+                  print('history: already installed')
+                  return s
+              s = one(s, '" VC  |  Won: "+round.wonVC+" VC"', '" VC  |  Credited: "+round.wonVC+" VC"', 'history summary')
+              s = one(s,
+                  '''entry.status.toUpperCase()+
+          (entry.payoutVC
+            ? " • +"+entry.payoutVC+" VC"
+            : "")''',
+                  '''(entry.status === 'lost' && entry.payoutVC === 10
+            ? '🔥 SO CLOSE! +10 VC BONUS'
+            : entry.status.toUpperCase()+
+              (entry.payoutVC ? " • +"+entry.payoutVC+" VC" : ""))''',
+                  'history near miss status')
+              s = one(s, '<h1>SAMRAT X-TREME</h1>', '<!-- SAMRAT_HISTORY_NEAR_MISS_V1 --><h1>SAMRAT X-TREME</h1>', 'history idempotence')
+              return s
+
+
+          def patch_admin(s):
+              if 'SAMRAT_ADMIN_NEAR_MISS_V1' in s:
+                  print('admin: already installed')
+                  return s
+              s=one(s,
+                  "['Credited Payout',d.creditedPayoutVC+' VC'],",
+                  "['Credited Payout',d.creditedPayoutVC+' VC'],\n     ['Near-Miss Bonus Paid',String(d.nearMissPayoutVC??0)+' VC'],",
+                  'admin VC metric')
+              s=one(s,'<h2>🎯 Winning Number Report</h2>',
+                  '<!-- SAMRAT_ADMIN_NEAR_MISS_V1 --><h2>🎯 Winning Number Report</h2>',
+                  'admin idempotence')
+              return s
+
+
+          def main():
+              files=[(BACKEND,patch_backend),(DRAW,patch_draw),(HISTORY,patch_history),(ADMIN,patch_admin)]
+              converted=[]
+              for path, fn in files:
+                  if not path.is_file():
+                      raise RuntimeError(f'Required project file missing: {path}')
+                  original=path.read_text(encoding='utf-8')
+                  changed=fn(original)
+                  converted.append((path,original,changed))
+              # Do not write anything until every file validated.
+              for path,original,changed in converted:
+                  if changed != original:
+                      path.write_text(changed,encoding='utf-8')
+                  print(f'{path}: '+('updated' if changed != original else 'unchanged'))
+              print('Samrat new draw features patch applied successfully')
+
+          if __name__ == '__main__':
+              try:
+                  main()
+              except Exception as exc:
+                  print('PATCH ABORTED: '+str(exc),file=sys.stderr)
+                  sys.exit(1)
+          SAMRAT_PATCH_PY
+          python3 /tmp/patch_samrat_draw.py
+      - name: Check backend and webpage JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/check_samrat_js.py <<'SAMRAT_SYNTAX_PY'
+          #!/usr/bin/env python3
+          """Syntax-validate full backend and inline scripts. Does not run them."""
+          from pathlib import Path
+          import re, subprocess
+          root=Path('.')
+          paths=['functions/game-wallet/src/main.js','number-draw.html','number-history.html','admin-dashboard.html']
+          for rel in paths:
+              src=(root/rel).read_text('utf-8')
+              if rel.endswith('.html'):
+                  m=re.findall(r'<script(?:\s+[^>]*)?>(.*?)</script\s*>',src,flags=re.S|re.I)
+                  m=[x for x in m if x.strip()]
+                  if not m: raise SystemExit(f'No inline script found: {rel}')
+                  script='\n'.join(m)
+              else:script=src
+              p=subprocess.run(['node','--input-type='+('module' if rel.endswith('.js') else 'commonjs'),'--check','-'],input=script,text=True,capture_output=True)
+              if p.returncode:raise SystemExit(f'{rel}: JS syntax failed\n{p.stderr}')
+              print(f'PASS JS syntax {rel}')
+          SAMRAT_SYNTAX_PY
+          python3 /tmp/check_samrat_js.py
+          git diff --check
+      - name: Run 15 offline bonus security and trend tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/test_samrat_features.js <<'SAMRAT_TEST_JS'
+          // Safe offline checks; DOES NOT call Appwrite or modify wallets.
+          'use strict';
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const assert = require('node:assert/strict');
+          const source = fs.readFileSync('functions/game-wallet/src/main.js','utf8');
+          const draw = fs.readFileSync('number-draw.html','utf8');
+          const history = fs.readFileSync('number-history.html','utf8');
+          const admin = fs.readFileSync('admin-dashboard.html','utf8');
+          const start=source.indexOf('// SAMRAT_HOT_COLD_NEAR_MISS_V1');
+          const end=source.indexOf('async function settleRound(',start);
+          assert.ok(start>0&&end>start, 'helper functions installed');
+          const src=source.slice(start,end);
+          const funcs=vm.runInNewContext(src+'\n({drawTrendStats,nearMissBonus})',{
+            valid:r=>r&&r.status==='settled'&&Number.isInteger(r.winningNumber)&&r.winningNumber>=1&&r.winningNumber<=9,
+          });
+          let tests=0;
+          function test(label,fn){fn();++tests;console.log('PASS '+label)}
+          const one = (id,num)=>({$id:id,selectNumber:num});
+          function r(i,n){return {roundId:'r_'+String(i).padStart(17,'0'),status:'settled',winningNumber:n,endsAt:new Date(Date.UTC(2026,10,14,10,i*20)).toISOString()}}
+          test('hot counts exactly last 10 settled results',()=>{
+           const x=funcs.drawTrendStats([r(0,2),r(1,1),r(2,4),r(3,4),r(4,7),r(5,4),r(6,7),r(7,4),r(8,2),r(9,2),r(10,2)]);
+           assert.equal(x.sampleSize,10);assert.equal(x.hot[0].number,4);assert.equal(x.hot[0].times,4);
+           assert.equal(x.results[0].number,2);assert.equal(x.hot.length,3);assert.equal(x.hot.some(a=>a.number===1),false);
+          });
+          test('cold picks unseen and longest-absent numbers',()=>{
+           const x=funcs.drawTrendStats([r(0,2),r(1,5),r(2,2)]);
+           assert.equal(x.sampleSize,3);assert.equal(x.cold.length,3);
+           assert.ok(x.cold.every(a=>a.times===0&&a.drawsAgo===null));
+          });
+          test('empty draw history does not fabricate hot or cold numbers',()=>{
+           const x=funcs.drawTrendStats([]);assert.equal(x.sampleSize,0);assert.equal(x.hot.length,0);assert.equal(x.cold.length,0);
+          });
+          test('reject invalid round numbers from sample',()=>{
+           const x=funcs.drawTrendStats([r(0,13),r(1,0),r(2,5)]);
+           assert.equal(x.sampleSize,1);assert.equal(x.hot[0].number,5);
+          });
+          test('near miss at winning 5: pick 4 receives 10VC',()=>{
+           assert.equal(funcs.nearMissBonus(one('e4',4),[one('e4',4)],5),10);
+          });
+          test('near miss at winning 5: pick 6 receives 10VC',()=>{
+           assert.equal(funcs.nearMissBonus(one('e6',6),[one('e6',6)],5),10);
+          });
+          test('no reward for exact winning number',()=>{
+           assert.equal(funcs.nearMissBonus(one('e5',5),[one('e5',5)],5),0);
+          });
+          test('no reward for more than one number away',()=>{
+           assert.equal(funcs.nearMissBonus(one('e2',2),[one('e2',2)],5),0);
+          });
+          test('boundary 1 and 9 work without wraparound',()=>{
+           assert.equal(funcs.nearMissBonus(one('e2',2),[one('e2',2)],1),10);
+           assert.equal(funcs.nearMissBonus(one('e8',8),[one('e8',8)],9),10);
+           assert.equal(funcs.nearMissBonus(one('e9',9),[one('e9',9)],1),0);
+          });
+          test('two nearby picks only one gets bonus',()=>{
+           const picks=[one('e6',6),one('e4',4)];
+           assert.equal(funcs.nearMissBonus(picks[0],picks,5),0);
+           assert.equal(funcs.nearMissBonus(picks[1],picks,5),10);
+          });
+          test('winner plus nearby pick gets no second-chance bonus',()=>{
+           const picks=[one('e4',4),one('e5',5)];
+           assert.equal(funcs.nearMissBonus(picks[0],picks,5),0);
+          });
+          test('award ledger is created atomically with payout',()=>{
+           assert.match(source,/op\('create', 'voucher_redemptions', rewardId/);
+           assert.match(source,/if \(!win && payout === 10\)/);
+           assert.match(source,/if \(payout\)\s*operations\.push/);
+           assert.match(source,/await transact\(key, operations\)/);
+          });
+          test('public trends action, with original night lock preserved',()=>{
+           assert.match(source,/if \(action === "get_draw_trends"\)/);
+           assert.match(source,/nightBreakInfo\(beforeCommit\)\.closed/);
+           assert.match(source,/roundIsDaytime\(round\)/);
+          });
+          test('UI has hot cold strip, verified suspense, and near miss notice',()=>{
+           for(const tag of ['id="hotNumbers"','id="coldNumbers"','id="nearMissNotice"','function beginSuspense(','function finishSuspenseIfReady(','get_draw_trends']) assert.ok(draw.includes(tag),tag);
+           assert.ok(draw.includes('Date.now()-suspenseStarted<3000'), 'three-second minimum');
+           assert.ok(draw.includes('currentNightInfo().closed'),'night lock preserved');
+          });
+          test('history and admin report distinguish bonus from winnings',()=>{
+           assert.match(history,/SO CLOSE! \+10 VC BONUS/);
+           assert.match(history,/Credited:/);
+           assert.match(admin,/Near-Miss Bonus Paid/);
+           assert.match(source,/nearMissPayoutVC/);
+          });
+          console.log(`All ${tests} Samrat offline feature checks passed.`);
+          SAMRAT_TEST_JS
+          node /tmp/test_samrat_features.js
+      - name: Commit four source files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add functions/game-wallet/src/main.js number-draw.html number-history.html admin-dashboard.html
+          if git diff --cached --quiet; then
+            echo 'Already installed; no source changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Add Hot Cold stats, suspense reveal, and atomic Near-Miss reward'
+          git push origin HEAD
