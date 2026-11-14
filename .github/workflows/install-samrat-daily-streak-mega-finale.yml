@@ -1,0 +1,508 @@
+name: Install Samrat Daily Streak and Mega Finale
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: samrat-daily-streak-mega-finale
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout existing Samrat X-Treme code
+        uses: actions/checkout@v4
+      - name: Install protected streak and free-finale backend plus matching UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/samrat_daily_finale_patch.py <<'PATCH_PY'
+          #!/usr/bin/env python3
+          """Apply Daily Streak + 21:20-21:40 IST free-ticket finale on Samrat X-Treme.
+          Fail closed on unexpected source layouts. No credentials and no live database writes.
+          """
+          from pathlib import Path
+          import sys
+          
+          ROOT=Path(sys.argv[1] if len(sys.argv)>1 else '.')
+          BACK=ROOT/'functions/game-wallet/src/main.js'
+          DRAW=ROOT/'number-draw.html'
+          MARK='SAMRAT_DAILY_STREAK_FINALE_V1'
+          
+          def swap(source,old,new,label):
+              n=source.count(old)
+              if n!=1:
+                  raise RuntimeError(f'{label}: expected exactly one matching anchor; found {n}')
+              return source.replace(old,new,1)
+          
+          def block_replace(source,start,end,new,label):
+              a=source.find(start)
+              if a<0 or source.find(start,a+1)>=0:
+                  raise RuntimeError(f'{label}: missing or non-unique start')
+              b=source.find(end,a+len(start))
+              if b<0: raise RuntimeError(f'{label}: missing end')
+              return source[:a]+new+source[b:]
+          
+          HELPERS=r'''// SAMRAT_DAILY_STREAK_FINALE_V1 — server-authoritative daily session from 9 AM IST.
+          const STREAK_REWARD_VC = 50, FREE_FINALE_WIN_VC = 160;
+          function samratDay(ts=Date.now()) {
+            // 09:00 IST maps to 00:00 of the same ISO date; before 09:00 is previous day.
+            const day = new Date(ts + OFFSET - 9*3600000).toISOString().slice(0,10);
+            const [y,m,d] = day.split('-').map(Number);
+            const startMs = Date.UTC(y,m-1,d,9,0,0)-OFFSET;
+            return { day, startMs, endMs: startMs+86400000 };
+          }
+          function samratIsFinale(round) {
+            if (!round || !roundIsDaytime(round)) return false;
+            const x=new Date(Date.parse(round.startsAt)+OFFSET);
+            return x.getUTCHours()===21 && x.getUTCMinutes()===20;
+          }
+          function samratFreeEntryId(user,roundId) {
+            return 'ef_'+createHash('sha256').update('MEGA_FINALE|'+user+'|'+roundId)
+              .digest('hex').slice(0,30);
+          }
+          function samratIsFreeEntry(entry,round) {
+            return entry.stakeVc===0 && samratIsFinale(round) &&
+              entry.$id===samratFreeEntryId(entry.userId,round.roundId);
+          }
+          function samratRoundStart(rid) {
+            const m=typeof rid==='string' && /^r_(\d{17})$/.exec(rid);
+            if(!m) return NaN;
+            const v=m[1];
+            const t=Date.UTC(+v.slice(0,4),+v.slice(4,6)-1,+v.slice(6,8),
+              +v.slice(8,10),+v.slice(10,12),+v.slice(12,14),+v.slice(14,17));
+            return roundFor(t).roundId===rid?t:NaN;
+          }
+          function samratStreakAwardId(user,day) {
+            return 'ds_'+createHash('sha256').update('DAILY_STREAK|'+user+'|'+day)
+              .digest('hex').slice(0,30);
+          }
+          async function samratGetLedger(id,key) {
+            try { return await request('GET',tablePath('voucher_redemptions')+'/'+id,key); }
+            catch(e){ if(e.status===404) return null; throw e; }
+          }
+          // Count *completed* unique draws, never number of tickets or placed bets.
+          // 9 AM IST boundaries use the round start, so late settlement is still assigned
+          // to the correct original day. Pagination is bounded and fails closed if truncated.
+          async function samratCompletedDay(user,day,key) {
+            const unique=new Set(); let cursor=null, completedScan=false;
+            for(let page=0;page<15;page++) {
+              const q=[eq('userId',user),order('$createdAt','desc'),lim(100)];
+              if(cursor) q.push({method:'cursorAfter',values:[cursor]});
+              const batch=await rows('game_entries',q,key);
+              for(const x of batch) {
+                if(x.status!=='won' && x.status!=='lost') continue;
+                const start=samratRoundStart(x.roundId);
+                if(start>=day.startMs && start<day.endMs) unique.add(x.roundId);
+              }
+              if(batch.length<100){completedScan=true;break;}
+              const tail=batch[batch.length-1];
+              // All subsequent pages are older, so we can safely stop here.
+              if(Date.parse(tail.$createdAt)<day.startMs){completedScan=true;break;}
+              if(!tail.$id || tail.$id===cursor) throw Error('Daily loyalty pagination stalled');
+              cursor=tail.$id;
+            }
+            if(!completedScan) throw Error('Daily loyalty records exceed scan limit');
+            return unique.size;
+          }
+          // Atomic reward ledger prevents double +50 VC even after retries/restarts.
+          async function samratDailyLoyalty(user,key,atMs=Date.now()) {
+            const day=samratDay(atMs), count=await samratCompletedDay(user,day,key);
+            const current=samratDay().day===day.day;
+            const p=await profile(user,key);
+            const rewardId=samratStreakAwardId(user,day.day);
+            let paid=count>=5 && !!(await samratGetLedger(rewardId,key));
+            const update=current && (p.lastPlayDate!==day.day || p.dailyDrawsPlayed!==Math.min(5,count));
+            if(update || (count>=5 && !paid)) {
+              const ops=[];
+              if(update) ops.push(op('update','user_profiles',p.$id,{
+                lastPlayDate:day.day,dailyDrawsPlayed:Math.min(5,count)
+              }));
+              if(count>=5 && !paid){
+                ops.push(op('create','voucher_redemptions',rewardId,{
+                  code:'DAILY_STREAK_'+day.day,userId:user,coins:STREAK_REWARD_VC
+                }));
+                ops.push(op('increment','user_profiles',p.$id,{
+                  column:'wallet',value:STREAK_REWARD_VC,max:900000000
+                }));
+              }
+              try {await transact(key,ops);if(count>=5)paid=true;}
+              catch(e){
+                if(e.status!==409) throw e;
+                // Another request may have awarded the bonus concurrently. Do not retry
+                // the wallet credit blindly; verify the unique ledger first.
+                paid=count>=5 && !!(await samratGetLedger(rewardId,key));
+                if(!paid) throw e;
+              }
+            }
+            const nowDay=samratDay();
+            const currentRound=roundFor(Date.now());
+            const isCurrent=day.day===nowDay.day;
+            const isFinale=isCurrent && samratIsFinale(currentRound);
+            let claimed=false;
+            if(isFinale){
+              try {await request('GET',tablePath('game_entries')+'/'+samratFreeEntryId(user,currentRound.roundId),key);claimed=true;}
+              catch(e){if(e.status!==404)throw e;}
+            }
+            return {ok:true,day:day.day,drawsPlayed:Math.min(5,count),totalCompleted:count,
+              target:5,bonusVC:50,bonusAwarded:paid,finaleUnlocked:count>=3,
+              isMegaFinale:isFinale,freeTicketClaimed:claimed,
+              freeTicketAvailable:isFinale && count>=3 && !claimed &&
+                currentRound.status==='open' && !nightBreakInfo().closed};
+          }
+          async function samratClaimFinale(user,b,key){
+            const current=roundFor(Date.now());
+            if(!samratIsFinale(current) || current.status!=='open' || nightBreakInfo().closed ||
+               b.roundId!==current.roundId)
+              return {ok:false,error:'Free Finale Ticket is only available 9:20–9:39 PM IST.'};
+            if(!Number.isInteger(b.number) || b.number<1 || b.number>9)
+              return {ok:false,error:'Choose a number 1 to 9 first.'};
+            const count=await samratCompletedDay(user,samratDay(),key);
+            if(count<3) return {ok:false,error:'Play 3 completed draws today to unlock the free ticket.'};
+            const r=await stored(current.roundId,key);
+            if(r && r.status!=='open') return {ok:false,error:'Finale is already closed.'};
+            // Time recheck immediately before commit, identical to paid-entry lock.
+            const t=roundFor(Date.now());
+            if(t.roundId!==current.roundId || t.status!=='open' ||
+               !samratIsFinale(t) || nightBreakInfo().closed)
+              return {ok:false,error:'Finale entry has closed.'};
+            const id=samratFreeEntryId(user,current.roundId);
+            try {
+              await transact(key,[op('create','game_entries',id,{
+                roundId:current.roundId,userId:user,selectNumber:b.number,
+                stakeVc:0,status:'pending',payoutVc:0
+              })]);
+            } catch(e) {
+              if(e.status===409) return {ok:false,error:'Free Finale Ticket already claimed or round changed.'};
+              throw e;
+            }
+            return {ok:true,roundId:current.roundId,number:b.number,stakeVC:0,
+              freeTicket:true,winningPayoutVC:FREE_FINALE_WIN_VC};
+          }
+          
+          '''
+          
+          def patch_backend(s):
+              if MARK in s: print('Backend already patched');return s
+              s=swap(s,'async function settleRound(round, key) {',HELPERS+'async function settleRound(round, key) {','backend helpers')
+              s=swap(s,'        entry.stakeVc < 1 ||\n        !Number.isInteger(entry.selectNumber)',
+                     '        (entry.stakeVc < 1 && !samratIsFreeEntry(entry,round)) ||\n        !Number.isInteger(entry.selectNumber)', 'settlement free entry validation')
+              s=swap(s,'      let payout = win ? entry.stakeVc * 8 : 0;',
+                     '      let payout = win ? (samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : entry.stakeVc * 8) : 0;', 'winning payout')
+              # Track which players had successful settlements. Updating daily progress
+              # after the transaction makes the 5th completed draw award authoritative.
+              s=swap(s,'  let total = 0;\n\n  for (let batch = 0; batch < 100; batch++) {',
+                     '  let total = 0;\n  const loyaltyUsers = new Set();\n\n  for (let batch = 0; batch < 100; batch++) {','settlement touched users')
+              s=swap(s,'        await transact(key, operations);\n        done++;\n        total++;',
+                     '        await transact(key, operations);\n        done++;\n        total++;\n        loyaltyUsers.add(entry.userId);','settlement record touched')
+              s=swap(s,'    if (!done) break;\n  }\n  return total;\n}',
+                     '''    if (!done) break;
+            }
+            // Every settled user is credited automatically. Failure to record loyalty
+            // never rolls back a winning/losing settlement; the player API retries it.
+            for(const userId of loyaltyUsers) {
+              try { await samratDailyLoyalty(userId,key,Date.parse(round.startsAt)); }
+              catch(e){ console.error('Daily streak sync failed for settled draw: '+e.message); }
+            }
+            return total;
+          }''','settlement sync')
+              # Existing route structure
+              s=swap(s,'      "get_draw_trends",\n      "place_entry",',
+                     '      "get_draw_trends",\n      "get_daily_loyalty",\n      "claim_finale_ticket",\n      "place_entry",','action allowlist')
+              s=swap(s,'    if (action === "get_draw_trends") {\n      return send(res, 200, await getDrawTrends(key));\n    }',
+                     '''    if (action === "get_draw_trends") {
+                return send(res, 200, await getDrawTrends(key));
+              }
+              if (action === "get_daily_loyalty") {
+                return send(res, 200, await samratDailyLoyalty(user,key));
+              }
+              if (action === "claim_finale_ticket") {
+                const x=await samratClaimFinale(user,b,key);
+                return send(res,x.ok?200:409,x);
+              }''','action handlers')
+              s=swap(s,'        mode: "free_virtual_coins",',
+                     '        isMegaFinale: samratIsFinale(current),\n        mode: "free_virtual_coins",','round finale flag')
+              s=swap(s,'            wallet: 0,\n            wins: 0,',
+                     '            wallet: 0,\n            dailyDrawsPlayed: 0,\n            lastPlayDate: "",\n            wins: 0,','new profile fields')
+              # account get_wallet fields are day-aware at 9 AM even if no request to sync yet.
+              s=swap(s,'        wallet: p.wallet,\n        unverifiedVC: safeReservedVC(p),',
+                     '''        wallet: p.wallet,
+                  dailyDrawsPlayed: p.lastPlayDate===samratDay().day ? (p.dailyDrawsPlayed||0) : 0,
+                  lastPlayDate: p.lastPlayDate||'',
+                  unverifiedVC: safeReservedVC(p),''','wallet fields')
+              # Reporting accepts free zero-stake finale tickets and verifies output.
+              s=swap(s,'      stake < 1 ||\n      !Number.isInteger(entry.selectNumber)',
+                     '      (stake < 1 && !samratIsFreeEntry(entry,round)) ||\n      !Number.isInteger(entry.selectNumber)', 'admin report free validation')
+              s=swap(s,'    const payout = stake * 8;',
+                     '    const payout = samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 8;','admin report winning payout')
+              return s
+          
+          STYLES=r'''/* SAMRAT_DAILY_STREAK_FINALE_V1 — loyalty and Mega Finale UI */
+          .streak-meter{height:14px;background:#170923;border:1px solid #6d478d;border-radius:18px;overflow:hidden;margin:14px 0}
+          .streak-fill{height:100%;width:0%;background:linear-gradient(90deg,#fdc94f,#ff638b,#e63d99);border-radius:18px;transition:width .45s ease}
+          .streak-hint{color:#e5cefa;font-size:12px;line-height:1.6}
+          .finale-panel{border-color:#ffca62;background:linear-gradient(145deg,#382239,#271233);box-shadow:0 0 20px #f9b85520}
+          .finale-panel h3{font-size:20px}
+          .finale-unlocked{color:#95ffc6;font-weight:900;font-size:15px;margin:9px 0}
+          .finale-closed{color:#d9c7ee;font-size:12px}
+          #freeFinaleButton:disabled{opacity:.5}
+          '''
+          
+          CARDS='''<section class="panel" id="dailyStreakPanel" aria-live="polite">
+          <h3>🔥 Daily Streak: <span id="dailyStreakCounter">0</span>/5 Draws (+50 VC Bonus)</h3>
+          <div class="streak-meter" id="dailyStreakProgress" role="progressbar" aria-label="Daily completed draws" aria-valuenow="0" aria-valuemin="0" aria-valuemax="5"><div class="streak-fill" id="dailyStreakFill"></div></div>
+          <div class="streak-hint" id="dailyStreakMessage">Sign in to track completed draws. Resets daily at 9:00 AM IST.</div>
+          </section>
+          <section class="panel finale-panel" id="finalePanel">
+          <h3>🏆 9:40 PM Mega Finale</h3>
+          <p class="small">Special draw: 9:20–9:40 PM IST. Complete 3 different draws today to unlock one FREE entry (0 VC). Pick a number from 1–9 below. A free winning ticket pays 160 VC.</p>
+          <div class="finale-unlocked hide" id="finaleUnlocked">🎟️ 9:40 PM Free Ticket UNLOCKED!</div>
+          <p class="finale-closed" id="finaleStatus">Finale entry opens at 9:20 PM IST. 3 completed draws required.</p>
+          <button class="btn hide" id="freeFinaleButton" type="button" disabled>🎟️ CLAIM FREE FINALE TICKET • 0 VC</button>
+          <div class="status" id="finaleMessage" role="status" aria-live="polite"></div>
+          </section>'''
+          
+          CLIENT=r'''// SAMRAT_DAILY_STREAK_FINALE_V1 — widget reads server-calculated loyalty only.
+          let loyaltyData=null, loyaltyLoading=false;
+          function drawUpdateFinale() {
+            const isFinale=!!round?.isMegaFinale;
+            const unlocked=!!loyaltyData?.finaleUnlocked;
+            $('finalePanel').classList.toggle('finale-live',isFinale);
+            $('finaleUnlocked').classList.toggle('hide',!unlocked);
+            const btn=$('freeFinaleButton');
+            const spent=!!loyaltyData?.freeTicketClaimed;
+            const open=isFinale&&!!round?.acceptingEntries&&
+              Date.parse(round.entryClosesAt)>Date.now()+serverDelta&&!currentNightInfo().closed;
+            btn.classList.toggle('hide',!user||!open||!unlocked||spent);
+            btn.disabled=!user||!open||!unlocked||spent||loyaltyLoading;
+            if(spent&&isFinale)msg('finaleStatus','✅ Free ticket submitted for this finale.');
+            else if(isFinale&&unlocked)msg('finaleStatus',
+              open?'🏆 Mega Finale LIVE — select number 1–9, then claim your free ticket.':'Finale entries closed for this round.');
+            else if(isFinale)msg('finaleStatus',
+              'Mega Finale LIVE • Complete 3 separate draws today to unlock the free ticket.');
+            else msg('finaleStatus','Special 9:20–9:40 PM IST round • '+
+              (unlocked?'Your free ticket is unlocked for tonight.':'Complete 3 draws to unlock a free ticket.'));
+          }
+          async function drawRefreshLoyalty() {
+            if(!user){loyaltyData=null;msg('dailyStreakCounter','0');
+              msg('dailyStreakMessage','Sign in to track completed draws. Resets daily at 9:00 AM IST.');
+              $('dailyStreakFill').style.width='0%';drawUpdateFinale();return;}
+            if(loyaltyLoading)return;
+            loyaltyLoading=true;
+            try{
+              const d=await api('get_daily_loyalty');loyaltyData=d;
+              const n=Math.max(0,Math.min(5,Number(d.drawsPlayed)||0));
+              msg('dailyStreakCounter',String(n));
+              $('dailyStreakFill').style.width=String(n*20)+'%';
+              $('dailyStreakProgress').setAttribute('aria-valuenow',String(n));
+              msg('dailyStreakMessage',d.bonusAwarded
+                ? '🎁 Daily 5-Draw Bonus: +50 VC credited! Resets at 9:00 AM IST.'
+                : (5-n)+' more completed '+(5-n===1?'draw':'draws')+' until +50 VC. Resets at 9:00 AM IST.');
+            }catch(e){msg('dailyStreakMessage','Daily streak temporarily unavailable: '+e.message);}
+            finally{loyaltyLoading=false;drawUpdateFinale();}
+          }
+          $('freeFinaleButton').onclick=async()=>{
+            if(!user) return msg('finaleMessage','Please log in first.');
+            if(!playerNumber) return msg('finaleMessage','Choose a number 1–9 below first.');
+            if(!round?.acceptingEntries||!round?.isMegaFinale)
+              return msg('finaleMessage','Free ticket is only available during the 9:20–9:40 PM finale.');
+            const btn=$('freeFinaleButton');btn.disabled=true;
+            try{
+              const x=await api('claim_finale_ticket',{roundId:round.roundId,number:playerNumber});
+              msg('finaleMessage','🎟️ FREE ticket confirmed! Number '+x.number+' • Cost 0 VC • Win 160 VC if correct.');
+              await Promise.all([refreshEntry(),drawRefreshLoyalty()]);
+            }catch(e){msg('finaleMessage',e.message);await drawRefreshLoyalty();}
+            finally{drawUpdateFinale();}
+          };
+          '''
+          
+          def patch_draw(s):
+              if MARK in s: print('Frontend already patched');return s
+              s=swap(s,'</style></head><body>',STYLES+'</style></head><body>','styles')
+              s=swap(s,'<section class="panel"><h3>Last Winning Number</h3>',
+                     CARDS+'<section class="panel"><h3>Last Winning Number</h3>','panels')
+              s=swap(s,'function updateCountdown(){',CLIENT+'function updateCountdown(){','client script')
+              s=swap(s,'    updateCountdown();\n  }catch(e){msg(\'roundLabel\'',
+                     '    updateCountdown();\n    drawUpdateFinale();\n  }catch(e){msg(\'roundLabel\'','refresh finale state')
+              s=swap(s,"if(user){void refreshWallet();void refreshEntry();void showNearMissForRound(result.roundId,result.winningNumber);}",
+                     "if(user){void refreshWallet();void refreshEntry();void drawRefreshLoyalty();void showNearMissForRound(result.roundId,result.winningNumber);}", 'after reveal sync')
+              s=swap(s,"msg('wins',p.wins);msg('losses',p.losses);", "msg('wins',p.wins);msg('losses',p.losses);",'wallet marker self')
+              s=swap(s,'await Promise.all([refreshWallet(),refreshEntry()])}catch{user=null;',
+                     'await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])}catch{user=null;loyaltyData=null;void drawRefreshLoyalty();',
+                     'login loyalty')
+              s=swap(s,'await Promise.all([refreshWallet(),refreshEntry()])}catch(e){msg(\'entryMsg\',e.message)}finally{btn.disabled=',
+                     'await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])}catch(e){msg(\'entryMsg\',e.message)}finally{btn.disabled=',
+                     'entry loyalty refresh')
+              s=swap(s,'if(user)await Promise.all([refreshWallet(),refreshEntry()])},30000)',
+                     'if(user)await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])},30000)',
+                     '30s loyalty refresh')
+              return s
+          
+          def main():
+              for f in [BACK,DRAW]:
+                  if not f.is_file(): raise RuntimeError(f'Missing {f}')
+              originalB,originalD=BACK.read_text(),DRAW.read_text()
+              b,d=patch_backend(originalB),patch_draw(originalD)
+              if b==originalB and d==originalD:
+                  print('Already installed. No changes.');return
+              if (b==originalB) != (d==originalD):raise RuntimeError('Partial existing installation; review before writing')
+              BACK.write_text(b);DRAW.write_text(d)
+              print('Patched backend and Number Draw UI. Verify with node --check before commit.')
+          
+          if __name__=='__main__': main()
+          PATCH_PY
+          python3 /tmp/samrat_daily_finale_patch.py .
+      - name: Verify JavaScript syntax and scenario tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check functions/game-wallet/src/main.js
+          python3 - <<'PY_HTML'
+          from pathlib import Path
+          import re
+          html=Path('number-draw.html').read_text()
+          scripts=re.findall(r'<script(?:[^>]*)>(.*?)</script>',html,re.S|re.I)
+          assert scripts and scripts[-1].strip(), 'Number Draw inline JS not found'
+          Path('/tmp/samrat_daily_draw_script.js').write_text(scripts[-1])
+          print('Extracted Number Draw JavaScript')
+          PY_HTML
+          node --check /tmp/samrat_daily_draw_script.js
+          cat > /tmp/samrat_daily_finale_test.mjs <<'TEST_JS'
+          // Local tests of the actual backend helpers after applying patch.py
+          import fs from 'node:fs';
+          import vm from 'node:vm';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          const src=fs.readFileSync(process.argv[2]||'functions/game-wallet/src/main.js','utf8');
+          const draw=fs.readFileSync(process.argv[3]||'number-draw.html','utf8');
+          const tag='// SAMRAT_DAILY_STREAK_FINALE_V1';
+          assert(src.includes(tag));assert(draw.includes(tag));
+          assert(src.includes('"get_daily_loyalty"'));
+          assert(src.includes('"claim_finale_ticket"'));
+          assert(src.includes('FREE_FINALE_WIN_VC : entry.stakeVc * 8'));
+          assert(src.includes('loyaltyUsers.add(entry.userId)'));
+          assert(src.includes('samratIsFreeEntry(entry,round)'));
+          assert(draw.includes('Daily Streak:'));
+          assert(draw.includes('9:40 PM Mega Finale'));
+          assert(draw.includes('9:40 PM Free Ticket UNLOCKED!'));
+          const base=src.slice(src.indexOf('// Samrat Night Break'),src.indexOf('async function stored('));
+          const helper=src.slice(src.indexOf(tag),src.indexOf('async function settleRound('));
+          assert(base.includes('function roundFor'));
+          const OFFSET=19800000,ROUND_MS=1200000;
+          let fakeTime=Date.parse('2026-11-14T15:53:00Z'); // 21:23 IST
+          const FakeDate=class extends Date {static now(){return fakeTime;}};
+          const player={ $id:'p1', wallet:0,dailyDrawsPlayed:0,lastPlayDate:'',unverifiedVC:0 };
+          let allEntries=[];const ledger=new Map();
+          function rows(table,queries){
+            if(table!=='game_entries') throw Error('unexpected table');
+            const user=queries.find(q=>q.method==='equal'&&q.attribute==='userId')?.values?.[0];
+            let e=allEntries.filter(x=>x.userId===user).sort((a,b)=>b.$createdAt.localeCompare(a.$createdAt));
+            const cur=queries.find(x=>x.method==='cursorAfter');
+            if(cur){let pos=e.findIndex(x=>x.$id===cur.values[0]);e=e.slice(pos+1)}
+            const lim=queries.find(x=>x.method==='limit')?.values?.[0]||100;
+            return Promise.resolve(e.slice(0,lim));
+          }
+          async function request(method,path,key){
+            const id=path.split('/').at(-1);
+            if(method==='GET'&&path.includes('/voucher_redemptions/')){
+              if(ledger.has(id)) return ledger.get(id);
+              const e=new Error('not found');e.status=404;throw e;
+            }
+            if(method==='GET'&&path.includes('/game_entries/')){
+              const e=allEntries.find(x=>x.$id===id);
+              if(e)return e;
+              const ex=new Error('missing');ex.status=404;throw ex;
+            }
+            throw Error('unexpected request: '+method+' '+path)
+          }
+          let operationsCount=0;
+          async function transact(key,ops){
+            // Transaction simulation: first validate create ids, then apply to mock state.
+            for(const o of ops){
+              if(o.action==='create'){
+                if(o.tableId==='voucher_redemptions'&&ledger.has(o.rowId)){
+                  const e=new Error('duplicate');e.status=409;throw e;
+                }
+                if(o.tableId==='game_entries'&&allEntries.some(x=>x.$id===o.rowId)){
+                  const e=new Error('duplicate entry');e.status=409;throw e;
+                }
+              }
+            }
+            operationsCount++;
+            for(const o of ops){
+              if(o.action==='create'&&o.tableId==='voucher_redemptions')ledger.set(o.rowId,{...o.data,$id:o.rowId});
+              if(o.action==='create'&&o.tableId==='game_entries')allEntries.push({...o.data,$id:o.rowId,$createdAt:new Date(fakeTime).toISOString()});
+              if(o.action==='update'&&o.tableId==='user_profiles')Object.assign(player,o.data);
+              if(o.action==='increment'&&o.tableId==='user_profiles')player[o.data.column]+=o.data.value;
+            }
+          }
+          const c={Date:FakeDate,createHash,OFFSET,ROUND_MS,DB:'db',eq:(attribute,value)=>({method:'equal',attribute,values:[value]}),order:(attribute,direction)=>({method:'orderDesc',attribute,values:[direction]}),lim:n=>({method:'limit',values:[n]}),rows,request,transact,profile:async()=>player,stored:async()=>null,op:(action,tableId,rowId,data)=>({action,tableId,rowId,data}),tablePath:(t)=>'/tables/'+t+'/rows'};
+          vm.createContext(c);
+          vm.runInContext(base+helper+`;this.test={samratDay,samratIsFinale,samratFreeEntryId,samratDailyLoyalty,samratClaimFinale,samratRoundStart,samratIsFreeEntry,samratCompletedDay};`,c);
+          const h=c.test;
+          const time=(s)=>Date.parse(s);
+          let n=0;const check=(cond,label)=>{assert(cond,label);console.log('PASS '+(++n)+': '+label)};
+          check(h.samratDay(time('2026-11-14T03:29:59Z')).day==='2026-11-13','8:59 AM belongs to previous loyalty day');
+          check(h.samratDay(time('2026-11-14T03:30:00Z')).day==='2026-11-14','9:00 AM resets loyalty day');
+          check(h.samratIsFinale(c.roundFor(time('2026-11-14T15:50:00Z'))),'9:20 PM is Mega Finale');
+          check(!h.samratIsFinale(c.roundFor(time('2026-11-14T16:10:00Z'))),'9:40 PM is not Mega Finale entry round');
+          check(!h.samratIsFinale(c.roundFor(time('2026-11-14T15:30:00Z'))),'9:00 PM is normal draw');
+          check(c.nightBreakInfo(time('2026-11-14T16:30:00Z')).closed,'10:00 PM night lock remains intact');
+          function seed(count){allEntries=[];for(let i=0;i<count;i++){
+            const round=c.roundFor(time('2026-11-14T03:30:00Z')+i*ROUND_MS);
+            allEntries.push({$id:'e_'+i,userId:'u1',roundId:round.roundId,selectNumber:2,stakeVc:20,
+              status:'lost',$createdAt:new Date(time('2026-11-14T03:30:01Z')+i*ROUND_MS).toISOString()});
+          }}
+          seed(2);
+          const locked=await h.samratClaimFinale('u1',{roundId:c.roundFor(fakeTime).roundId,number:4},'key');
+          check(!locked.ok && allEntries.length===2,'Under 3 settled rounds cannot claim free ticket');
+          seed(3);
+          check((await h.samratCompletedDay('u1',h.samratDay(),'key'))===3,'3 distinct settled draws');
+          allEntries.push({...allEntries[0],$id:'extra',selectNumber:3});
+          check((await h.samratCompletedDay('u1',h.samratDay(),'key'))===3,'Multiple entries same round count once');
+          const e={...allEntries[0],$id:'pending-only',roundId:c.roundFor(time('2026-11-14T05:30:00Z')).roundId,status:'pending'};
+          allEntries.push(e);
+          check((await h.samratCompletedDay('u1',h.samratDay(),'key'))===3,'Unsettled round not counted');
+          const loyalty=await h.samratDailyLoyalty('u1','key');
+          check(loyalty.finaleUnlocked===true && loyalty.drawsPlayed===3,'Three completed rounds unlock ticket');
+          const finale=c.roundFor(fakeTime);
+          const first=await h.samratClaimFinale('u1',{roundId:finale.roundId,number:4},'key');
+          check(first.ok && first.stakeVC===0&&player.wallet===0,'Free ticket creates zero-cost entry');
+          const free=allEntries.find(x=>x.$id===h.samratFreeEntryId('u1',finale.roundId));
+          check(!!free && h.samratIsFreeEntry(free,finale),'Free entry ID is server-verified and unique');
+          const dup=await h.samratClaimFinale('u1',{roundId:finale.roundId,number:7},'key');
+          check(!dup.ok && allEntries.filter(x=>x.$id===free.$id).length===1,'Repeat free ticket rejected even with changed number');
+          fakeTime=time('2026-11-14T16:09:00Z'); // 21:39 IST, one-minute early cutoff
+          const late=await h.samratClaimFinale('u1',{roundId:c.roundFor(fakeTime).roundId,number:2},'key');
+          check(!late.ok,'Free Finale claim stops one minute before 9:40 PM');
+          fakeTime=time('2026-11-14T15:53:00Z');
+          seed(5);
+          const claim=await h.samratDailyLoyalty('u1','key');
+          check(claim.drawsPlayed===5 && claim.bonusAwarded && player.wallet===50,'Fifth settled draw credits +50 VC');
+          const balance=player.wallet, ledgerSize=ledger.size;
+          await h.samratDailyLoyalty('u1','key');
+          check(player.wallet===balance && ledger.size===ledgerSize,'Replay cannot double-credit +50 VC');
+          fakeTime=time('2026-11-15T03:30:00Z');
+          const reset=await h.samratDailyLoyalty('u1','key');
+          check(reset.drawsPlayed===0 && player.dailyDrawsPlayed===0 && player.lastPlayDate==='2026-11-15','Next 9 AM resets profile count');
+          console.log(`All ${n} Daily Streak & Mega Finale tests passed.`);
+          TEST_JS
+          node /tmp/samrat_daily_finale_test.mjs functions/game-wallet/src/main.js number-draw.html
+      - name: Commit changed source files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/game-wallet/src/main.js number-draw.html
+          if git diff --cached --quiet; then
+            echo "No source changes; already installed."
+            exit 0
+          fi
+          git commit -m "Add daily 5-draw streak bonus and 9:40 PM Mega Finale free ticket"
+          git push origin HEAD:main
