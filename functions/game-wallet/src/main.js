@@ -190,9 +190,147 @@ function nearMissBonus(entry, userEntries, winningNumber) {
   return candidates[0]?.$id === entry.$id ? 10 : 0;
 }
 
+// SAMRAT_DAILY_STREAK_FINALE_V1 — server-authoritative daily session from 9 AM IST.
+const STREAK_REWARD_VC = 50, FREE_FINALE_WIN_VC = 160;
+function samratDay(ts=Date.now()) {
+  // 09:00 IST maps to 00:00 of the same ISO date; before 09:00 is previous day.
+  const day = new Date(ts + OFFSET - 9*3600000).toISOString().slice(0,10);
+  const [y,m,d] = day.split('-').map(Number);
+  const startMs = Date.UTC(y,m-1,d,9,0,0)-OFFSET;
+  return { day, startMs, endMs: startMs+86400000 };
+}
+function samratIsFinale(round) {
+  if (!round || !roundIsDaytime(round)) return false;
+  const x=new Date(Date.parse(round.startsAt)+OFFSET);
+  return x.getUTCHours()===21 && x.getUTCMinutes()===20;
+}
+function samratFreeEntryId(user,roundId) {
+  return 'ef_'+createHash('sha256').update('MEGA_FINALE|'+user+'|'+roundId)
+    .digest('hex').slice(0,30);
+}
+function samratIsFreeEntry(entry,round) {
+  return entry.stakeVc===0 && samratIsFinale(round) &&
+    entry.$id===samratFreeEntryId(entry.userId,round.roundId);
+}
+function samratRoundStart(rid) {
+  const m=typeof rid==='string' && /^r_(\d{17})$/.exec(rid);
+  if(!m) return NaN;
+  const v=m[1];
+  const t=Date.UTC(+v.slice(0,4),+v.slice(4,6)-1,+v.slice(6,8),
+    +v.slice(8,10),+v.slice(10,12),+v.slice(12,14),+v.slice(14,17));
+  return roundFor(t).roundId===rid?t:NaN;
+}
+function samratStreakAwardId(user,day) {
+  return 'ds_'+createHash('sha256').update('DAILY_STREAK|'+user+'|'+day)
+    .digest('hex').slice(0,30);
+}
+async function samratGetLedger(id,key) {
+  try { return await request('GET',tablePath('voucher_redemptions')+'/'+id,key); }
+  catch(e){ if(e.status===404) return null; throw e; }
+}
+// Count *completed* unique draws, never number of tickets or placed bets.
+// 9 AM IST boundaries use the round start, so late settlement is still assigned
+// to the correct original day. Pagination is bounded and fails closed if truncated.
+async function samratCompletedDay(user,day,key) {
+  const unique=new Set(); let cursor=null, completedScan=false;
+  for(let page=0;page<15;page++) {
+    const q=[eq('userId',user),order('$createdAt','desc'),lim(100)];
+    if(cursor) q.push({method:'cursorAfter',values:[cursor]});
+    const batch=await rows('game_entries',q,key);
+    for(const x of batch) {
+      if(x.status!=='won' && x.status!=='lost') continue;
+      const start=samratRoundStart(x.roundId);
+      if(start>=day.startMs && start<day.endMs) unique.add(x.roundId);
+    }
+    if(batch.length<100){completedScan=true;break;}
+    const tail=batch[batch.length-1];
+    // All subsequent pages are older, so we can safely stop here.
+    if(Date.parse(tail.$createdAt)<day.startMs){completedScan=true;break;}
+    if(!tail.$id || tail.$id===cursor) throw Error('Daily loyalty pagination stalled');
+    cursor=tail.$id;
+  }
+  if(!completedScan) throw Error('Daily loyalty records exceed scan limit');
+  return unique.size;
+}
+// Atomic reward ledger prevents double +50 VC even after retries/restarts.
+async function samratDailyLoyalty(user,key,atMs=Date.now()) {
+  const day=samratDay(atMs), count=await samratCompletedDay(user,day,key);
+  const current=samratDay().day===day.day;
+  const p=await profile(user,key);
+  const rewardId=samratStreakAwardId(user,day.day);
+  let paid=count>=5 && !!(await samratGetLedger(rewardId,key));
+  const update=current && (p.lastPlayDate!==day.day || p.dailyDrawsPlayed!==Math.min(5,count));
+  if(update || (count>=5 && !paid)) {
+    const ops=[];
+    if(update) ops.push(op('update','user_profiles',p.$id,{
+      lastPlayDate:day.day,dailyDrawsPlayed:Math.min(5,count)
+    }));
+    if(count>=5 && !paid){
+      ops.push(op('create','voucher_redemptions',rewardId,{
+        code:'DAILY_STREAK_'+day.day,userId:user,coins:STREAK_REWARD_VC
+      }));
+      ops.push(op('increment','user_profiles',p.$id,{
+        column:'wallet',value:STREAK_REWARD_VC,max:900000000
+      }));
+    }
+    try {await transact(key,ops);if(count>=5)paid=true;}
+    catch(e){
+      if(e.status!==409) throw e;
+      // Another request may have awarded the bonus concurrently. Do not retry
+      // the wallet credit blindly; verify the unique ledger first.
+      paid=count>=5 && !!(await samratGetLedger(rewardId,key));
+      if(!paid) throw e;
+    }
+  }
+  const nowDay=samratDay();
+  const currentRound=roundFor(Date.now());
+  const isCurrent=day.day===nowDay.day;
+  const isFinale=isCurrent && samratIsFinale(currentRound);
+  let claimed=false;
+  if(isFinale){
+    try {await request('GET',tablePath('game_entries')+'/'+samratFreeEntryId(user,currentRound.roundId),key);claimed=true;}
+    catch(e){if(e.status!==404)throw e;}
+  }
+  return {ok:true,day:day.day,drawsPlayed:Math.min(5,count),totalCompleted:count,
+    target:5,bonusVC:50,bonusAwarded:paid,finaleUnlocked:count>=3,
+    isMegaFinale:isFinale,freeTicketClaimed:claimed,
+    freeTicketAvailable:isFinale && count>=3 && !claimed &&
+      currentRound.status==='open' && !nightBreakInfo().closed};
+}
+async function samratClaimFinale(user,b,key){
+  const current=roundFor(Date.now());
+  if(!samratIsFinale(current) || current.status!=='open' || nightBreakInfo().closed ||
+     b.roundId!==current.roundId)
+    return {ok:false,error:'Free Finale Ticket is only available 9:20–9:39 PM IST.'};
+  if(!Number.isInteger(b.number) || b.number<1 || b.number>9)
+    return {ok:false,error:'Choose a number 1 to 9 first.'};
+  const count=await samratCompletedDay(user,samratDay(),key);
+  if(count<3) return {ok:false,error:'Play 3 completed draws today to unlock the free ticket.'};
+  const r=await stored(current.roundId,key);
+  if(r && r.status!=='open') return {ok:false,error:'Finale is already closed.'};
+  // Time recheck immediately before commit, identical to paid-entry lock.
+  const t=roundFor(Date.now());
+  if(t.roundId!==current.roundId || t.status!=='open' ||
+     !samratIsFinale(t) || nightBreakInfo().closed)
+    return {ok:false,error:'Finale entry has closed.'};
+  const id=samratFreeEntryId(user,current.roundId);
+  try {
+    await transact(key,[op('create','game_entries',id,{
+      roundId:current.roundId,userId:user,selectNumber:b.number,
+      stakeVc:0,status:'pending',payoutVc:0
+    })]);
+  } catch(e) {
+    if(e.status===409) return {ok:false,error:'Free Finale Ticket already claimed or round changed.'};
+    throw e;
+  }
+  return {ok:true,roundId:current.roundId,number:b.number,stakeVC:0,
+    freeTicket:true,winningPayoutVC:FREE_FINALE_WIN_VC};
+}
+
 async function settleRound(round, key) {
   if (!valid(round)) return 0;
   let total = 0;
+  const loyaltyUsers = new Set();
 
   for (let batch = 0; batch < 100; batch++) {
     const entries = await rows(
@@ -207,13 +345,13 @@ async function settleRound(round, key) {
     for (const entry of entries) {
       if (
         !Number.isInteger(entry.stakeVc) ||
-        entry.stakeVc < 1 ||
+        (entry.stakeVc < 1 && !samratIsFreeEntry(entry,round)) ||
         !Number.isInteger(entry.selectNumber)
       )
         continue;
 
       const win = entry.selectNumber === round.winningNumber;
-      let payout = win ? entry.stakeVc * 8 : 0;
+      let payout = win ? (samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : entry.stakeVc * 8) : 0;
       const p = await profile(entry.userId, key);
       const previousEntries = await rows(
         "game_entries",
@@ -266,11 +404,18 @@ async function settleRound(round, key) {
         await transact(key, operations);
         done++;
         total++;
+        loyaltyUsers.add(entry.userId);
       } catch (e) {
         if (e.status !== 409) throw e;
       }
     }
     if (!done) break;
+  }
+  // Every settled user is credited automatically. Failure to record loyalty
+  // never rolls back a winning/losing settlement; the player API retries it.
+  for(const userId of loyaltyUsers) {
+    try { await samratDailyLoyalty(userId,key,Date.parse(round.startsAt)); }
+    catch(e){ console.error('Daily streak sync failed for settled draw: '+e.message); }
   }
   return total;
 }
@@ -764,7 +909,7 @@ async function adminRoundReport(user, b, key) {
     const stake = entry.stakeVc;
     if (
       !Number.isSafeInteger(stake) ||
-      stake < 1 ||
+      (stake < 1 && !samratIsFreeEntry(entry,round)) ||
       !Number.isInteger(entry.selectNumber) ||
       entry.selectNumber < 1 ||
       entry.selectNumber > 9 ||
@@ -789,7 +934,7 @@ async function adminRoundReport(user, b, key) {
 
     winningEntries++;
     winningStakedVC += stake;
-    const payout = stake * 8;
+    const payout = samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 8;
     expectedPayoutVC += payout;
     if (!winners.has(entry.userId))
       winners.set(entry.userId, {
@@ -1884,6 +2029,8 @@ export default async ({ req, res, error }) => {
       "get_last_result",
       "get_recent_activity",
       "get_draw_trends",
+      "get_daily_loyalty",
+      "claim_finale_ticket",
       "place_entry",
       "grant_coins",
       "request_vc",
@@ -1931,6 +2078,13 @@ export default async ({ req, res, error }) => {
     if (action === "get_draw_trends") {
       return send(res, 200, await getDrawTrends(key));
     }
+    if (action === "get_daily_loyalty") {
+      return send(res, 200, await samratDailyLoyalty(user,key));
+    }
+    if (action === "claim_finale_ticket") {
+      const x=await samratClaimFinale(user,b,key);
+      return send(res,x.ok?200:409,x);
+    }
 
     if (action === "start_game") {
       const x = await startGame(user, b, key);
@@ -1963,6 +2117,7 @@ export default async ({ req, res, error }) => {
         nextOpensAt: night.nextOpensAt,
         acceptingEntries: !night.closed && roundIsDaytime(current) &&
           current.status === "open" && (!r || r.status === "open"),
+        isMegaFinale: samratIsFinale(current),
         mode: "free_virtual_coins",
       });
     }
@@ -1988,6 +2143,8 @@ export default async ({ req, res, error }) => {
             name: typeof b.name === "string" ? b.name.slice(0, 80) : "",
             email: typeof b.email === "string" ? b.email.slice(0, 160) : "",
             wallet: 0,
+            dailyDrawsPlayed: 0,
+            lastPlayDate: "",
             wins: 0,
             losses: 0,
             rounds: 0,
@@ -2012,6 +2169,8 @@ export default async ({ req, res, error }) => {
         ok: true,
         userId: user,
         wallet: p.wallet,
+        dailyDrawsPlayed: p.lastPlayDate===samratDay().day ? (p.dailyDrawsPlayed||0) : 0,
+        lastPlayDate: p.lastPlayDate||'',
         unverifiedVC: safeReservedVC(p),
         spendableVC: p.wallet - safeReservedVC(p),
         canWithdraw: p.canWithdraw === true && safeReservedVC(p) === 0,

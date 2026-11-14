@@ -12,7 +12,28 @@
 @media(prefers-reduced-motion:reduce){.slot-spinning{animation:none}}
 .near-win{border:1px solid #fdb44e;background:linear-gradient(135deg,#46220c,#381342);color:#ffefbd;border-radius:13px;padding:13px;text-align:center;font-weight:900;margin:13px 0}
 @media(max-width:340px){.draw-trend-grid{grid-template-columns:1fr}}
-</style></head><body><main class="app"><header class="hero"><div class="brand">SAMRAT</div><div class="sub">X-TREME</div><p class="small">VIRTUAL COINS • NO CASH VALUE • NON-WITHDRAWABLE</p></header><nav class="links"><a href="index.html">Home</a><a href="player-profile.html">My Profile</a><a href="referral.html">Referral</a><a href="reward.html">Rewards</a></nav><section class="panel night-banner hide" id="nightBreakBanner" role="status" aria-live="polite"><strong>🌙 Night Break (10:00 PM – 9:00 AM). Next Lucky Draw opens sharply at 9:00 AM IST!</strong><div class="small">Reopens in</div><div class="night-clock" id="nightCountdown">--:--:--</div></section><section class="panel"><div class="flex"><div><h3>20-Minute Live Draw</h3><div class="small" id="roundLabel">Connecting…</div></div><span class="pill" id="roundStatus">LOADING</span></div><div class="flex"><div class="small">Time left: <strong id="countdown">--:--</strong></div><div class="small">Entries close 1 minute early</div></div></section><section class="panel"><h3>Last Winning Number</h3><div class="result" id="winningNumber">—</div><div class="small" id="lastRound">Result pending</div></section><section class="panel" id="drawTrendsPanel"><h3>🔥 Hot &amp; ❄️ Cold Numbers</h3><p class="small" id="drawTrendCount">Loading last 10 settled draws…</p><div class="draw-trend-grid"><div class="draw-trend"><strong>🔥 Hot Numbers</strong><div id="hotNumbers" class="trend-empty">Loading…</div></div><div class="draw-trend"><strong>❄️ Cold Numbers</strong><div id="coldNumbers" class="trend-empty">Loading…</div></div></div><p class="small">Past results do not change the odds of any number in the next draw.</p></section><div id="nearMissNotice" class="near-win hide" role="status" aria-live="polite">🔥 So Close! Bas 1 number se chook gaye! +10 VC Bonus credited.</div><section class="panel hide" id="guestPanel"><h3>Guest Prediction</h3><p class="small">Free prediction saved on this device only. Login to use virtual coins.</p><div id="guestNums" class="nums"></div><button class="btn" id="guestPlay">PLAY FREE</button><div class="status" id="guestMsg"></div><a class="btn secondary" href="index.html">LOGIN / SIGN UP ON HOMEPAGE</a></section><section class="panel hide" id="playerPanel"><div class="flex"><div><h3>Player Wallet</h3><div class="wallet"><span id="wallet">0</span> VC</div><div class="small" id="walletVerificationStatus"></div><div class="small" id="userName"></div></div><button class="btn secondary" style="width:auto" id="logout">LOG OUT</button></div><div class="row" style="margin:12px 0"><div class="stat"><strong id="wins">0</strong>Wins</div><div class="stat"><strong id="losses">0</strong>Losses</div><div class="stat"><strong id="rounds">0</strong>Rounds</div></div>
+/* SAMRAT_DAILY_STREAK_FINALE_V1 — loyalty and Mega Finale UI */
+.streak-meter{height:14px;background:#170923;border:1px solid #6d478d;border-radius:18px;overflow:hidden;margin:14px 0}
+.streak-fill{height:100%;width:0%;background:linear-gradient(90deg,#fdc94f,#ff638b,#e63d99);border-radius:18px;transition:width .45s ease}
+.streak-hint{color:#e5cefa;font-size:12px;line-height:1.6}
+.finale-panel{border-color:#ffca62;background:linear-gradient(145deg,#382239,#271233);box-shadow:0 0 20px #f9b85520}
+.finale-panel h3{font-size:20px}
+.finale-unlocked{color:#95ffc6;font-weight:900;font-size:15px;margin:9px 0}
+.finale-closed{color:#d9c7ee;font-size:12px}
+#freeFinaleButton:disabled{opacity:.5}
+</style></head><body><main class="app"><header class="hero"><div class="brand">SAMRAT</div><div class="sub">X-TREME</div><p class="small">VIRTUAL COINS • NO CASH VALUE • NON-WITHDRAWABLE</p></header><nav class="links"><a href="index.html">Home</a><a href="player-profile.html">My Profile</a><a href="referral.html">Referral</a><a href="reward.html">Rewards</a></nav><section class="panel night-banner hide" id="nightBreakBanner" role="status" aria-live="polite"><strong>🌙 Night Break (10:00 PM – 9:00 AM). Next Lucky Draw opens sharply at 9:00 AM IST!</strong><div class="small">Reopens in</div><div class="night-clock" id="nightCountdown">--:--:--</div></section><section class="panel"><div class="flex"><div><h3>20-Minute Live Draw</h3><div class="small" id="roundLabel">Connecting…</div></div><span class="pill" id="roundStatus">LOADING</span></div><div class="flex"><div class="small">Time left: <strong id="countdown">--:--</strong></div><div class="small">Entries close 1 minute early</div></div></section><section class="panel" id="dailyStreakPanel" aria-live="polite">
+<h3>🔥 Daily Streak: <span id="dailyStreakCounter">0</span>/5 Draws (+50 VC Bonus)</h3>
+<div class="streak-meter" id="dailyStreakProgress" role="progressbar" aria-label="Daily completed draws" aria-valuenow="0" aria-valuemin="0" aria-valuemax="5"><div class="streak-fill" id="dailyStreakFill"></div></div>
+<div class="streak-hint" id="dailyStreakMessage">Sign in to track completed draws. Resets daily at 9:00 AM IST.</div>
+</section>
+<section class="panel finale-panel" id="finalePanel">
+<h3>🏆 9:40 PM Mega Finale</h3>
+<p class="small">Special draw: 9:20–9:40 PM IST. Complete 3 different draws today to unlock one FREE entry (0 VC). Pick a number from 1–9 below. A free winning ticket pays 160 VC.</p>
+<div class="finale-unlocked hide" id="finaleUnlocked">🎟️ 9:40 PM Free Ticket UNLOCKED!</div>
+<p class="finale-closed" id="finaleStatus">Finale entry opens at 9:20 PM IST. 3 completed draws required.</p>
+<button class="btn hide" id="freeFinaleButton" type="button" disabled>🎟️ CLAIM FREE FINALE TICKET • 0 VC</button>
+<div class="status" id="finaleMessage" role="status" aria-live="polite"></div>
+</section><section class="panel"><h3>Last Winning Number</h3><div class="result" id="winningNumber">—</div><div class="small" id="lastRound">Result pending</div></section><section class="panel" id="drawTrendsPanel"><h3>🔥 Hot &amp; ❄️ Cold Numbers</h3><p class="small" id="drawTrendCount">Loading last 10 settled draws…</p><div class="draw-trend-grid"><div class="draw-trend"><strong>🔥 Hot Numbers</strong><div id="hotNumbers" class="trend-empty">Loading…</div></div><div class="draw-trend"><strong>❄️ Cold Numbers</strong><div id="coldNumbers" class="trend-empty">Loading…</div></div></div><p class="small">Past results do not change the odds of any number in the next draw.</p></section><div id="nearMissNotice" class="near-win hide" role="status" aria-live="polite">🔥 So Close! Bas 1 number se chook gaye! +10 VC Bonus credited.</div><section class="panel hide" id="guestPanel"><h3>Guest Prediction</h3><p class="small">Free prediction saved on this device only. Login to use virtual coins.</p><div id="guestNums" class="nums"></div><button class="btn" id="guestPlay">PLAY FREE</button><div class="status" id="guestMsg"></div><a class="btn secondary" href="index.html">LOGIN / SIGN UP ON HOMEPAGE</a></section><section class="panel hide" id="playerPanel"><div class="flex"><div><h3>Player Wallet</h3><div class="wallet"><span id="wallet">0</span> VC</div><div class="small" id="walletVerificationStatus"></div><div class="small" id="userName"></div></div><button class="btn secondary" style="width:auto" id="logout">LOG OUT</button></div><div class="row" style="margin:12px 0"><div class="stat"><strong id="wins">0</strong>Wins</div><div class="stat"><strong id="losses">0</strong>Losses</div><div class="stat"><strong id="rounds">0</strong>Rounds</div></div>
 <section class="panel" id="redeemVoucherPanel"
          style="margin:14px 0;background:linear-gradient(135deg,#111827,#1b2540);border-color:#365e65">
   <h3>🎟️ Redeem In-Game Coins</h3>
@@ -61,6 +82,58 @@ function currentNightInfo(){
   return {closed,now:ms,nextOpen:localMidnightUTC+(hour>=22?86400000:0)+9*3600000};
 }
 function clockHHMMSS(ms){const sec=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(sec/3600)).padStart(2,'0')}:${String(Math.floor((sec%3600)/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`}
+// SAMRAT_DAILY_STREAK_FINALE_V1 — widget reads server-calculated loyalty only.
+let loyaltyData=null, loyaltyLoading=false;
+function drawUpdateFinale() {
+  const isFinale=!!round?.isMegaFinale;
+  const unlocked=!!loyaltyData?.finaleUnlocked;
+  $('finalePanel').classList.toggle('finale-live',isFinale);
+  $('finaleUnlocked').classList.toggle('hide',!unlocked);
+  const btn=$('freeFinaleButton');
+  const spent=!!loyaltyData?.freeTicketClaimed;
+  const open=isFinale&&!!round?.acceptingEntries&&
+    Date.parse(round.entryClosesAt)>Date.now()+serverDelta&&!currentNightInfo().closed;
+  btn.classList.toggle('hide',!user||!open||!unlocked||spent);
+  btn.disabled=!user||!open||!unlocked||spent||loyaltyLoading;
+  if(spent&&isFinale)msg('finaleStatus','✅ Free ticket submitted for this finale.');
+  else if(isFinale&&unlocked)msg('finaleStatus',
+    open?'🏆 Mega Finale LIVE — select number 1–9, then claim your free ticket.':'Finale entries closed for this round.');
+  else if(isFinale)msg('finaleStatus',
+    'Mega Finale LIVE • Complete 3 separate draws today to unlock the free ticket.');
+  else msg('finaleStatus','Special 9:20–9:40 PM IST round • '+
+    (unlocked?'Your free ticket is unlocked for tonight.':'Complete 3 draws to unlock a free ticket.'));
+}
+async function drawRefreshLoyalty() {
+  if(!user){loyaltyData=null;msg('dailyStreakCounter','0');
+    msg('dailyStreakMessage','Sign in to track completed draws. Resets daily at 9:00 AM IST.');
+    $('dailyStreakFill').style.width='0%';drawUpdateFinale();return;}
+  if(loyaltyLoading)return;
+  loyaltyLoading=true;
+  try{
+    const d=await api('get_daily_loyalty');loyaltyData=d;
+    const n=Math.max(0,Math.min(5,Number(d.drawsPlayed)||0));
+    msg('dailyStreakCounter',String(n));
+    $('dailyStreakFill').style.width=String(n*20)+'%';
+    $('dailyStreakProgress').setAttribute('aria-valuenow',String(n));
+    msg('dailyStreakMessage',d.bonusAwarded
+      ? '🎁 Daily 5-Draw Bonus: +50 VC credited! Resets at 9:00 AM IST.'
+      : (5-n)+' more completed '+(5-n===1?'draw':'draws')+' until +50 VC. Resets at 9:00 AM IST.');
+  }catch(e){msg('dailyStreakMessage','Daily streak temporarily unavailable: '+e.message);}
+  finally{loyaltyLoading=false;drawUpdateFinale();}
+}
+$('freeFinaleButton').onclick=async()=>{
+  if(!user) return msg('finaleMessage','Please log in first.');
+  if(!playerNumber) return msg('finaleMessage','Choose a number 1–9 below first.');
+  if(!round?.acceptingEntries||!round?.isMegaFinale)
+    return msg('finaleMessage','Free ticket is only available during the 9:20–9:40 PM finale.');
+  const btn=$('freeFinaleButton');btn.disabled=true;
+  try{
+    const x=await api('claim_finale_ticket',{roundId:round.roundId,number:playerNumber});
+    msg('finaleMessage','🎟️ FREE ticket confirmed! Number '+x.number+' • Cost 0 VC • Win 160 VC if correct.');
+    await Promise.all([refreshEntry(),drawRefreshLoyalty()]);
+  }catch(e){msg('finaleMessage',e.message);await drawRefreshLoyalty();}
+  finally{drawUpdateFinale();}
+};
 function updateCountdown(){
   if(!round)return;
   const n=currentNightInfo();
@@ -95,6 +168,7 @@ async function refreshRound(){
       beginSuspense(previous.roundId);
     }
     updateCountdown();
+    drawUpdateFinale();
   }catch(e){msg('roundLabel',e.message);msg('roundStatus','ERROR');$('submitEntry').disabled=true;}
 }
 // SAMRAT_HOT_COLD_NEAR_MISS_V1: suspense is visual only; server owns the result and wallet.
@@ -156,7 +230,7 @@ function finishSuspenseIfReady(){
   msg('winningNumber',String(result.winningNumber));
   msg('lastRound',result.roundId+' • Verified result');
   void refreshDrawTrends();
-  if(user){void refreshWallet();void refreshEntry();void showNearMissForRound(result.roundId,result.winningNumber);}
+  if(user){void refreshWallet();void refreshEntry();void drawRefreshLoyalty();void showNearMissForRound(result.roundId,result.winningNumber);}
 }
 async function showNearMissForRound(roundId,winningNumber){
   try{
@@ -188,7 +262,7 @@ async function refreshResult(){
 }
 async function refreshWallet(){if(!user)return;try{const p=await api('get_wallet');msg('wallet',p.wallet);msg('walletVerificationStatus',p.unverifiedVC>0
   ? `${p.unverifiedVC} VC pending Gift Card verification · ${p.spendableVC} VC available for games`
-  : '');msg('wins',p.wins);msg('losses',p.losses);msg('rounds',p.rounds);$('adminPanel').classList.toggle('hide',!p.isAdmin)}catch(e){msg('entryMsg',e.message)}}async function refreshEntry(){if(!user)return;try{const d=await api('my_entries');msg('myEntry',d.entries.length?d.entries.map(x=>`Number ${x.number} • ${x.stakeVC} VC • ${x.status}${x.payoutVC?(x.status==='lost'?' • Near-Miss Bonus +':' • Won ')+x.payoutVC+' VC':''}`).join(' | '):'No entry this round')}catch(e){msg('myEntry',e.message)}}async function loadUser(){try{user=await account.get();$('guestPanel').classList.add('hide');$('playerPanel').classList.remove('hide');msg('userName',user.name||user.email);await Promise.all([refreshWallet(),refreshEntry()])}catch{user=null;$('guestPanel').classList.remove('hide');$('playerPanel').classList.add('hide');$('adminPanel').classList.add('hide')}}$('guestPlay').onclick=()=>{if(currentNightInfo().closed)return msg('guestMsg','Night Break. Guest prediction resumes at 9:00 AM IST.');if(!guestNumber)return msg('guestMsg','Choose a number first.');if(!round)return msg('guestMsg','Wait for round to load.');try{localStorage.setItem('samrat_guest_prediction',JSON.stringify({roundId:round.roundId,number:guestNumber}));msg('guestMsg',`Number ${guestNumber} saved on this device for this round.`)}catch{msg('guestMsg','Unable to save on this device')}};$('logout').onclick=async()=>{try{await account.deleteSession({sessionId:'current'});await loadUser()}catch(e){msg('entryMsg',e.message)}};$('submitEntry').onclick=async()=>{if(currentNightInfo().closed)return msg('entryMsg','Night Break (10 PM–9 AM IST). Try at 9 AM.');if(!playerNumber)return msg('entryMsg','Choose a number first.');if(!round?.acceptingEntries)return msg('entryMsg','Round closed. Wait for next draw.');const btn=$('submitEntry');btn.disabled=true;try{const x=await api('place_entry',{roundId:round.roundId,number:playerNumber,stakeVC:Number($('stake').value)});msg('entryMsg',`Entry saved! Number ${x.number}, ${x.stakeVC} VC deducted.`);await Promise.all([refreshWallet(),refreshEntry()])}catch(e){msg('entryMsg',e.message)}finally{btn.disabled=currentNightInfo().closed||!round?.acceptingEntries}};
+  : '');msg('wins',p.wins);msg('losses',p.losses);msg('rounds',p.rounds);$('adminPanel').classList.toggle('hide',!p.isAdmin)}catch(e){msg('entryMsg',e.message)}}async function refreshEntry(){if(!user)return;try{const d=await api('my_entries');msg('myEntry',d.entries.length?d.entries.map(x=>`Number ${x.number} • ${x.stakeVC} VC • ${x.status}${x.payoutVC?(x.status==='lost'?' • Near-Miss Bonus +':' • Won ')+x.payoutVC+' VC':''}`).join(' | '):'No entry this round')}catch(e){msg('myEntry',e.message)}}async function loadUser(){try{user=await account.get();$('guestPanel').classList.add('hide');$('playerPanel').classList.remove('hide');msg('userName',user.name||user.email);await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])}catch{user=null;loyaltyData=null;void drawRefreshLoyalty();$('guestPanel').classList.remove('hide');$('playerPanel').classList.add('hide');$('adminPanel').classList.add('hide')}}$('guestPlay').onclick=()=>{if(currentNightInfo().closed)return msg('guestMsg','Night Break. Guest prediction resumes at 9:00 AM IST.');if(!guestNumber)return msg('guestMsg','Choose a number first.');if(!round)return msg('guestMsg','Wait for round to load.');try{localStorage.setItem('samrat_guest_prediction',JSON.stringify({roundId:round.roundId,number:guestNumber}));msg('guestMsg',`Number ${guestNumber} saved on this device for this round.`)}catch{msg('guestMsg','Unable to save on this device')}};$('logout').onclick=async()=>{try{await account.deleteSession({sessionId:'current'});await loadUser()}catch(e){msg('entryMsg',e.message)}};$('submitEntry').onclick=async()=>{if(currentNightInfo().closed)return msg('entryMsg','Night Break (10 PM–9 AM IST). Try at 9 AM.');if(!playerNumber)return msg('entryMsg','Choose a number first.');if(!round?.acceptingEntries)return msg('entryMsg','Round closed. Wait for next draw.');const btn=$('submitEntry');btn.disabled=true;try{const x=await api('place_entry',{roundId:round.roundId,number:playerNumber,stakeVC:Number($('stake').value)});msg('entryMsg',`Entry saved! Number ${x.number}, ${x.stakeVC} VC deducted.`);await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])}catch(e){msg('entryMsg',e.message)}finally{btn.disabled=currentNightInfo().closed||!round?.acceptingEntries}};
 $('requestVCBtn').onclick=async()=>{
   const btn=$('requestVCBtn');
   btn.disabled=true;
@@ -237,4 +311,4 @@ $('buyArcadeVoucher').addEventListener('click', event => {
   msg('voucherRedeemMessage',
       'Voucher store link will be added after checkout setup.');
 });
-$('grant').onclick=async()=>{const btn=$('grant');btn.disabled=true;try{const x=await api('grant_coins',{targetUserId:$('targetUser').value.trim(),amount:Number($('coinAmount').value)});msg('adminMsg',`${x.amount} VC added to ${x.targetUserId}`);await refreshWallet()}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}};(async()=>{await Promise.all([refreshRound(),refreshResult(),loadUser(),refreshDrawTrends()]);setInterval(updateCountdown,1000);setInterval(async()=>{await refreshRound();await refreshResult();if(user)await Promise.all([refreshWallet(),refreshEntry()])},30000)})();</script></body></html>
+$('grant').onclick=async()=>{const btn=$('grant');btn.disabled=true;try{const x=await api('grant_coins',{targetUserId:$('targetUser').value.trim(),amount:Number($('coinAmount').value)});msg('adminMsg',`${x.amount} VC added to ${x.targetUserId}`);await refreshWallet()}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}};(async()=>{await Promise.all([refreshRound(),refreshResult(),loadUser(),refreshDrawTrends()]);setInterval(updateCountdown,1000);setInterval(async()=>{await refreshRound();await refreshResult();if(user)await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])},30000)})();</script></body></html>
