@@ -55,6 +55,8 @@ function element(tag,text,cls){
   return e;
 }
 
+function fmt2(n){return Number.isInteger(n)&&n>=0&&n<=99?String(n).padStart(2,"0"):"—";}
+
 async function load(){
   area.replaceChildren();
   status.textContent="Loading history...";
@@ -90,7 +92,7 @@ async function load(){
         const item=element("div","","entry");
         const label=element(
 "div",
-"Number "+entry.number+
+"Number "+fmt2(entry.number)+
 " • "+entry.stakeVC+" VC"
         );
         item.appendChild(label);

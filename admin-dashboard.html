@@ -84,10 +84,11 @@ function renderPlayers(items){const dst=el('players');dst.replaceChildren();if(!
  for(const p of items){item(dst,p.name||('Player '+String(p.userId).slice(0,7)),(p.email||'No email')+'\nID: '+p.userId+' · W '+(p.wins??0)+' / L '+(p.losses??0),fmt(p.wallet)+' VC');}}
 function renderVouchers(items){const dst=el('vouchers');dst.replaceChildren();if(!items?.length){dst.append(node('p','No vouchers found.','blank'));return;}
  for(const v of items){const used=Boolean(v.isRedeemed);item(dst,v.code,(used?'REDEEMED':'UNUSED')+' · Created '+date(v.createdAt)+(used&&v.redeemedBy?'\nUser: '+v.redeemedBy:''),fmt(v.coins)+' VC',used?'state used':'state');}}
+function fmt2(n){return Number.isInteger(n)&&n>=0&&n<=99?String(n).padStart(2,"0"):"—";}
 function renderRounds(items){const dst=el('rounds');dst.replaceChildren();if(!items?.length){dst.append(node('p','No rounds found.','blank'));return;}
  for(const r of items){
    const wrap=node('div'),button=node('button','View Winning Report');
-   item(wrap,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+r.winningNumber:'—');
+   item(wrap,r.roundId||'Round',String(r.status||'unknown').toUpperCase()+' · End '+date(r.endsAt),Number.isInteger(r.winningNumber)?'Won: '+fmt2(r.winningNumber):'—');
    button.type='button';button.disabled=r.status!=='settled'||!Number.isInteger(r.winningNumber);
    button.style.marginTop='8px';
    button.onclick=()=>{
@@ -104,7 +105,7 @@ async function loadWinningReport(roundId){
    const d=await api('admin_round_report',{roundId});
    status.textContent='Round '+d.roundId+' · End '+date(d.endsAt)+(d.pendingEntries?' · Settlement pending':' · Settlement checked');
    for(const [label,value] of [
-     ['Winning Number',d.winningNumber],['Winning Players',d.winningPlayers],
+     ['Winning Number',fmt2(d.winningNumber)],['Winning Players',d.winningPlayers],
      ['Winning Entries',d.winningEntries],['VC on Winning Number',d.winningStakedVC+' VC'],
      ['Expected Payout',d.expectedPayoutVC+' VC'],['Credited Payout',d.creditedPayoutVC+' VC'],
      ['Near-Miss Bonus Paid',String(d.nearMissPayoutVC??0)+' VC'],

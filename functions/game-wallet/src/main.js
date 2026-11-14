@@ -116,8 +116,8 @@ async function stored(id, key) {
 const valid = (r) =>
   r?.status === "settled" &&
   Number.isInteger(r.winningNumber) &&
-  r.winningNumber >= 1 &&
-  r.winningNumber <= 9;
+  r.winningNumber >= 0 &&
+  r.winningNumber <= 99;
 
 async function profile(user, key) {
   const x = await rows("user_profiles", [eq("userId", user), lim(2)], key);
@@ -154,18 +154,19 @@ async function transact(key, operations) {
   }
 }
 
+// SAMRAT_TWO_DIGIT_00_99_V1 — 100 uniform server-side possibilities (00..99); 50x standard, 1500 finale.
 // SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.
 function drawTrendStats(rounds) {
   const last10 = rounds.filter((r) => valid(r) && Number.isFinite(Date.parse(r.endsAt)))
     .sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))
     .slice(0, 10);
-  const hits = Array(10).fill(0), distance = Array(10).fill(11);
+  const hits = Array(100).fill(0), distance = Array(100).fill(11);
   last10.forEach((r, i) => {
     hits[r.winningNumber]++;
     if (distance[r.winningNumber] === 11) distance[r.winningNumber] = i;
   });
   if (!last10.length) return { sampleSize: 0, hot: [], cold: [], results: [] };
-  const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+  const numbers = Array.from({ length: 100 }, (_, i) => i);
   const hot = [...numbers].sort((a, b) => hits[b] - hits[a] || distance[a] - distance[b] || a - b)
     .filter((n) => hits[n] > 0).slice(0, 3)
     .map((n) => ({ number: n, times: hits[n] }));
@@ -191,7 +192,7 @@ function nearMissBonus(entry, userEntries, winningNumber) {
 }
 
 // SAMRAT_DAILY_STREAK_FINALE_V1 — server-authoritative daily session from 9 AM IST.
-const STREAK_REWARD_VC = 50, FREE_FINALE_WIN_VC = 160;
+const STREAK_REWARD_VC = 50, FREE_FINALE_WIN_VC = 1500;
 function samratDay(ts=Date.now()) {
   // 09:00 IST maps to 00:00 of the same ISO date; before 09:00 is previous day.
   const day = new Date(ts + OFFSET - 9*3600000).toISOString().slice(0,10);
@@ -302,8 +303,8 @@ async function samratClaimFinale(user,b,key){
   if(!samratIsFinale(current) || current.status!=='open' || nightBreakInfo().closed ||
      b.roundId!==current.roundId)
     return {ok:false,error:'Free Finale Ticket is only available 9:20–9:39 PM IST.'};
-  if(!Number.isInteger(b.number) || b.number<1 || b.number>9)
-    return {ok:false,error:'Choose a number 1 to 9 first.'};
+  if(!Number.isInteger(b.number) || b.number<0 || b.number>99)
+    return {ok:false,error:'Choose a number 00 to 99 first.'};
   const count=await samratCompletedDay(user,samratDay(),key);
   if(count<3) return {ok:false,error:'Play 3 completed draws today to unlock the free ticket.'};
   const r=await stored(current.roundId,key);
@@ -351,7 +352,7 @@ async function settleRound(round, key) {
         continue;
 
       const win = entry.selectNumber === round.winningNumber;
-      let payout = win ? (samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : entry.stakeVc * 8) : 0;
+      let payout = win ? (samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : entry.stakeVc * 50) : 0;
       const p = await profile(entry.userId, key);
       const previousEntries = await rows(
         "game_entries",
@@ -443,7 +444,7 @@ async function lastResult(key) {
           endsAt: previous.endsAt,
           settleAt: new Date().toISOString(),
           status: "settled",
-          winningNumber: randomInt(1, 10),
+          winningNumber: randomInt(0, 100),
         },
       });
     } catch (e) {
@@ -515,7 +516,7 @@ async function recoverPendingRounds(key, justProcessedRoundId) {
             endsAt: round.endsAt,
             settleAt: new Date().toISOString(),
             status: "settled",
-            winningNumber: randomInt(1, 10),
+            winningNumber: randomInt(0, 100),
           },
         });
       } catch (e) {
@@ -552,8 +553,8 @@ async function placeEntry(user, b, key) {
 
   if (
     !Number.isInteger(b.number) ||
-    b.number < 1 ||
-    b.number > 9 ||
+    b.number < 0 ||
+    b.number > 99 ||
     ![20, 50, 100].includes(b.stakeVC)
   )
     return { ok: false, error: "Invalid number or VC amount" };
@@ -911,8 +912,8 @@ async function adminRoundReport(user, b, key) {
       !Number.isSafeInteger(stake) ||
       (stake < 1 && !samratIsFreeEntry(entry,round)) ||
       !Number.isInteger(entry.selectNumber) ||
-      entry.selectNumber < 1 ||
-      entry.selectNumber > 9 ||
+      entry.selectNumber < 0 ||
+      entry.selectNumber > 99 ||
       typeof entry.userId !== "string" ||
       !entry.userId
     )
@@ -934,7 +935,10 @@ async function adminRoundReport(user, b, key) {
 
     winningEntries++;
     winningStakedVC += stake;
-    const payout = samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 8;
+    const payout = entry.status === "won" && Number.isSafeInteger(entry.payoutVc) &&
+      (entry.payoutVc === stake * 8 || (samratIsFreeEntry(entry,round) && entry.payoutVc === 160))
+      ? entry.payoutVc
+      : samratIsFreeEntry(entry,round) ? FREE_FINALE_WIN_VC : stake * 50;
     expectedPayoutVC += payout;
     if (!winners.has(entry.userId))
       winners.set(entry.userId, {
@@ -1931,14 +1935,14 @@ async function getRecentActivity(key) {
   for (const w of wins) {
     if (Number.isInteger(w.payoutVc) && w.payoutVc > 0) {
       items.push(
-        `🎉 ${displayName(w.userId)} won ${w.payoutVc} VC (8×) on Lucky Number #${w.selectNumber}!`
+        `🎉 ${displayName(w.userId)} won ${w.payoutVc} VC on Lucky Number #${String(w.selectNumber).padStart(2, "0")}!`
       );
     }
   }
 
   if (rounds.length > 0 && valid(rounds[0])) {
     items.push(
-      `🎯 Last 20-Min Lucky Draw Winning Number: #${rounds[0].winningNumber} (Next draw runs every 20 mins!)`
+      `🎯 Last 20-Min Lucky Draw Winning Number: #${String(rounds[0].winningNumber).padStart(2, "0")} (Next draw runs every 20 mins!)`
     );
   }
 
