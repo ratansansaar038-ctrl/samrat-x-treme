@@ -371,10 +371,11 @@ async function placeEntry(user, b, key) {
   if (r && r.status !== "open") return { ok: false, error: "Round closed" };
 
   const p = await profile(user, key);
-  if (p.wallet < b.stakeVC)
+  const spendable = p.wallet - safeReservedVC(p);
+  if (spendable < b.stakeVC)
     return {
       ok: false,
-      error: "Not enough VC. Add coins via Gift Voucher.",
+      error: 'Not enough verified VC. Amazon ₹10 VC are visible but locked until admin verifies the PIN.',
     };
 
   const id =
@@ -424,6 +425,46 @@ async function placeEntry(user, b, key) {
     number: b.number,
     stakeVC: b.stakeVC,
   };
+}
+
+// SAMRAT INSTANT-GIFT-CREDIT V1
+// A format-valid Amazon PIN is NOT a verified PIN. Display 100 VC immediately,
+// reserve them until the admin verifies the actual gift card.
+const INSTANT_GIFT_STATUS = "instant_pending";
+const isInstantGiftRequest = (entry) =>
+  entry?.status === INSTANT_GIFT_STATUS &&
+  /^gc_[a-f0-9]{28}$/.test(entry.$id || "") && entry.amount === 100;
+function safeReservedVC(player) {
+  const n = player?.unverifiedVC;
+  if (n == null) return 0;
+  if (!Number.isSafeInteger(n) || n < 0) throw Error("Invalid reserved VC balance");
+  return n;
+}
+function giftDecisionOps(entry, decision, player, table) {
+  const instant = entry.status === INSTANT_GIFT_STATUS;
+  if (instant && !isInstantGiftRequest(entry))
+    throw Error("Instant gift request details invalid");
+  if (!instant && entry.status !== "pending")
+    throw Error("Request already handled");
+  const ops = [op("update", table, entry.$id, { status: decision })];
+  if (instant) {
+    if (!player) throw Error("Gift card player missing");
+    const reserved = safeReservedVC(player);
+    if (reserved < 100 || player.wallet < 100)
+      throw Error("Gift card reserve mismatch; manual review required");
+    ops.push(op("decrement", "user_profiles", player.$id,
+      { column: "unverifiedVC", value: 100, min: 0 }));
+    if (decision === "rejected")
+      ops.push(op("decrement", "user_profiles", player.$id,
+        { column: "wallet", value: 100, min: 0 }));
+    if (reserved === 100)
+      ops.push(op("update", "user_profiles", player.$id, { canWithdraw: true }));
+  } else if (decision === "approved") {
+    if (!player) throw Error("Player missing");
+    ops.push(op("increment", "user_profiles", player.$id,
+      { column: "wallet", value: entry.amount, max: 900000000 }));
+  }
+  return ops;
 }
 
 async function redeemVoucher(user, b, key) {
@@ -884,85 +925,76 @@ const vcClean = (value) =>
 async function submitGiftCard(user, b, key) {
   const rawCode = typeof b.code === "string" ? b.code.trim().toUpperCase() : "";
   const cleanPin = rawCode.replace(/[^A-Z0-9]/g, "");
+  if (cleanPin.length !== 14 || !/^[A-Z0-9]{14}$/.test(cleanPin))
+    return { ok: false, error: "Please enter a valid 14-character PIN format" };
 
-  if (cleanPin.length !== 14)
-    return { ok: false, error: "Please enter a valid 14-character PIN" };
-
-  const SLABS = {
-    10: 100,
-    50: 500,
-    100: 1000,
-    200: 2000,
-    500: 5000,
-  };
-
+  const SLABS = { 10: 100, 50: 500, 100: 1000, 200: 2000, 500: 5000 };
   const amountInr = Number(b.amount);
   const coins = SLABS[amountInr];
-  if (!coins)
-    return { ok: false, error: "Invalid slab amount (Choose ₹10, ₹50, ₹100, ₹200 or ₹500)" };
+  if (!coins) return { ok: false, error: "Invalid gift card amount" };
 
   const table = vcRequestTable();
   const player = await profile(user, key);
-
-  // Unique deterministic Row ID per PIN prevents duplicate PIN submissions automatically
-  const requestId =
-    "gc_" + createHash("sha256").update(cleanPin).digest("hex").slice(0, 28);
-
+  const requestId = 'gc_' + createHash('sha256').update(cleanPin).digest('hex').slice(0, 28);
+  const instant = amountInr === 10;
   let row;
   try {
-    row = await request("POST", tablePath(table), key, {
-      rowId: requestId,
-      data: {
-        userId: user,
-        amount: coins,
-        status: "pending",
-      },
-    });
-  } catch (e) {
-    if (e.status === 409) {
-      return { ok: false, error: "Yeh Gift Card PIN pehle hi submit ho chuka hai!" };
+    if (instant) {
+      // One pending instant-credit PIN per player. Format alone is not proof of value.
+      if (safeReservedVC(player) !== 0)
+        return { ok: false, error: 'Existing ₹10 instant credit is awaiting admin verification.' };
+      // Both columns MUST exist with defaults before enabling the feature.
+      if (typeof player.canWithdraw !== 'boolean' ||
+          !Number.isSafeInteger(player.unverifiedVC))
+        return { ok: false, error: 'Admin setup required: add canWithdraw and unverifiedVC columns in user_profiles.' };
+      await transact(key, [
+        op('create', table, requestId,
+          { userId: user, amount: coins, status: INSTANT_GIFT_STATUS }),
+        op('increment', 'user_profiles', player.$id,
+          { column: 'wallet', value: 100, max: 900000000 }),
+        op('increment', 'user_profiles', player.$id,
+          { column: 'unverifiedVC', value: 100, max: 900000000 }),
+        op('update', 'user_profiles', player.$id, { canWithdraw: false }),
+      ]);
+      row = { $id: requestId };
+    } else {
+      row = await request('POST', tablePath(table), key, {
+        rowId: requestId,
+        data: { userId: user, amount: coins, status: 'pending' },
+      });
     }
+  } catch (e) {
+    if (e.status === 409)
+      return { ok: false, error: 'Gift Card PIN already submitted or wallet busy; please refresh.' };
     throw e;
   }
 
-  const formattedPin =
-    cleanPin.slice(0, 4) + "-" + cleanPin.slice(4, 10) + "-" + cleanPin.slice(10);
-
+  const formattedPin = cleanPin.slice(0, 4) + '-' + cleanPin.slice(4, 10) + '-' + cleanPin.slice(10);
   const message = [
-    "🎁 AMAZON PAY E-VOUCHER DEPOSIT",
-    "Request ID: " + vcClean(row.$id),
-    "Player: " + vcClean(player.name) + " (" + vcClean(player.email) + ")",
-    "Player ID: " + vcClean(user),
-    "Paid Amount: ₹" + amountInr + " -> " + coins + " VC",
-    "14-Char PIN: " + formattedPin,
-    "Current Wallet: " + player.wallet + " VC",
-    "",
-    "Tap Approve after claiming PIN in Amazon Pay:",
-  ].join("\n");
-
+    '🎁 AMAZON PAY GIFT CARD VERIFICATION',
+    'Request ID: ' + vcClean(row.$id),
+    'Player: ' + vcClean(player.name) + ' (' + vcClean(player.email) + ')',
+    'Player ID: ' + vcClean(user),
+    'Claimed pack: ₹' + amountInr + ' => ' + coins + ' VC',
+    '14-Char PIN: ' + formattedPin,
+    instant ? '100 VC VISIBLE, LOCKED from gameplay until verified.' : 'PENDING: NO VC credited yet.',
+    'Claim and authenticate the real PIN before approval.',
+  ].join('\n');
   const replyMarkup = {
-    inline_keyboard: [
-      [
-        {
-          text: "✅ Approve (+" + coins + " VC)",
-          callback_data: "vc_approve:" + row.$id,
-        },
-        {
-          text: "❌ Reject",
-          callback_data: "vc_reject:" + row.$id,
-        },
-      ],
-    ],
+    inline_keyboard: [[
+      { text: instant ? '✅ Verify ₹10 (UNLOCK VC)' : '✅ Approve (+' + coins + ' VC)',
+        callback_data: 'vc_approve:' + row.$id },
+      { text: instant ? '❌ Reject (REVERSE VC)' : '❌ Reject',
+        callback_data: 'vc_reject:' + row.$id },
+    ]],
   };
-
   const telegramNotified = await sendVCTelegram(message, replyMarkup);
-
   return {
-    ok: true,
-    requestId: row.$id,
-    coins,
-    telegramNotified,
-    message: "PIN submitted! Coins will be added after verification.",
+    ok: true, requestId: row.$id, coins, instantCredited: instant,
+    reservedVC: instant ? 100 : 0, telegramNotified,
+    message: instant
+      ? '100 VC visible in wallet, locked until Gift Card is verified.'
+      : '₹50+ packs subah 9:00 AM se pehle verify hokar wallet mein add honge',
   };
 }
 
@@ -988,25 +1020,21 @@ async function handleTelegramWebhook(cb, key) {
   const entry = await request("GET", tablePath(table) + "/" + requestId, key);
 
   let statusLine = "";
-  if (entry.status !== "pending") {
+  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status)) {
     statusLine = "\n\n⚠️ Already " + entry.status.toUpperCase();
   } else {
-    const operations = [op("update", table, entry.$id, { status: decision })];
-    if (decision === "approved") {
-      const player = await profile(entry.userId, key);
-      operations.push(
-        op("increment", "user_profiles", player.$id, {
-          column: "wallet",
-          value: entry.amount,
-          max: 900000000,
-        })
-      );
-    }
+    const instant = isInstantGiftRequest(entry);
+    const player = (instant || decision === "approved")
+      ? await profile(entry.userId, key) : null;
+    const operations = giftDecisionOps(entry, decision, player, table);
     await transact(key, operations);
-    statusLine =
-      decision === "approved"
+    statusLine = instant
+      ? (decision === "approved"
+        ? "\n\n✅ VERIFIED: 100 previously credited VC unlocked; no double credit."
+        : "\n\n❌ REJECTED: 100 locked VC reversed.")
+      : (decision === "approved"
         ? "\n\n✅ APPROVED (+" + entry.amount + " VC credited)"
-        : "\n\n❌ REJECTED (No coins credited)";
+        : "\n\n❌ REJECTED (No coins credited)");
   }
 
   await telegramApi("answerCallbackQuery", {
@@ -1153,7 +1181,7 @@ async function adminListVCRequests(user, key) {
     ok: true,
     requests,
     limit: 100,
-    pending: requests.filter((r) => r.status === "pending").length,
+    pending: requests.filter((r) => ["pending", INSTANT_GIFT_STATUS].includes(r.status)).length,
   };
 }
 
@@ -1170,7 +1198,7 @@ async function adminDecideVCRequest(user, b, key) {
 
   const table = vcRequestTable();
   const entry = await request("GET", tablePath(table) + "/" + requestId, key);
-  if (entry.status !== "pending")
+  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status))
     return { ok: false, error: "Request already handled: " + entry.status };
   if (
     !Number.isSafeInteger(entry.amount) ||
@@ -1181,17 +1209,10 @@ async function adminDecideVCRequest(user, b, key) {
   )
     return { ok: false, error: "Request details invalid; no credit made" };
 
-  const operations = [op("update", table, entry.$id, { status: decision })];
-  if (decision === "approved") {
-    const player = await profile(entry.userId, key);
-    operations.push(
-      op("increment", "user_profiles", player.$id, {
-        column: "wallet",
-        value: entry.amount,
-        max: 900000000,
-      })
-    );
-  }
+  const instant = isInstantGiftRequest(entry);
+  const player = (instant || decision === "approved")
+    ? await profile(entry.userId, key) : null;
+  const operations = giftDecisionOps(entry, decision, player, table);
 
   try {
     await transact(key, operations);
@@ -1211,9 +1232,13 @@ async function adminDecideVCRequest(user, b, key) {
       "Request ID: " + vcClean(requestId),
       "Player ID: " + vcClean(entry.userId),
       "Amount: " + entry.amount + " VC",
-      decision === "approved"
-        ? "Coins credited once in the same database transaction."
-        : "No coins credited.",
+      instant
+        ? (decision === "approved"
+          ? "100 earlier credited VC unlocked; no second credit."
+          : "Previously locked 100 VC reversed.")
+        : (decision === "approved"
+          ? "Coins credited once in the same database transaction."
+          : "No coins credited."),
     ].join("\n")
   );
 
@@ -1927,6 +1952,9 @@ export default async ({ req, res, error }) => {
         ok: true,
         userId: user,
         wallet: p.wallet,
+        unverifiedVC: safeReservedVC(p),
+        spendableVC: p.wallet - safeReservedVC(p),
+        canWithdraw: p.canWithdraw === true && safeReservedVC(p) === 0,
         wins: p.wins || 0,
         losses: p.losses || 0,
         rounds: p.rounds || 0,

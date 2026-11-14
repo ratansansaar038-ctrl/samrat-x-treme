@@ -50,16 +50,16 @@ async function api(action,body={}){
 }
 function render(){
  $('list').replaceChildren();
- $('total').textContent=String(requests.length);$('pending').textContent=String(requests.filter(x=>x.status==='pending').length);
+ $('total').textContent=String(requests.length);$('pending').textContent=String(requests.filter(x=>['pending','instant_pending'].includes(x.status)).length);
  $('completed').textContent=String(requests.filter(x=>x.status==='approved'||x.status==='rejected').length);
- const filtered=requests.filter(x=>$('filter').value==='all'||x.status===$('filter').value);
+ const filtered=requests.filter(x=>$('filter').value==='all'||( $('filter').value==='pending' ? ['pending','instant_pending'].includes(x.status) : x.status===$('filter').value));
  if(!filtered.length){$('list').append(node('p','No requests in this view.','sub'));return}
  for(const r of filtered){
   const box=node('div',null,'req');const line=node('div',null,'line');
   line.append(node('div',r.userId||'Unknown player','name'),node('div',r.amount+' VC','coins'));
   box.append(line,node('div','Request ID: '+r.requestId,'small'),node('div','Created: '+date(r.createdAt),'small'));
-  box.append(node('div',String(r.status||'unknown').toUpperCase(),'status'+(r.status==='pending'?'':' done')));
-  if(r.status==='pending'){
+  box.append(node('div',String(r.status||'unknown').toUpperCase(),'status'+(['pending','instant_pending'].includes(r.status)?'':' done')));
+  if(['pending','instant_pending'].includes(r.status)){
    const buttons=node('div',null,'buttons');
    for(const decision of ['approved','rejected']){
     const btn=node('button',decision==='approved'?'APPROVE':'REJECT',decision==='approved'?'approve':'reject');

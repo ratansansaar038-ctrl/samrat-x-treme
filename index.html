@@ -314,7 +314,7 @@
 
     <input id="voucherCode" maxlength="18" placeholder="Enter 14-Char PIN (XXXX-XXXXXX-XXXX)" style="text-align:center; text-transform:uppercase; letter-spacing:1px;">
     <p class="small" style="color:#ffe080;border:1px solid #80619e;border-radius:10px;padding:9px;margin:10px 0;">10 PM ke baad submit kiye gaye Amazon Gift Cards subah 9:00 AM ke draw se pehle approve ho jayenge.</p>
-    <p class="small" style="margin:4px 0 10px">*Approval requires Admin verification; submission alone does not credit VC automatically.</p>
+    <p class="small" style="margin:4px 0 10px">*₹10 pack: 100 VC instantly shown in wallet but locked until PIN verification. ₹50+ packs: no instant credit. No Amazon code is confirmed valid by its format alone.</p>
     <button class="btn" id="redeemBtn" style="margin-top:8px;">SUBMIT VOUCHER PIN</button>
     <div class="status" id="voucherMsg"></div>
   </section>
@@ -547,12 +547,15 @@ $('redeemBtn').onclick = async () => {
   msg('voucherMsg', 'Submitting voucher PIN for verification...');
 
   try {
-    await api('submit_gift_card', {
+    const result = await api('submit_gift_card', {
       code: cleanPin,
       amount: amount,
       coins: coins
     });
-    msg('voucherMsg', `✅ PIN Submitted! ${coins} VC will be added within 2-5 mins after verification.`);
+    msg('voucherMsg', result.instantCredited
+      ? '✅ 100 VC wallet mein turant add hue, lekin admin verification tak locked rahenge. Koi withdrawal ya game entry mein ye 100 VC use nahin honge.'
+      : '₹50+ packs subah 9:00 AM se pehle verify hokar wallet mein add honge' +
+        (result.telegramNotified ? ' · Admin alerted on Telegram.' : ' · Admin notification not confirmed.'));
     $('voucherCode').value = '';
   } catch (err) {
     msg('voucherMsg', err.message || 'Error submitting voucher PIN.');
