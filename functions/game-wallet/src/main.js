@@ -78,6 +78,23 @@ async function rows(table, queries, key) {
   return (await request("GET", tablePath(table, queries), key)).rows || [];
 }
 
+// Samrat Night Break is ALWAYS calculated on the Appwrite server in IST.
+const IST_OFFSET_MS = 330 * 60 * 1000;
+function nightBreakInfo(nowMs = Date.now()) {
+  const local = new Date(nowMs + IST_OFFSET_MS);
+  const hour = local.getUTCHours();
+  const closed = hour >= 22 || hour < 9;
+  if (!closed) return { closed: false, nextOpensAt: null };
+  const localMidnightUTC = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - IST_OFFSET_MS;
+  const nextOpenMs = localMidnightUTC + (hour >= 22 ? 86400000 : 0) + 9 * 3600000;
+  return { closed: true, nextOpensAt: new Date(nextOpenMs).toISOString() };
+}
+function roundIsDaytime(round) {
+  const start = Date.parse(round.startsAt), end = Date.parse(round.endsAt);
+  return Number.isFinite(start) && Number.isFinite(end) &&
+    end > start && !nightBreakInfo(start).closed && !nightBreakInfo(end - 1).closed;
+}
+
 function roundFor(t) {
   const start = Math.floor((t + OFFSET) / ROUND_MS) * ROUND_MS - OFFSET;
   const end = start + ROUND_MS;
@@ -214,6 +231,15 @@ async function settleRound(round, key) {
 
 async function lastResult(key) {
   const previous = roundFor(Date.now() - ROUND_MS);
+  // No new overnight winning result. Still allow settlement of the last
+  // daytime round after 22:00 and recovery of older daytime entries.
+  if (!roundIsDaytime(previous)) {
+    let recovery;
+    try { recovery = await recoverPendingRounds(key, previous.roundId); }
+    catch (e) { console.error('Night recovery failed: ' + e.message); recovery = { ok: false }; }
+    return { ok: true, available: false, roundId: previous.roundId,
+      winningNumber: null, settledEntries: 0, nightBreak: nightBreakInfo(), recovery };
+  }
   let r = await stored(previous.roundId, key);
 
   if (!r) {
@@ -277,7 +303,7 @@ async function recoverPendingRounds(key, justProcessedRoundId) {
     const startMs = Date.UTC(y, m - 1, d, h, minute, sec, millis);
     if (!Number.isFinite(startMs)) continue;
     const round = roundFor(startMs);
-    if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff) continue;
+    if (round.roundId !== rid || Date.parse(round.endsAt) > cutoff || !roundIsDaytime(round)) continue;
     candidates.set(rid, round);
   }
 
@@ -325,6 +351,10 @@ async function recoverPendingRounds(key, justProcessedRoundId) {
 
 async function placeEntry(user, b, key) {
   const current = roundFor(Date.now());
+  const night = nightBreakInfo();
+  if (night.closed || !roundIsDaytime(current))
+    return { ok: false, error: 'Night Break (10:00 PM – 9:00 AM IST). Entry opens at 9:00 AM.',
+      nightBreak: true, nextOpensAt: night.nextOpensAt };
 
   if (current.status !== "open" || b.roundId !== current.roundId)
     return { ok: false, error: "Round locked or changed. Refresh." };
@@ -353,6 +383,14 @@ async function placeEntry(user, b, key) {
       .update(user + "|" + current.roundId + "|" + b.number)
       .digest("hex")
       .slice(0, 30);
+
+  // Re-check immediately before wallet transaction: prevents a slow
+  // request started before the lock from being accepted after the cutoff.
+  const beforeCommit = Date.now();
+  const commitRound = roundFor(beforeCommit);
+  if (nightBreakInfo(beforeCommit).closed || !roundIsDaytime(commitRound) ||
+      commitRound.roundId !== current.roundId || commitRound.status !== "open")
+    return { ok: false, error: 'Round closed or Night Break started. Refresh.' };
 
   try {
     await transact(key, [
@@ -1829,12 +1867,16 @@ export default async ({ req, res, error }) => {
 
     if (action === "get_round") {
       const current = roundFor(Date.now());
-      const r = await stored(current.roundId, key);
+      const night = nightBreakInfo();
+      const r = night.closed ? null : await stored(current.roundId, key);
       return send(res, 200, {
         ok: true,
         ...current,
+        status: night.closed ? 'night_break' : current.status,
         serverTime: new Date().toISOString(),
-        acceptingEntries:
+        nightBreak: night.closed,
+        nextOpensAt: night.nextOpensAt,
+        acceptingEntries: !night.closed && roundIsDaytime(current) &&
           current.status === "open" && (!r || r.status === "open"),
         mode: "free_virtual_coins",
       });
