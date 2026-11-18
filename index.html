@@ -145,6 +145,10 @@
       color: #fff;
       border: 1px solid #976bce;
     }
+    .green-btn {
+      background: linear-gradient(100deg, #43f396, #14b876);
+      color: #072417;
+    }
     .tg-btn {
       background: linear-gradient(100deg, #24a1de, #1c88bd);
       color: #fff;
@@ -203,6 +207,27 @@
       line-height: 1.6;
       margin: 10px 0;
     }
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 11px 8px;
+      border-radius: 11px;
+      border: 1px solid #7f53b5;
+      background: #160928;
+      color: #d9c0f7;
+      font-weight: 800;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: linear-gradient(100deg, #ffe34c, #ffad2b);
+      color: #230b24;
+      border-color: #ffe34c;
+    }
     .skill-grid { display:grid; gap:16px; margin:20px 0; }
     .skill-card {
       display:flex; align-items:center; gap:18px; padding:24px 18px;
@@ -226,9 +251,9 @@
 <!-- 🔴 LIVE SCROLLING PATTI (REAL ACTIVITY / PLATFORM UPDATES) -->
 <div class="ticker-wrap">
   <div class="ticker-move" id="liveTicker">
-    <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>💳 Instant UPI Deposit & Auto Bank Payout now LIVE!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>🎯 Lucky Number Live Draw: every 20 minutes, 9 AM–10 PM IST — Win up to 50× VC!</span>
-    <span class="ticker-item"><span class="ticker-dot">●</span>⚡ New Players get FREE Welcome VC on Sign Up!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>📢 Join @samratxtremegame on Telegram for live draw results & updates!</span>
   </div>
 </div>
@@ -239,7 +264,7 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • NO CASH VALUE
+      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • INSTANT WALLET
     </p>
     <a class="btn tg-btn" href="https://t.me/samratxtremegame" target="_blank" style="max-width:290px; margin:10px auto 0; padding:11px 16px;">
       📢 JOIN OFFICIAL TELEGRAM CHANNEL
@@ -282,6 +307,7 @@
       <div>
         <h3>Welcome back!</h3>
         <div id="signedName" class="small"></div>
+        <div id="walletSummary" style="color:#89ffb4; font-weight:800; font-size:13px; margin-top:4px;">Wallet: Loading...</div>
       </div>
       <button class="btn secondary" style="width:auto" id="logout">
         LOG OUT
@@ -290,11 +316,53 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
+  <!-- 💳 INSTANT DEPOSIT & AUTO WITHDRAWAL (PAISAPAY) -->
+  <section class="panel" id="instantWalletPanel" style="text-align:center; border: 1px solid #5cff9d;">
+    <h3 style="color:#89ffb4; margin-bottom:4px;">⚡ INSTANT DEPOSIT & WITHDRAWAL</h3>
+    <p class="small" style="margin-top:0;">
+      24×7 Automated UPI Pay-In & Instant Bank Payout (<strong>₹1 = 10 VC</strong>)
+    </p>
+
+    <div class="tab-bar">
+      <button type="button" class="tab-btn active" id="tabDepositBtn">💳 ADD VC (UPI)</button>
+      <button type="button" class="tab-btn" id="tabWithdrawBtn">🏦 WITHDRAW (BANK)</button>
+    </div>
+
+    <!-- DEPOSIT TAB -->
+    <div id="depositTabBox">
+      <div class="guide-box">
+        • Minimum Deposit: <strong>₹300 = 3,000 VC</strong> (Max ₹50,000)<br>
+        • Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.
+      </div>
+      <input id="ppDepositAmount" type="number" min="300" max="50000" step="1" value="300" placeholder="Enter Amount in INR (Min ₹300)">
+      <input id="ppDepositMobile" type="tel" maxlength="10" placeholder="10-Digit Mobile Number (e.g. 9876543210)">
+      <div class="small" id="ppDepositPreview" style="color:#89ffb4; font-weight:700;">You will receive: 3,000 VC</div>
+      <button class="btn green-btn" id="ppDepositBtn">PAY NOW & GET INSTANT VC →</button>
+      <div class="status" id="ppDepositMsg"></div>
+    </div>
+
+    <!-- WITHDRAW TAB -->
+    <div id="withdrawTabBox" class="hide">
+      <div class="guide-box">
+        • Minimum Withdrawal: <strong>₹2,000 (20,000 VC)</strong> · Rate: 10 VC = ₹1<br>
+        • Amount seedha aapke bank account mein IMPS/NEFT ke zariye transfer hoga.
+      </div>
+      <input id="ppWithdrawAmount" type="number" min="2000" max="50000" step="1" placeholder="Withdrawal Amount in INR (Min ₹2000)">
+      <input id="ppAccountNumber" type="text" inputmode="numeric" maxlength="18" placeholder="Bank Account Number">
+      <input id="ppIfscCode" type="text" maxlength="11" placeholder="IFSC Code (e.g. SBIN0001234)" style="text-transform:uppercase;">
+      <input id="ppHolderName" type="text" maxlength="80" placeholder="Account Holder Name">
+      <input id="ppBankName" type="text" maxlength="80" placeholder="Bank Name (e.g. State Bank of India)">
+      <div class="small" id="ppWithdrawPreview" style="color:#ffe080; font-weight:700;">VC to deduct: 20,000 VC</div>
+      <button class="btn" id="ppWithdrawBtn">INSTANT BANK WITHDRAWAL →</button>
+      <div class="status" id="ppWithdrawMsg"></div>
+    </div>
+  </section>
+
   <!-- 🪙 VIRTUAL COINS STORE (AMAZON PAY E-VOUCHER) -->
   <section class="panel" style="text-align:center; border: 1px solid #ffd15c;">
-    <h3 style="color:#ffe080; margin-bottom:4px;">🪙 GET VIRTUAL COINS</h3>
+    <h3 style="color:#ffe080; margin-bottom:4px;">🪙 AMAZON PAY E-VOUCHER</h3>
     <p class="small" style="margin-top:0;">
-      Instant Game Tokens via <strong>Amazon Pay E-Voucher</strong>
+      Start Small from ₹10 via <strong>Amazon Pay E-Voucher</strong>
     </p>
 
     <div class="guide-box">
@@ -433,7 +501,6 @@ async function api(action, extra = {}) {
 }
 
 // ⏱️ 20-Minute Live Draw Countdown (Syncs with every :00, :20, :40 min)
-// Homepage IST clock. Actual coin entry is locked by Appwrite server.
 function startDrawTimer() {
   function tick() {
     const now=Date.now();
@@ -455,7 +522,7 @@ function startDrawTimer() {
   tick();setInterval(tick,1000);
 }
 
-// 🔴 Load Real Activity into Scrolling Ticker (Falls back gracefully if not yet configured in backend)
+// 🔴 Load Real Activity into Scrolling Ticker
 async function loadLiveTicker() {
   try {
     const res = await api('get_recent_activity');
@@ -464,8 +531,16 @@ async function loadLiveTicker() {
         .map(text => `<span class="ticker-item"><span class="ticker-dot">●</span>${text}</span>`)
         .join('');
     }
+  } catch {}
+}
+
+async function refreshWalletSummary() {
+  if (!currentUser) return;
+  try {
+    const w = await api('get_wallet');
+    $('walletSummary').textContent = `Wallet: ${w.wallet} VC (Spendable: ${w.spendableVC} VC)`;
   } catch {
-    // Keeps default authentic platform highlights if backend action is not added yet
+    $('walletSummary').textContent = 'Wallet: Active';
   }
 }
 
@@ -475,6 +550,7 @@ async function refreshUser() {
     $('authPanel').classList.add('hide');
     $('signedPanel').classList.remove('hide');
     msg('signedName', currentUser.name || currentUser.email);
+    await refreshWalletSummary();
   } catch {
     currentUser = null;
     $('authPanel').classList.remove('hide');
@@ -523,6 +599,133 @@ $('logout').onclick = async () => {
     await refreshUser();
   } catch (error) {
     msg('signedMsg', error.message);
+  }
+};
+
+// 💳 Deposit / Withdraw Tab Switcher & Previews
+$('tabDepositBtn').onclick = () => {
+  $('tabDepositBtn').classList.add('active');
+  $('tabWithdrawBtn').classList.remove('active');
+  $('depositTabBox').classList.remove('hide');
+  $('withdrawTabBox').classList.add('hide');
+};
+
+$('tabWithdrawBtn').onclick = () => {
+  $('tabWithdrawBtn').classList.add('active');
+  $('tabDepositBtn').classList.remove('active');
+  $('withdrawTabBox').classList.remove('hide');
+  $('depositTabBox').classList.add('hide');
+};
+
+$('ppDepositAmount').oninput = () => {
+  const amt = Math.max(0, Math.floor(Number($('ppDepositAmount').value) || 0));
+  $('ppDepositPreview').textContent = `You will receive: ${(amt * 10).toLocaleString()} VC`;
+};
+
+$('ppWithdrawAmount').oninput = () => {
+  const amt = Math.max(0, Math.floor(Number($('ppWithdrawAmount').value) || 0));
+  $('ppWithdrawPreview').textContent = `VC to deduct: ${(amt * 10).toLocaleString()} VC`;
+};
+
+// 💳 PaisaPay Pay-In Checkout Redirect
+$('ppDepositBtn').onclick = async () => {
+  if (!currentUser) {
+    msg('ppDepositMsg', '⚠️ Please Login or Sign Up first to add Virtual Coins.');
+    $('authPanel').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  const amount = Number($('ppDepositAmount').value);
+  const mobile = $('ppDepositMobile').value.replace(/\D/g, '');
+
+  if (!Number.isFinite(amount) || amount < 300 || amount > 50000) {
+    msg('ppDepositMsg', 'Minimum deposit amount is ₹300 (Max ₹50,000).');
+    return;
+  }
+  if (!/^[6-9]\d{9}$/.test(mobile)) {
+    msg('ppDepositMsg', 'Enter a valid 10-digit Indian mobile number.');
+    return;
+  }
+
+  $('ppDepositBtn').disabled = true;
+  msg('ppDepositMsg', 'Creating secure payment session...');
+
+  try {
+    const res = await api('paisapay_create_order', { amount, mobile });
+    msg('ppDepositMsg', 'Redirecting to PaisaPay checkout...');
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = res.checkoutUrl;
+
+    for (const [k, v] of Object.entries(res.formFields || {})) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = k;
+      input.value = String(v);
+      form.appendChild(input);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+  } catch (err) {
+    msg('ppDepositMsg', err.message || 'Could not start payment.');
+    $('ppDepositBtn').disabled = false;
+  }
+};
+
+// 🏦 PaisaPay Auto Bank Payout
+$('ppWithdrawBtn').onclick = async () => {
+  if (!currentUser) {
+    msg('ppWithdrawMsg', '⚠️ Please Login or Sign Up first to withdraw.');
+    $('authPanel').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  const amount = Number($('ppWithdrawAmount').value);
+  const account_number = $('ppAccountNumber').value.replace(/\s+/g, '');
+  const ifsc_code = $('ppIfscCode').value.trim().toUpperCase();
+  const holder_name = $('ppHolderName').value.trim();
+  const bank_name = $('ppBankName').value.trim();
+
+  if (!Number.isFinite(amount) || amount < 2000 || amount > 50000) {
+    msg('ppWithdrawMsg', 'Minimum withdrawal amount is ₹2,000 (20,000 VC).');
+    return;
+  }
+  if (!/^\d{9,18}$/.test(account_number)) {
+    msg('ppWithdrawMsg', 'Enter a valid bank account number (9–18 digits).');
+    return;
+  }
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc_code)) {
+    msg('ppWithdrawMsg', 'Enter a valid 11-character IFSC code.');
+    return;
+  }
+  if (holder_name.length < 2 || bank_name.length < 2) {
+    msg('ppWithdrawMsg', 'Enter account holder name and bank name.');
+    return;
+  }
+
+  $('ppWithdrawBtn').disabled = true;
+  msg('ppWithdrawMsg', 'Processing instant bank payout...');
+
+  try {
+    const res = await api('paisapay_create_payout', {
+      amount,
+      account_number,
+      ifsc_code,
+      holder_name,
+      bank_name
+    });
+    msg(
+      'ppWithdrawMsg',
+      `✅ Payout Initiated! Order ID: ${res.orderId} · Status: ${res.status} (₹${res.amountInr})`
+    );
+    $('ppWithdrawAmount').value = '';
+    await refreshWalletSummary();
+  } catch (err) {
+    msg('ppWithdrawMsg', err.message || 'Withdrawal failed.');
+  } finally {
+    $('ppWithdrawBtn').disabled = false;
   }
 };
 
