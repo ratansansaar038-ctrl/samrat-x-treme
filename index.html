@@ -251,7 +251,7 @@
 <!-- 🔴 LIVE SCROLLING PATTI (REAL ACTIVITY / PLATFORM UPDATES) -->
 <div class="ticker-wrap">
   <div class="ticker-move" id="liveTicker">
-    <span class="ticker-item"><span class="ticker-dot">●</span>💳 Instant UPI Deposit & Auto Bank Payout now LIVE!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>💳 Instant UPI Deposit (Min ₹100) & Auto Bank Payout now LIVE!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>🎯 Lucky Number Live Draw: every 20 minutes, 9 AM–10 PM IST — Win up to 50× VC!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>📢 Join @samratxtremegame on Telegram for live draw results & updates!</span>
@@ -331,12 +331,12 @@
     <!-- DEPOSIT TAB -->
     <div id="depositTabBox">
       <div class="guide-box">
-        • Minimum Deposit: <strong>₹300 = 3,000 VC</strong> (Max ₹50,000)<br>
+        • Minimum Deposit: <strong>₹100 = 1,000 VC</strong> (Max ₹50,000)<br>
         • Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.
       </div>
-      <input id="ppDepositAmount" type="number" min="300" max="50000" step="1" value="300" placeholder="Enter Amount in INR (Min ₹300)">
+      <input id="ppDepositAmount" type="number" min="100" max="50000" step="1" value="100" placeholder="Enter Amount in INR (Min ₹100)">
       <input id="ppDepositMobile" type="tel" maxlength="10" placeholder="10-Digit Mobile Number (e.g. 9876543210)">
-      <div class="small" id="ppDepositPreview" style="color:#89ffb4; font-weight:700;">You will receive: 3,000 VC</div>
+      <div class="small" id="ppDepositPreview" style="color:#89ffb4; font-weight:700;">You will receive: 1,000 VC</div>
       <button class="btn green-btn" id="ppDepositBtn">PAY NOW & GET INSTANT VC →</button>
       <div class="status" id="ppDepositMsg"></div>
     </div>
@@ -638,8 +638,8 @@ $('ppDepositBtn').onclick = async () => {
   const amount = Number($('ppDepositAmount').value);
   const mobile = $('ppDepositMobile').value.replace(/\D/g, '');
 
-  if (!Number.isFinite(amount) || amount < 300 || amount > 50000) {
-    msg('ppDepositMsg', 'Minimum deposit amount is ₹300 (Max ₹50,000).');
+  if (!Number.isFinite(amount) || amount < 100 || amount > 50000) {
+    msg('ppDepositMsg', 'Minimum deposit amount is ₹100 (Max ₹50,000).');
     return;
   }
   if (!/^[6-9]\d{9}$/.test(mobile)) {
