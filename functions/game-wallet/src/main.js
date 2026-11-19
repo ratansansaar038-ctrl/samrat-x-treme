@@ -1358,13 +1358,9 @@ async function requestVC(user, b, key) {
       message: "Your earlier VC request is still pending admin review",
     };
 
-  const bucket = Math.floor((Date.now() + OFFSET) / ROUND_MS);
-  const requestId =
-    "vcr_" +
-    createHash("sha256")
-      .update(user + "|" + bucket)
-      .digest("hex")
-      .slice(0, 30);
+  // Each approved or rejected request must allow a new one immediately,
+  // even within the same 20-minute draw. Pending requests still block duplicates.
+  const requestId = "vcr_" + randomBytes(16).toString("hex");
   let row;
   try {
     row = await request("POST", tablePath(table), key, {
