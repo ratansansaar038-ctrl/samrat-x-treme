@@ -1321,6 +1321,209 @@ async function sendVCTelegram(message, replyMarkup) {
   return telegramApi("sendMessage", payload);
 }
 
+async function requestVC(user, b, key) {
+  const amount = Number(b.amount);
+  if (![20, 50, 100, 200].includes(amount))
+    return { ok: false, error: "Choose 20, 50, 100 or 200 VC" };
+
+  const table = vcRequestTable();
+  const player = await profile(user, key);
+
+  let latest;
+  try {
+    latest = await rows(table, [order("$createdAt", "desc"), lim(100)], key);
+  } catch (e) {
+    if ([400, 404].includes(e.status))
+      return {
+        ok: false,
+        error:
+          "VC requests table unavailable. Check game-wallet VC_REQUESTS_TABLE_ID.",
+      };
+    throw e;
+  }
+  const pending = latest.find(
+    (row) => row.userId === user && row.status === "pending"
+  );
+  if (pending)
+    return {
+      ok: true,
+      created: false,
+      requestId: pending.$id,
+      amount: pending.amount,
+      status: "pending",
+      telegramNotified: null,
+      message: "Your earlier VC request is still pending admin review",
+    };
+
+  const bucket = Math.floor((Date.now() + OFFSET) / ROUND_MS);
+  const requestId =
+    "vcr_" +
+    createHash("sha256")
+      .update(user + "|" + bucket)
+      .digest("hex")
+      .slice(0, 30);
+  let row;
+  try {
+    row = await request("POST", tablePath(table), key, {
+      rowId: requestId,
+      data: { userId: user, amount, status: "pending" },
+    });
+  } catch (e) {
+    if (e.status === 409) {
+      const existing = await request(
+        "GET",
+        tablePath(table) + "/" + requestId,
+        key
+      );
+      return {
+        ok: true,
+        created: false,
+        requestId,
+        amount: existing.amount,
+        status: existing.status,
+        telegramNotified: null,
+        message: "Request already recorded in this interval",
+      };
+    }
+    if ([400, 404].includes(e.status))
+      return {
+        ok: false,
+        error:
+          "VC requests table could not accept this request. Check table ID and columns.",
+      };
+    throw e;
+  }
+
+  const message = [
+    "SAMRAT X-TREME | NEW VC REQUEST",
+    "Request ID: " + vcClean(row.$id),
+    "Player: " + vcClean(player.name),
+    "Player ID: " + vcClean(user),
+    "Email: " + vcClean(player.email),
+    "Requested: " + amount + " VC",
+    "Current wallet: " + player.wallet + " VC",
+    "Status: PENDING",
+    "Review (admin login): https://samratxtreme.online/admin-vc-requests.html",
+  ].join("\n");
+
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        {
+          text: "✅ Approve (+" + amount + " VC)",
+          callback_data: "vc_approve:" + row.$id,
+        },
+        {
+          text: "❌ Reject",
+          callback_data: "vc_reject:" + row.$id,
+        },
+      ],
+    ],
+  };
+
+  const telegramNotified = await sendVCTelegram(message, replyMarkup);
+  return {
+    ok: true,
+    created: true,
+    requestId: row.$id,
+    amount,
+    status: "pending",
+    telegramNotified,
+    message: "Request saved for admin approval",
+  };
+}
+
+async function adminListVCRequests(user, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: "Admin access denied" };
+  const table = vcRequestTable();
+  const found = await rows(table, [order("$createdAt", "desc"), lim(100)], key);
+  const requests = found.map((row) => ({
+    requestId: row.$id,
+    userId: row.userId,
+    amount: row.amount,
+    status: row.status,
+    createdAt: row.$createdAt,
+  }));
+  return {
+    ok: true,
+    requests,
+    limit: 100,
+    pending: requests.filter((r) =>
+      ["pending", INSTANT_GIFT_STATUS].includes(r.status)
+    ).length,
+  };
+}
+
+async function adminDecideVCRequest(user, b, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: "Admin access denied" };
+  const requestId = typeof b.requestId === "string" ? b.requestId.trim() : "";
+  const decision = b.decision;
+  if (
+    !/^[a-zA-Z0-9._-]{1,36}$/.test(requestId) ||
+    !["approved", "rejected"].includes(decision)
+  )
+    return { ok: false, error: "Invalid request ID or decision" };
+
+  const table = vcRequestTable();
+  const entry = await request("GET", tablePath(table) + "/" + requestId, key);
+  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status))
+    return { ok: false, error: "Request already handled: " + entry.status };
+  if (
+    !Number.isSafeInteger(entry.amount) ||
+    entry.amount < 1 ||
+    entry.amount > 100000 ||
+    typeof entry.userId !== "string" ||
+    !/^[a-zA-Z0-9._-]{1,36}$/.test(entry.userId)
+  )
+    return { ok: false, error: "Request details invalid; no credit made" };
+
+  const instant = isInstantGiftRequest(entry);
+  const player =
+    instant || decision === "approved"
+      ? await profile(entry.userId, key)
+      : null;
+  const operations = giftDecisionOps(entry, decision, player, table);
+
+  try {
+    await transact(key, operations);
+  } catch (e) {
+    if (e.status === 409)
+      return {
+        ok: false,
+        error:
+          "Request was handled or wallet changed. Refresh before trying again.",
+      };
+    throw e;
+  }
+
+  const telegramNotified = await sendVCTelegram(
+    [
+      "SAMRAT X-TREME | VC REQUEST " + decision.toUpperCase(),
+      "Request ID: " + vcClean(requestId),
+      "Player ID: " + vcClean(entry.userId),
+      "Amount: " + entry.amount + " VC",
+      instant
+        ? decision === "approved"
+          ? "100 earlier credited VC unlocked; no second credit."
+          : "Previously locked 100 VC reversed."
+        : decision === "approved"
+        ? "Coins credited once in the same database transaction."
+        : "No coins credited.",
+    ].join("\n")
+  );
+
+  return {
+    ok: true,
+    requestId,
+    userId: entry.userId,
+    amount: entry.amount,
+    status: decision,
+    telegramNotified,
+  };
+}
+
 const vcClean = (value) =>
   String(value ?? "")
     .replace(/[<>]/g, "")
@@ -3194,6 +3397,11 @@ export default async ({ req, res, error }) => {
 
     if (action === "paisapay_create_payout") {
       const x = await paisaCreatePayout(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
+    if (action === "request_vc") {
+      const x = await requestVC(user, b, key);
       return send(res, x.ok ? 200 : 400, x);
     }
 
