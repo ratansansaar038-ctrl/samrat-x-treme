@@ -1701,6 +1701,229 @@ async function handleTelegramWebhook(cb, key) {
 }
 
 // ============================================================================
+// TELEGRAM ADMIN COMMANDS (/pay, /paisa, /code, /vc)
+// ============================================================================
+
+async function handleTelegramAdminCommand(msg, key) {
+  const adminChatId = String(process.env.TELEGRAM_CHAT_ID || "").trim();
+  const chatId = String(msg?.chat?.id || "").trim();
+  const text = String(msg?.text || "").trim();
+
+  if (!adminChatId || chatId !== adminChatId || !text.startsWith("/")) {
+    return { ok: true };
+  }
+
+  const parts = text.split(/\s+/);
+  const cmd = parts[0].toLowerCase().split("@")[0];
+
+  if (cmd === "/help" || cmd === "/start") {
+    await sendVCTelegram(
+      [
+        "🤖 SAMRAT X-TREME ADMIN COMMANDS",
+        "",
+        "1️⃣ InstentPayment Link:",
+        "/pay 100 8287499285",
+        "/pay 100 8287499285 USER_ID  (Auto VC credit ke liye)",
+        "",
+        "2️⃣ PaisaPay Link:",
+        "/paisa 300 8287499285",
+        "/paisa 300 8287499285 USER_ID",
+        "",
+        "3️⃣ Free Voucher Code Banayein:",
+        "/code 1000",
+        "",
+        "4️⃣ Direct Wallet Credit:",
+        "/vc USER_ID 1000",
+      ].join("\n")
+    );
+    return { ok: true };
+  }
+
+  if (cmd === "/pay") {
+    const amountInr = Number(parts[1]);
+    const mobile = String(parts[2] || "8287499285").replace(/\D/g, "");
+    const targetUserId = String(parts[3] || "").trim();
+
+    if (!Number.isFinite(amountInr) || amountInr < 100 || amountInr > 50000) {
+      await sendVCTelegram("⚠️ Sahi format: /pay 100 8287499285");
+      return { ok: true };
+    }
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      await sendVCTelegram("⚠️ Valid 10-digit mobile number daalein.");
+      return { ok: true };
+    }
+
+    try {
+      const coins = Math.round(amountInr * 10);
+      const orderId =
+        "IP_" + Date.now() + "_" + randomBytes(4).toString("hex").toUpperCase();
+      const bearer = await instentGetToken();
+      const resHttp = await postViaStaticProxy(
+        `${INSTENT_BASE}/api/v1/payin/create`,
+        JSON.stringify({
+          order_id: orderId,
+          amount: Number(amountInr.toFixed(2)),
+          name: "Samrat Player",
+          email: "player@samratxtreme.online",
+          mobile,
+        }),
+        {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${bearer}`,
+        }
+      );
+      const gw = JSON.parse(resHttp.raw);
+      const payUrl = gw?.data?.payment_url || gw?.data?.intent;
+      if (gw?.status !== 1 || !payUrl) {
+        await sendVCTelegram(
+          "❌ InstentPayment Error: " + (gw?.message || "Link generate failed")
+        );
+        return { ok: true };
+      }
+
+      if (targetUserId && /^[a-zA-Z0-9._-]{1,36}$/.test(targetUserId)) {
+        try {
+          await request("POST", tablePath(vcRequestTable()), key, {
+            rowId: orderId,
+            data: { userId: targetUserId, amount: coins, status: "ip_pending" },
+          });
+        } catch {}
+      }
+
+      await sendVCTelegram(
+        [
+          "⚡ INSTENTPAYMENT UPI LINK READY",
+          "Amount: ₹" + amountInr.toFixed(2) + " (" + coins + " VC)",
+          "Order ID: " + orderId,
+          targetUserId ? "Auto-Credit User: " + targetUserId : "Mode: Manual Voucher after pay",
+          "",
+          "👇 Link forward karein:",
+          payUrl,
+        ].join("\n")
+      );
+    } catch (err) {
+      await sendVCTelegram("❌ Error: " + err.message);
+    }
+    return { ok: true };
+  }
+
+  if (cmd === "/paisa") {
+    const amountInr = Number(parts[1]);
+    const mobile = String(parts[2] || "8287499285").replace(/\D/g, "");
+    const targetUserId = String(parts[3] || "").trim();
+    const token = process.env.PAISAPAY_TOKEN;
+    const secretKey = process.env.PAISAPAY_SECRET_KEY;
+
+    if (!token || !secretKey) {
+      await sendVCTelegram("⚠️ PaisaPay keys Appwrite mein set nahi hain.");
+      return { ok: true };
+    }
+    if (!Number.isFinite(amountInr) || amountInr < 300 || amountInr > 50000) {
+      await sendVCTelegram("⚠️ PaisaPay minimum ₹300 hai. Format: /paisa 300 8287499285");
+      return { ok: true };
+    }
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      await sendVCTelegram("⚠️ Valid 10-digit mobile number daalein.");
+      return { ok: true };
+    }
+
+    try {
+      const coins = Math.round(amountInr * 10);
+      const orderId =
+        "PP_" + Date.now() + "_" + randomBytes(4).toString("hex").toUpperCase();
+      if (targetUserId && /^[a-zA-Z0-9._-]{1,36}$/.test(targetUserId)) {
+        try {
+          await request("POST", tablePath(vcRequestTable()), key, {
+            rowId: orderId,
+            data: { userId: targetUserId, amount: coins, status: "pp_pending" },
+          });
+        } catch {}
+      }
+      const encryptedPayload = paisaEncrypt(
+        { amount: amountInr.toFixed(2), mobile, udf1: orderId },
+        secretKey
+      );
+      const checkoutLink = `https://pay.paisapay.site/create_order.php?token=${encodeURIComponent(
+        token
+      )}&payload=${encodeURIComponent(encryptedPayload)}`;
+
+      await sendVCTelegram(
+        [
+          "💳 PAISAPAY LINK READY",
+          "Amount: ₹" + amountInr.toFixed(2) + " (" + coins + " VC)",
+          "Order ID: " + orderId,
+          "",
+          "👇 Link forward karein:",
+          checkoutLink,
+        ].join("\n")
+      );
+    } catch (err) {
+      await sendVCTelegram("❌ Error: " + err.message);
+    }
+    return { ok: true };
+  }
+
+  if (cmd === "/code") {
+    const coins = Number(parts[1]);
+    if (!Number.isSafeInteger(coins) || coins < 1 || coins > 100000) {
+      await sendVCTelegram("⚠️ Format: /code 1000 (1 se 100000 VC tak)");
+      return { ok: true };
+    }
+    try {
+      const code = "SX-" + randomBytes(12).toString("hex").toUpperCase();
+      await request("POST", tablePath("vouchers"), key, {
+        rowId: code,
+        data: { code, coins, isRedeemed: false },
+      });
+      await sendVCTelegram(
+        [
+          "🎟️ NEW VOUCHER CODE CREATED",
+          "Value: " + coins + " VC",
+          "",
+          "Code (Copy & Send):",
+          code,
+        ].join("\n")
+      );
+    } catch (err) {
+      await sendVCTelegram("❌ Voucher Error: " + err.message);
+    }
+    return { ok: true };
+  }
+
+  if (cmd === "/vc") {
+    const targetUserId = String(parts[1] || "").trim();
+    const coins = Number(parts[2]);
+    if (
+      !targetUserId ||
+      !Number.isSafeInteger(coins) ||
+      coins < 1 ||
+      coins > 100000
+    ) {
+      await sendVCTelegram("⚠️ Format: /vc USER_ID 1000");
+      return { ok: true };
+    }
+    try {
+      const p = await profile(targetUserId, key);
+      await transact(key, [
+        op("increment", "user_profiles", p.$id, {
+          column: "wallet",
+          value: coins,
+          max: 900000000,
+        }),
+      ]);
+      await sendVCTelegram(
+        `✅ ${coins} VC directly credited to ${vcClean(p.name)} (${targetUserId})!`
+      );
+    } catch (err) {
+      await sendVCTelegram("❌ Error: " + err.message);
+    }
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
+
+// ============================================================================
 // OUTBOUND STATIC IP PROXY HELPER (PURE BUILT-IN NODE MODULES)
 // ============================================================================
 
@@ -1764,7 +1987,9 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
       if (proxyRes.statusCode !== 200) {
         socket.destroy();
         return reject(
-          new Error(`Proxy CONNECT HTTP ${proxyRes.statusCode}: ${proxyRes.statusMessage}`)
+          new Error(
+            `Proxy CONNECT HTTP ${proxyRes.statusCode}: ${proxyRes.statusMessage}`
+          )
         );
       }
 
@@ -1831,7 +2056,6 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
     try {
       return await httpProxyTunnelPost(proxy, target, bodyString, headersObj);
     } catch (proxyErr) {
-      // If proxy TLS fails, try direct connection as backup
       try {
         return await directHttpsPost(target, bodyString, headersObj);
       } catch {
@@ -3160,6 +3384,15 @@ export default async ({ req, res, error }) => {
       return send(res, 200, { ok: false, error: e.message });
     }
   }
+  if (b.message && b.message.text) {
+    try {
+      const result = await handleTelegramAdminCommand(b.message, key);
+      return send(res, 200, result);
+    } catch (e) {
+      error("Telegram command error: " + e.message);
+      return send(res, 200, { ok: false, error: e.message });
+    }
+  }
   if (b.update_id) {
     return send(res, 200, { ok: true });
   }
@@ -3167,10 +3400,6 @@ export default async ({ req, res, error }) => {
   const action = b.action;
   const user = req.headers["x-appwrite-user-id"];
 
-  // Free-VC-only mode: block all new financial operations at the server,
-  // including callers running an old cached version of the website.
-  // Existing gateway callbacks remain available for reconciling payments
-  // initiated before this change; do not delete historical transactions.
   if (
     [
       "auto_create_order",
@@ -3184,7 +3413,8 @@ export default async ({ req, res, error }) => {
   ) {
     return send(res, 410, {
       ok: false,
-      error: "Paid deposits, gift card submissions and cash withdrawals are disabled. VC is free and has no cash value.",
+      error:
+        "Paid deposits, gift card submissions and cash withdrawals are disabled. VC is free and has no cash value.",
     });
   }
 
