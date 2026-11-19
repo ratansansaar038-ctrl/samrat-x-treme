@@ -86,7 +86,6 @@ async function rows(table, queries, key) {
   return (await request("GET", tablePath(table, queries), key)).rows || [];
 }
 
-// Samrat Night Break is ALWAYS calculated on the Appwrite server in IST.
 const IST_OFFSET_MS = 330 * 60 * 1000;
 function nightBreakInfo(nowMs = Date.now()) {
   const local = new Date(nowMs + IST_OFFSET_MS);
@@ -171,7 +170,6 @@ async function transact(key, operations) {
   }
 }
 
-// SAMRAT_TWO_DIGIT_00_99_V1 — 100 uniform server-side possibilities (00..99); 50x standard, 1500 finale.
 function drawTrendStats(rounds) {
   const last10 = rounds
     .filter((r) => valid(r) && Number.isFinite(Date.parse(r.endsAt)))
@@ -795,7 +793,6 @@ async function placeEntry(user, b, key) {
   };
 }
 
-// SAMRAT INSTANT-GIFT-CREDIT V1
 const INSTANT_GIFT_STATUS = "instant_pending";
 const isInstantGiftRequest = (entry) =>
   entry?.status === INSTANT_GIFT_STATUS &&
@@ -1263,7 +1260,6 @@ async function grantCoins(admin, b, key) {
   };
 }
 
-// SAMRAT UNIFIED VC REQUESTS & AMAZON E-VOUCHER SYSTEM
 const vcRequestTable = () => {
   const table = (process.env.VC_REQUESTS_TABLE_ID || "vc_requests").trim();
   if (!/^[a-zA-Z0-9._-]{1,36}$/.test(table)) {
@@ -1500,209 +1496,6 @@ async function handleTelegramWebhook(cb, key) {
   return { ok: true, status: decision };
 }
 
-async function requestVC(user, b, key) {
-  const amount = Number(b.amount);
-  if (![20, 50, 100, 200].includes(amount))
-    return { ok: false, error: "Choose 20, 50, 100 or 200 VC" };
-
-  const table = vcRequestTable();
-  const player = await profile(user, key);
-
-  let latest;
-  try {
-    latest = await rows(table, [order("$createdAt", "desc"), lim(100)], key);
-  } catch (e) {
-    if ([400, 404].includes(e.status))
-      return {
-        ok: false,
-        error:
-          "VC requests table unavailable. Check game-wallet VC_REQUESTS_TABLE_ID.",
-      };
-    throw e;
-  }
-  const pending = latest.find(
-    (row) => row.userId === user && row.status === "pending"
-  );
-  if (pending)
-    return {
-      ok: true,
-      created: false,
-      requestId: pending.$id,
-      amount: pending.amount,
-      status: "pending",
-      telegramNotified: null,
-      message: "Your earlier VC request is still pending admin review",
-    };
-
-  const bucket = Math.floor((Date.now() + OFFSET) / ROUND_MS);
-  const requestId =
-    "vcr_" +
-    createHash("sha256")
-      .update(user + "|" + bucket)
-      .digest("hex")
-      .slice(0, 30);
-  let row;
-  try {
-    row = await request("POST", tablePath(table), key, {
-      rowId: requestId,
-      data: { userId: user, amount, status: "pending" },
-    });
-  } catch (e) {
-    if (e.status === 409) {
-      const existing = await request(
-        "GET",
-        tablePath(table) + "/" + requestId,
-        key
-      );
-      return {
-        ok: true,
-        created: false,
-        requestId,
-        amount: existing.amount,
-        status: existing.status,
-        telegramNotified: null,
-        message: "Request already recorded in this interval",
-      };
-    }
-    if ([400, 404].includes(e.status))
-      return {
-        ok: false,
-        error:
-          "VC requests table could not accept this request. Check table ID and columns.",
-      };
-    throw e;
-  }
-
-  const message = [
-    "SAMRAT X-TREME | NEW VC REQUEST",
-    "Request ID: " + vcClean(row.$id),
-    "Player: " + vcClean(player.name),
-    "Player ID: " + vcClean(user),
-    "Email: " + vcClean(player.email),
-    "Requested: " + amount + " VC",
-    "Current wallet: " + player.wallet + " VC",
-    "Status: PENDING",
-    "Review (admin login): https://samratxtreme.online/admin-vc-requests.html",
-  ].join("\n");
-
-  const replyMarkup = {
-    inline_keyboard: [
-      [
-        {
-          text: "✅ Approve (+" + amount + " VC)",
-          callback_data: "vc_approve:" + row.$id,
-        },
-        {
-          text: "❌ Reject",
-          callback_data: "vc_reject:" + row.$id,
-        },
-      ],
-    ],
-  };
-
-  const telegramNotified = await sendVCTelegram(message, replyMarkup);
-  return {
-    ok: true,
-    created: true,
-    requestId: row.$id,
-    amount,
-    status: "pending",
-    telegramNotified,
-    message: "Request saved for admin approval",
-  };
-}
-
-async function adminListVCRequests(user, key) {
-  if (!dashboardIsAdmin(user))
-    return { ok: false, error: "Admin access denied" };
-  const table = vcRequestTable();
-  const found = await rows(table, [order("$createdAt", "desc"), lim(100)], key);
-  const requests = found.map((row) => ({
-    requestId: row.$id,
-    userId: row.userId,
-    amount: row.amount,
-    status: row.status,
-    createdAt: row.$createdAt,
-  }));
-  return {
-    ok: true,
-    requests,
-    limit: 100,
-    pending: requests.filter((r) =>
-      ["pending", INSTANT_GIFT_STATUS].includes(r.status)
-    ).length,
-  };
-}
-
-async function adminDecideVCRequest(user, b, key) {
-  if (!dashboardIsAdmin(user))
-    return { ok: false, error: "Admin access denied" };
-  const requestId = typeof b.requestId === "string" ? b.requestId.trim() : "";
-  const decision = b.decision;
-  if (
-    !/^[a-zA-Z0-9._-]{1,36}$/.test(requestId) ||
-    !["approved", "rejected"].includes(decision)
-  )
-    return { ok: false, error: "Invalid request ID or decision" };
-
-  const table = vcRequestTable();
-  const entry = await request("GET", tablePath(table) + "/" + requestId, key);
-  if (!["pending", INSTANT_GIFT_STATUS].includes(entry.status))
-    return { ok: false, error: "Request already handled: " + entry.status };
-  if (
-    !Number.isSafeInteger(entry.amount) ||
-    entry.amount < 1 ||
-    entry.amount > 100000 ||
-    typeof entry.userId !== "string" ||
-    !/^[a-zA-Z0-9._-]{1,36}$/.test(entry.userId)
-  )
-    return { ok: false, error: "Request details invalid; no credit made" };
-
-  const instant = isInstantGiftRequest(entry);
-  const player =
-    instant || decision === "approved"
-      ? await profile(entry.userId, key)
-      : null;
-  const operations = giftDecisionOps(entry, decision, player, table);
-
-  try {
-    await transact(key, operations);
-  } catch (e) {
-    if (e.status === 409)
-      return {
-        ok: false,
-        error:
-          "Request was handled or wallet changed. Refresh before trying again.",
-      };
-    throw e;
-  }
-
-  const telegramNotified = await sendVCTelegram(
-    [
-      "SAMRAT X-TREME | VC REQUEST " + decision.toUpperCase(),
-      "Request ID: " + vcClean(requestId),
-      "Player ID: " + vcClean(entry.userId),
-      "Amount: " + entry.amount + " VC",
-      instant
-        ? decision === "approved"
-          ? "100 earlier credited VC unlocked; no second credit."
-          : "Previously locked 100 VC reversed."
-        : decision === "approved"
-        ? "Coins credited once in the same database transaction."
-        : "No coins credited.",
-    ].join("\n")
-  );
-
-  return {
-    ok: true,
-    requestId,
-    userId: entry.userId,
-    amount: entry.amount,
-    status: decision,
-    telegramNotified,
-  };
-}
-
 // ============================================================================
 // OUTBOUND STATIC IP HTTP PROXY HELPER (TrueIP 185.155.223.55:10366)
 // ============================================================================
@@ -1710,7 +1503,7 @@ async function adminDecideVCRequest(user, b, key) {
 function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   return new Promise((resolve, reject) => {
     const target = new URL(targetUrl);
-    const proxyRaw = process.env.PROXY_URL;
+    const proxyRaw = String(process.env.PROXY_URL || "").trim();
 
     const sendHttpsRequest = (socket) => {
       const req = https.request(
@@ -1745,7 +1538,16 @@ function postViaStaticProxy(targetUrl, bodyString, headersObj) {
 
     if (!proxyRaw) return sendHttpsRequest(null);
 
-    const proxy = new URL(proxyRaw);
+    let proxy;
+    try {
+      const normalized = proxyRaw.includes("://")
+        ? proxyRaw
+        : "http://" + proxyRaw;
+      proxy = new URL(normalized);
+    } catch {
+      return reject(new Error("Invalid PROXY_URL format in Appwrite"));
+    }
+
     const proxyPort = Number(proxy.port) || 80;
     const auth =
       proxy.username || proxy.password
@@ -1761,7 +1563,9 @@ function postViaStaticProxy(targetUrl, bodyString, headersObj) {
     const tcp = net.connect(proxyPort, proxy.hostname);
     tcp.setTimeout(15000);
     tcp.on("timeout", () => tcp.destroy(new Error("Static proxy timeout")));
-    tcp.on("error", reject);
+    tcp.on("error", (err) =>
+      reject(new Error("Static proxy error: " + err.message))
+    );
 
     tcp.on("connect", () => {
       tcp.write(
@@ -1787,7 +1591,9 @@ function postViaStaticProxy(targetUrl, bodyString, headersObj) {
         socket: tcp,
         servername: target.hostname,
       });
-      tlsSocket.on("error", reject);
+      tlsSocket.on("error", (err) =>
+        reject(new Error("Proxy TLS error: " + err.message))
+      );
       sendHttpsRequest(tlsSocket);
     };
     tcp.on("data", onProxyData);
@@ -1795,7 +1601,7 @@ function postViaStaticProxy(targetUrl, bodyString, headersObj) {
 }
 
 // ============================================================================
-// GATEWAY 1: INSTENTPAYMENT (JSON V1 — PAY-IN, PAYOUT, STATUS & CALLBACKS)
+// GATEWAY 1: INSTENTPAYMENT (JSON V1)
 // ============================================================================
 
 const INSTENT_BASE = "https://transaction.instentpayment.com";
@@ -1806,7 +1612,7 @@ async function instentGetToken() {
   const api_secret = String(process.env.INSTENT_API_SECRET || "").trim();
 
   if (!merchant_id || !merchant_email || !api_secret) {
-    throw new Error("InstentPayment credentials not configured");
+    throw new Error("InstentPayment credentials missing in Appwrite");
   }
 
   const resHttp = await postViaStaticProxy(
@@ -1819,19 +1625,21 @@ async function instentGetToken() {
   try {
     parsed = JSON.parse(resHttp.raw);
   } catch {
-    throw new Error("InstentPayment token invalid response");
+    throw new Error(
+      `InstentPayment token invalid response (HTTP ${resHttp.statusCode})`
+    );
   }
 
   const token = parsed?.token || parsed?.data?.token;
   if (!token) {
     throw new Error(
-      parsed?.message || "InstentPayment token error (Check IP whitelist)"
+      parsed?.message ||
+        `InstentPayment token rejected (HTTP ${resHttp.statusCode})`
     );
   }
   return token;
 }
 
-// 1A. INSTENTPAYMENT CREATE PAY-IN (Min ₹100 -> 1000 VC)
 async function instentCreateOrder(user, b, key) {
   const amountInr = Number(b.amount);
   if (!Number.isFinite(amountInr) || amountInr < 100 || amountInr > 50000)
@@ -1878,13 +1686,18 @@ async function instentCreateOrder(user, b, key) {
   try {
     gw = JSON.parse(resHttp.raw);
   } catch {
-    return { ok: false, error: "InstentPayment invalid JSON response" };
+    return {
+      ok: false,
+      error: `InstentPayment invalid JSON (HTTP ${resHttp.statusCode})`,
+    };
   }
 
   if (gw?.status !== 1 || (!gw?.data?.payment_url && !gw?.data?.intent)) {
     return {
       ok: false,
-      error: gw?.message || "InstentPayment could not create payment order",
+      error:
+        gw?.message ||
+        `InstentPayment order failed (status: ${gw?.status ?? "unknown"})`,
     };
   }
 
@@ -1918,7 +1731,6 @@ async function instentCreateOrder(user, b, key) {
   };
 }
 
-// 1B. INSTENTPAYMENT CREATE PAYOUT (Min ₹2000 = 20000 VC)
 async function instentCreatePayout(user, b, key) {
   const amountInr = Number(b.amount);
   if (!Number.isFinite(amountInr) || amountInr < 2000 || amountInr > 50000)
@@ -2016,7 +1828,10 @@ async function instentCreatePayout(user, b, key) {
   }
 
   const txnStatus = String(gw?.data?.txn_status || "").toUpperCase();
-  if (gw?.status !== 1 || !["PENDING", "SUCCESS", "PROCESSING"].includes(txnStatus)) {
+  if (
+    gw?.status !== 1 ||
+    !["PENDING", "SUCCESS", "PROCESSING"].includes(txnStatus)
+  ) {
     await transact(key, [
       op("update", table, orderId, { status: "ip_payout_rejected" }),
       op("increment", "user_profiles", player.$id, {
@@ -2055,7 +1870,6 @@ async function instentCreatePayout(user, b, key) {
   };
 }
 
-// 1C. INSTENTPAYMENT WEBHOOK CALLBACK (service_id: 1 = Payin, 2 = Payout)
 async function handleInstentCallback(cb, key) {
   const orderId = String(cb?.order_id || "").trim();
   const serviceId = Number(cb?.service_id);
@@ -2073,7 +1887,6 @@ async function handleInstentCallback(cb, key) {
     throw e;
   }
 
-  // Verify status directly from InstentPayment /api/v1/status for tamper-proof security
   const bearer = await instentGetToken();
   const statusRes = await postViaStaticProxy(
     `${INSTENT_BASE}/api/v1/status`,
@@ -2123,7 +1936,8 @@ async function handleInstentCallback(cb, key) {
       });
     }
   } else if (serviceId === 2) {
-    if (!String(entry.status || "").startsWith("ip_payout_p")) return { ok: true };
+    if (!String(entry.status || "").startsWith("ip_payout_p"))
+      return { ok: true };
     if (verifiedStatus === "SUCCESS") {
       await request("PATCH", tablePath(table) + "/" + orderId, key, {
         data: { status: "ip_payout_success" },
@@ -2160,7 +1974,7 @@ async function handleInstentCallback(cb, key) {
 }
 
 // ============================================================================
-// GATEWAY 2: PAISAPAY (PAY-IN, STATIC-IP PAYOUT & ENCRYPTED CALLBACK)
+// GATEWAY 2: PAISAPAY (AUTOMATIC FALLBACK GATEWAY)
 // ============================================================================
 
 function paisaKeyBuffer(secretKey) {
@@ -2205,7 +2019,7 @@ async function paisaCreateOrder(user, b, key) {
   if (!Number.isFinite(amountInr) || amountInr < 300 || amountInr > 50000)
     return {
       ok: false,
-      error: "PaisaPay minimum deposit is ₹300 (Use InstentPayment for ₹100+)",
+      error: "Minimum deposit is ₹300 on fallback gateway",
     };
 
   const mobile = String(b.mobile || "").replace(/\D/g, "");
@@ -2386,6 +2200,45 @@ async function paisaCreatePayout(user, b, key) {
     amountInr: amountInr.toFixed(2),
     coinsDebited: coinsToDebit,
   };
+}
+
+// ============================================================================
+// AUTOMATIC DUAL-GATEWAY ROUTER (INSTENTPAYMENT PRIMARY -> PAISAPAY FALLBACK)
+// ============================================================================
+
+async function autoCreateOrder(user, b, key) {
+  try {
+    const primary = await instentCreateOrder(user, b, key);
+    if (primary.ok) return primary;
+    if (Number(b.amount) >= 300) {
+      const fallback = await paisaCreateOrder(user, b, key);
+      if (fallback.ok) return fallback;
+    }
+    return primary;
+  } catch (e) {
+    if (Number(b.amount) >= 300) {
+      try {
+        const fallback = await paisaCreateOrder(user, b, key);
+        if (fallback.ok) return fallback;
+      } catch {}
+    }
+    return { ok: false, error: e.message || "Payment gateway error" };
+  }
+}
+
+async function autoCreatePayout(user, b, key) {
+  try {
+    const primary = await instentCreatePayout(user, b, key);
+    if (primary.ok) return primary;
+    const fallback = await paisaCreatePayout(user, b, key);
+    return fallback.ok ? fallback : primary;
+  } catch (e) {
+    try {
+      const fallback = await paisaCreatePayout(user, b, key);
+      if (fallback.ok) return fallback;
+    } catch {}
+    return { ok: false, error: e.message || "Payout gateway error" };
+  }
 }
 
 async function handlePaisaPayCallback(encryptedPayload, key) {
@@ -2994,7 +2847,6 @@ export default async ({ req, res, error }) => {
       } catch {}
     }
 
-    // InstentPayment Payin/Payout Callback
     if (
       parsedJson &&
       parsedJson.order_id &&
@@ -3012,7 +2864,6 @@ export default async ({ req, res, error }) => {
       }
     }
 
-    // PaisaPay Encrypted Callback
     let incomingPayload = null;
     if (contentType.includes("application/x-www-form-urlencoded")) {
       incomingPayload = new URLSearchParams(rawBody).get("payload");
@@ -3058,7 +2909,6 @@ export default async ({ req, res, error }) => {
       error: "Function API key missing",
     });
 
-  // Handle Telegram Inline Approve/Reject Webhook Callback
   if (b.callback_query) {
     try {
       const result = await handleTelegramWebhook(b.callback_query, key);
@@ -3088,6 +2938,8 @@ export default async ({ req, res, error }) => {
       "grant_coins",
       "request_vc",
       "submit_gift_card",
+      "auto_create_order",
+      "auto_create_payout",
       "instent_create_order",
       "instent_create_payout",
       "paisapay_create_order",
@@ -3255,6 +3107,16 @@ export default async ({ req, res, error }) => {
       return send(res, x.ok ? 200 : 400, x);
     }
 
+    if (action === "auto_create_order") {
+      const x = await autoCreateOrder(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
+    if (action === "auto_create_payout") {
+      const x = await autoCreatePayout(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
     if (action === "instent_create_order") {
       const x = await instentCreateOrder(user, b, key);
       return send(res, x.ok ? 200 : 400, x);
@@ -3375,7 +3237,7 @@ export default async ({ req, res, error }) => {
     error("Game backend: " + e.message);
     return send(res, e.status === 409 ? 409 : 500, {
       ok: false,
-      error: "Game service error. Check function logs.",
+      error: e.message || "Game service error. Check function logs.",
       code: e.status || 500,
     });
   }
