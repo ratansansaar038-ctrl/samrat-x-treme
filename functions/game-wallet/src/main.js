@@ -1497,7 +1497,7 @@ async function handleTelegramWebhook(cb, key) {
 }
 
 // ============================================================================
-// OUTBOUND STATIC IP PROXY HELPER (HTTP + SOCKS5 AUTO-FALLBACK)
+// OUTBOUND STATIC IP PROXY HELPER (FAST 4s HTTP -> SOCKS5 AUTO-FALLBACK)
 // ============================================================================
 
 function connectHttpProxy(proxy, target) {
@@ -1515,8 +1515,8 @@ function connectHttpProxy(proxy, target) {
         : "";
 
     const tcp = net.connect(proxyPort, proxy.hostname);
-    tcp.setTimeout(15000);
-    tcp.on("timeout", () => tcp.destroy(new Error("Static proxy timeout")));
+    tcp.setTimeout(4000);
+    tcp.on("timeout", () => tcp.destroy(new Error("HTTP proxy timeout")));
     tcp.on("error", reject);
 
     tcp.on("connect", () => {
@@ -1543,6 +1543,10 @@ function connectHttpProxy(proxy, target) {
         socket: tcp,
         servername: target.hostname,
       });
+      tlsSocket.setTimeout(5000);
+      tlsSocket.on("timeout", () =>
+        tlsSocket.destroy(new Error("HTTP proxy TLS timeout"))
+      );
       tlsSocket.on("error", reject);
       resolve(tlsSocket);
     };
@@ -1558,7 +1562,7 @@ function connectSocks5Proxy(proxy, target) {
     const hasAuth = Boolean(user || pass);
 
     const tcp = net.connect(proxyPort, proxy.hostname);
-    tcp.setTimeout(15000);
+    tcp.setTimeout(5000);
     tcp.on("timeout", () => tcp.destroy(new Error("SOCKS5 proxy timeout")));
     tcp.on("error", reject);
 
@@ -1633,6 +1637,10 @@ function connectSocks5Proxy(proxy, target) {
           socket: tcp,
           servername: target.hostname,
         });
+        tlsSocket.setTimeout(6000);
+        tlsSocket.on("timeout", () =>
+          tlsSocket.destroy(new Error("SOCKS5 TLS timeout"))
+        );
         tlsSocket.on("error", reject);
         resolve(tlsSocket);
       }
@@ -1640,6 +1648,8 @@ function connectSocks5Proxy(proxy, target) {
     tcp.on("data", onData);
   });
 }
+
+let preferredProxyMode = "auto";
 
 async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   const target = new URL(targetUrl);
@@ -1654,7 +1664,7 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
           path: target.pathname + target.search,
           method: "POST",
           ...(socket ? { socket, agent: false } : {}),
-          timeout: 20000,
+          timeout: 8000,
           headers: {
             "Content-Length": Buffer.byteLength(bodyString),
             Accept: "application/json,text/html,*/*",
@@ -1671,7 +1681,7 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
           r.on("end", () => resolve({ statusCode: r.statusCode, raw }));
         }
       );
-      req.on("timeout", () => req.destroy(new Error("Gateway timeout")));
+      req.on("timeout", () => req.destroy(new Error("Gateway API timeout")));
       req.on("error", reject);
       req.write(bodyString);
       req.end();
@@ -1682,22 +1692,21 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   const normalized = proxyRaw.includes("://") ? proxyRaw : "http://" + proxyRaw;
   const proxy = new URL(normalized);
 
-  if (proxy.protocol.startsWith("socks")) {
+  if (proxy.protocol.startsWith("socks") || preferredProxyMode === "socks5") {
     const sock = await connectSocks5Proxy(proxy, target);
     return sendHttpsRequest(sock);
   }
 
   try {
     const sock = await connectHttpProxy(proxy, target);
-    return await sendHttpsRequest(sock);
+    const res = await sendHttpsRequest(sock);
+    preferredProxyMode = "http";
+    return res;
   } catch (err) {
-    if (
-      /wrong version number|CONNECT failed|EPROTO/i.test(err.message || "")
-    ) {
-      const sock5 = await connectSocks5Proxy(proxy, target);
-      return sendHttpsRequest(sock5);
-    }
-    throw err;
+    const sock5 = await connectSocks5Proxy(proxy, target);
+    const res5 = await sendHttpsRequest(sock5);
+    preferredProxyMode = "socks5";
+    return res5;
   }
 }
 
@@ -2934,7 +2943,6 @@ export default async ({ req, res, error }) => {
   const rawBody = typeof req.body === "string" ? req.body : "";
   const contentType = String(req.headers["content-type"] || "").toLowerCase();
 
-  // Direct Server-to-Server Payment Webhooks (InstentPayment JSON or PaisaPay payload)
   if (
     req.headers["x-appwrite-trigger"] !== "schedule" &&
     !req.headers["x-appwrite-user-id"]
