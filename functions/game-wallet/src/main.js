@@ -1,6 +1,5 @@
 import https from "node:https";
 import http from "node:http";
-import net from "node:net";
 import tls from "node:tls";
 import {
   randomInt,
@@ -9,6 +8,7 @@ import {
   createCipheriv,
   createDecipheriv,
 } from "node:crypto";
+import { matchesDepositAmount, safePayoutFallback } from "./payment-checks.js";
 
 const ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
 const PROJECT = "6a7f2add0011a7bfc21a";
@@ -1501,37 +1501,6 @@ async function handleTelegramWebhook(cb, key) {
 // OUTBOUND STATIC IP PROXY HELPER (PURE BUILT-IN NODE MODULES)
 // ============================================================================
 
-function directHttpsPost(target, bodyString, headersObj) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        hostname: target.hostname,
-        port: 443,
-        path: target.pathname + target.search,
-        method: "POST",
-        timeout: 12000,
-        headers: {
-          "Content-Length": Buffer.byteLength(bodyString),
-          Accept: "application/json,text/html,*/*",
-          ...headersObj,
-        },
-      },
-      (r) => {
-        let raw = "";
-        r.on("data", (c) => {
-          raw += c;
-          if (raw.length > 500000) r.destroy(new Error("Response too large"));
-        });
-        r.on("end", () => resolve({ statusCode: r.statusCode, raw }));
-      }
-    );
-    req.on("timeout", () => req.destroy(new Error("Direct API timeout")));
-    req.on("error", reject);
-    req.write(bodyString);
-    req.end();
-  });
-}
-
 function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
   return new Promise((resolve, reject) => {
     const proxyPort = Number(proxy.port) || 80;
@@ -1568,16 +1537,19 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
       const tlsOptions = {
         socket,
         servername: target.hostname,
-        rejectUnauthorized: false,
       };
       const tlsSocket = tls.connect(tlsOptions, () => {
+        // HTTPS requests must reuse the authenticated proxy tunnel. The
+        // `createConnection` option by itself can be ignored by the Agent.
+        const agent = new https.Agent({ keepAlive: false });
+        agent.createConnection = () => tlsSocket;
         const req = https.request(
           {
             hostname: target.hostname,
             port: 443,
             path: target.pathname + target.search,
             method: "POST",
-            createConnection: () => tlsSocket,
+            agent,
             timeout: 15000,
             headers: {
               "Content-Length": Buffer.byteLength(bodyString),
@@ -1596,6 +1568,7 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
         );
         req.on("timeout", () => req.destroy(new Error("Gateway API timeout")));
         req.on("error", reject);
+        req.on("close", () => agent.destroy());
         req.write(bodyString);
         req.end();
       });
@@ -1619,26 +1592,18 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
 async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   const target = new URL(targetUrl);
   const proxyRaw = String(process.env.PROXY_URL || "").trim();
-
-  if (proxyRaw) {
-    const normalized = proxyRaw.includes("://")
-      ? proxyRaw
-      : "http://" + proxyRaw;
-    const proxy = new URL(normalized);
-    try {
-      return await httpProxyTunnelPost(proxy, target, bodyString, headersObj);
-    } catch (proxyErr) {
-      // If proxy TLS fails, try direct connection as backup
-      try {
-        return await directHttpsPost(target, bodyString, headersObj);
-      } catch {
-        throw proxyErr;
-      }
-    }
-  }
-
-  return directHttpsPost(target, bodyString, headersObj);
+  if (!proxyRaw) throw new Error("PROXY_URL is required for payment API calls");
+  const normalized = proxyRaw.includes("://")
+    ? proxyRaw
+    : "http://" + proxyRaw;
+  const proxy = new URL(normalized);
+  if (proxy.protocol !== "http:")
+    throw new Error("The configured gateway proxy must support HTTP CONNECT");
+  // Never bypass the allowlisted source IP when the proxy fails.
+  return httpProxyTunnelPost(proxy, target, bodyString, headersObj);
 }
+
+export { postViaStaticProxy };
 
 // ============================================================================
 // GATEWAY 1: INSTENTPAYMENT (JSON V1)
@@ -1772,6 +1737,8 @@ async function instentCreateOrder(user, b, key) {
 }
 
 async function instentCreatePayout(user, b, key) {
+  if (!String(process.env.PROXY_URL || "").trim())
+    return { ok: false, error: "Static payment proxy not configured" };
   const amountInr = Number(b.amount);
   if (!Number.isFinite(amountInr) || amountInr < 2000 || amountInr > 50000)
     return { ok: false, error: "Minimum payout amount is ₹2,000 (20,000 VC)" };
@@ -1832,8 +1799,10 @@ async function instentCreatePayout(user, b, key) {
   ]);
 
   let gw;
+  let payoutRequestStarted = false;
   try {
     const bearer = await instentGetToken();
+    payoutRequestStarted = true;
     const resHttp = await postViaStaticProxy(
       `${INSTENT_BASE}/api/v1/payout/create`,
       JSON.stringify({
@@ -1853,6 +1822,17 @@ async function instentCreatePayout(user, b, key) {
     );
     gw = JSON.parse(resHttp.raw);
   } catch (err) {
+    if (payoutRequestStarted) {
+      await request("PATCH", tablePath(table) + "/" + orderId, key, {
+        data: { status: "ip_payout_review" },
+      });
+      return {
+        ok: false,
+        needsReview: true,
+        orderId,
+        error: "Payout status unknown; funds held for verification. Do not retry.",
+      };
+    }
     await transact(key, [
       op("update", table, orderId, { status: "ip_payout_failed" }),
       op("increment", "user_profiles", player.$id, {
@@ -1896,7 +1876,7 @@ async function instentCreatePayout(user, b, key) {
       "Order ID: " + orderId,
       "Player: " + vcClean(player.name) + " (" + vcClean(user) + ")",
       "Amount: ₹" + amountInr.toFixed(2) + " (-" + coinsToDebit + " VC)",
-      "A/C: " + accountNumber + " | IFSC: " + ifscCode,
+      "A/C: ****" + accountNumber.slice(-4) + " | IFSC: " + ifscCode,
       "Status: " + txnStatus,
     ].join("\n")
   );
@@ -1913,7 +1893,6 @@ async function instentCreatePayout(user, b, key) {
 async function handleInstentCallback(cb, key) {
   const orderId = String(cb?.order_id || "").trim();
   const serviceId = Number(cb?.service_id);
-  const txnStatus = String(cb?.txn_status || "").toUpperCase();
   const utr = String(cb?.utr || "").trim();
 
   if (!/^[a-zA-Z0-9._-]{1,40}$/.test(orderId)) return { ok: false };
@@ -1937,16 +1916,22 @@ async function handleInstentCallback(cb, key) {
     }
   );
   const verifiedJson = JSON.parse(statusRes.raw);
-  const verifiedStatus = String(
-    verifiedJson?.data?.txn_status || txnStatus
-  ).toUpperCase();
-  const verifiedAmount = Number(verifiedJson?.data?.amount || cb?.amount || 0);
+  if (statusRes.statusCode < 200 || statusRes.statusCode >= 300 || !verifiedJson?.data)
+    throw new Error("Gateway status verification unavailable");
+  const verifiedStatus = String(verifiedJson.data.txn_status || "").toUpperCase();
+  const verifiedAmount = Number(verifiedJson.data.amount);
+  if (!verifiedStatus || !Number.isFinite(verifiedAmount) || verifiedAmount <= 0)
+    throw new Error("Gateway did not verify status and amount");
+  if (verifiedJson.data.order_id && String(verifiedJson.data.order_id) !== orderId)
+    throw new Error("Gateway returned a different order ID");
+  if (verifiedJson.data.service_id !== undefined && Number(verifiedJson.data.service_id) !== serviceId)
+    throw new Error("Gateway returned a different service ID");
 
   if (serviceId === 1) {
     if (entry.status !== "ip_pending") return { ok: true };
     if (
       verifiedStatus === "SUCCESS" &&
-      Math.round(verifiedAmount * 10) === entry.amount
+      matchesDepositAmount(verifiedAmount, entry.amount)
     ) {
       const player = await profile(entry.userId, key);
       try {
@@ -1976,7 +1961,7 @@ async function handleInstentCallback(cb, key) {
       });
     }
   } else if (serviceId === 2) {
-    if (!String(entry.status || "").startsWith("ip_payout_p"))
+    if (!["ip_payout_processing", "ip_payout_pending", "ip_payout_review"].includes(entry.status))
       return { ok: true };
     if (verifiedStatus === "SUCCESS") {
       await request("PATCH", tablePath(table) + "/" + orderId, key, {
@@ -2112,6 +2097,8 @@ async function paisaCreateOrder(user, b, key) {
 }
 
 async function paisaCreatePayout(user, b, key) {
+  if (!String(process.env.PROXY_URL || "").trim())
+    return { ok: false, error: "Static payment proxy not configured" };
   const token = process.env.PAISAPAY_TOKEN;
   const secretKey = process.env.PAISAPAY_SECRET_KEY;
   if (!token || !secretKey)
@@ -2180,7 +2167,9 @@ async function paisaCreatePayout(user, b, key) {
   const encryptedPayload = paisaEncrypt(payloadObj, secretKey);
 
   let gwResponse;
+  let payoutRequestStarted = false;
   try {
+    payoutRequestStarted = true;
     const resHttp = await postViaStaticProxy(
       "https://pay.paisapay.site/create_payout.php",
       new URLSearchParams({ token, payload: encryptedPayload }).toString(),
@@ -2188,6 +2177,17 @@ async function paisaCreatePayout(user, b, key) {
     );
     gwResponse = JSON.parse(resHttp.raw);
   } catch (err) {
+    if (payoutRequestStarted) {
+      await request("PATCH", tablePath(table) + "/" + orderId, key, {
+        data: { status: "payout_review" },
+      });
+      return {
+        ok: false,
+        needsReview: true,
+        orderId,
+        error: "Payout status unknown; funds held for verification. Do not retry.",
+      };
+    }
     await transact(key, [
       op("update", table, orderId, { status: "payout_failed" }),
       op("increment", "user_profiles", player.$id, {
@@ -2228,7 +2228,7 @@ async function paisaCreatePayout(user, b, key) {
       "Order ID: " + orderId,
       "Player: " + vcClean(player.name) + " (" + vcClean(user) + ")",
       "Amount: ₹" + amountInr.toFixed(2) + " (-" + coinsToDebit + " VC)",
-      "A/C: " + accountNumber + " | IFSC: " + ifscCode,
+      "A/C: ****" + accountNumber.slice(-4) + " | IFSC: " + ifscCode,
       "Gateway Status: " + gwStatus,
     ].join("\n")
   );
@@ -2270,13 +2270,11 @@ async function autoCreatePayout(user, b, key) {
   try {
     const primary = await instentCreatePayout(user, b, key);
     if (primary.ok) return primary;
+    // Never route an ambiguous or rejected transfer to another bank API.
+    if (!safePayoutFallback(primary)) return primary;
     const fallback = await paisaCreatePayout(user, b, key);
     return fallback.ok ? fallback : primary;
   } catch (e) {
-    try {
-      const fallback = await paisaCreatePayout(user, b, key);
-      if (fallback.ok) return fallback;
-    } catch {}
     return { ok: false, error: e.message || "Payout gateway error" };
   }
 }
@@ -2304,6 +2302,8 @@ async function handlePaisaPayCallback(encryptedPayload, key) {
   if (entry.status !== "pp_pending") return "success";
 
   if (status === "SUCCESS") {
+    if (!matchesDepositAmount(data?.amount, entry.amount))
+      throw new Error("PaisaPay amount mismatch; wallet not credited");
     const player = await profile(entry.userId, key);
     try {
       await transact(key, [
