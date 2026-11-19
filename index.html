@@ -248,7 +248,7 @@
 
 <body>
 
-<!-- 🔴 LIVE SCROLLING PATTI (REAL ACTIVITY / PLATFORM UPDATES) -->
+<!-- 🔴 LIVE SCROLLING PATTI -->
 <div class="ticker-wrap">
   <div class="ticker-move" id="liveTicker">
     <span class="ticker-item"><span class="ticker-dot">●</span>💳 Instant UPI Deposit (Min ₹100) & Auto Bank Payout now LIVE!</span>
@@ -316,7 +316,7 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
-  <!-- 💳 INSTANT DEPOSIT & AUTO WITHDRAWAL (PAISAPAY) -->
+  <!-- 💳 INSTANT DEPOSIT & AUTO WITHDRAWAL (DUAL GATEWAY: INSTENTPAYMENT + PAISAPAY) -->
   <section class="panel" id="instantWalletPanel" style="text-align:center; border: 1px solid #5cff9d;">
     <h3 style="color:#89ffb4; margin-bottom:4px;">⚡ INSTANT DEPOSIT & WITHDRAWAL</h3>
     <p class="small" style="margin-top:0;">
@@ -330,7 +330,11 @@
 
     <!-- DEPOSIT TAB -->
     <div id="depositTabBox">
-      <div class="guide-box">
+      <select id="depositGateway">
+        <option value="instentpayment" selected>⚡ Gateway 1: Instant UPI (Min ₹100)</option>
+        <option value="paisapay">💳 Gateway 2: PaisaPay (Min ₹300)</option>
+      </select>
+      <div class="guide-box" id="depositGuideBox">
         • Minimum Deposit: <strong>₹100 = 1,000 VC</strong> (Max ₹50,000)<br>
         • Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.
       </div>
@@ -343,6 +347,10 @@
 
     <!-- WITHDRAW TAB -->
     <div id="withdrawTabBox" class="hide">
+      <select id="withdrawGateway">
+        <option value="instentpayment" selected>⚡ Gateway 1: Instant Bank Payout (Min ₹2,000)</option>
+        <option value="paisapay">🏦 Gateway 2: PaisaPay Bank Payout (Min ₹2,000)</option>
+      </select>
       <div class="guide-box">
         • Minimum Withdrawal: <strong>₹2,000 (20,000 VC)</strong> · Rate: 10 VC = ₹1<br>
         • Amount seedha aapke bank account mein IMPS/NEFT ke zariye transfer hoga.
@@ -352,6 +360,7 @@
       <input id="ppIfscCode" type="text" maxlength="11" placeholder="IFSC Code (e.g. SBIN0001234)" style="text-transform:uppercase;">
       <input id="ppHolderName" type="text" maxlength="80" placeholder="Account Holder Name">
       <input id="ppBankName" type="text" maxlength="80" placeholder="Bank Name (e.g. State Bank of India)">
+      <input id="ppWithdrawMobile" type="tel" maxlength="10" placeholder="10-Digit Mobile Number">
       <div class="small" id="ppWithdrawPreview" style="color:#ffe080; font-weight:700;">VC to deduct: 20,000 VC</div>
       <button class="btn" id="ppWithdrawBtn">INSTANT BANK WITHDRAWAL →</button>
       <div class="status" id="ppWithdrawMsg"></div>
@@ -602,7 +611,7 @@ $('logout').onclick = async () => {
   }
 };
 
-// 💳 Deposit / Withdraw Tab Switcher & Previews
+// 💳 Deposit / Withdraw Tab Switcher & Gateway Switching
 $('tabDepositBtn').onclick = () => {
   $('tabDepositBtn').classList.add('active');
   $('tabWithdrawBtn').classList.remove('active');
@@ -617,6 +626,23 @@ $('tabWithdrawBtn').onclick = () => {
   $('depositTabBox').classList.add('hide');
 };
 
+$('depositGateway').onchange = () => {
+  const gw = $('depositGateway').value;
+  if (gw === 'paisapay') {
+    $('ppDepositAmount').min = 300;
+    if (Number($('ppDepositAmount').value) < 300) $('ppDepositAmount').value = 300;
+    $('ppDepositAmount').placeholder = 'Enter Amount in INR (Min ₹300)';
+    $('depositGuideBox').innerHTML =
+      '• Minimum Deposit (PaisaPay): <strong>₹300 = 3,000 VC</strong> (Max ₹50,000)<br>• Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.';
+  } else {
+    $('ppDepositAmount').min = 100;
+    $('ppDepositAmount').placeholder = 'Enter Amount in INR (Min ₹100)';
+    $('depositGuideBox').innerHTML =
+      '• Minimum Deposit: <strong>₹100 = 1,000 VC</strong> (Max ₹50,000)<br>• Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.';
+  }
+  $('ppDepositAmount').oninput();
+};
+
 $('ppDepositAmount').oninput = () => {
   const amt = Math.max(0, Math.floor(Number($('ppDepositAmount').value) || 0));
   $('ppDepositPreview').textContent = `You will receive: ${(amt * 10).toLocaleString()} VC`;
@@ -627,7 +653,7 @@ $('ppWithdrawAmount').oninput = () => {
   $('ppWithdrawPreview').textContent = `VC to deduct: ${(amt * 10).toLocaleString()} VC`;
 };
 
-// 💳 PaisaPay Pay-In Checkout Redirect
+// 💳 Dual-Gateway Pay-In Checkout (InstentPayment + PaisaPay)
 $('ppDepositBtn').onclick = async () => {
   if (!currentUser) {
     msg('ppDepositMsg', '⚠️ Please Login or Sign Up first to add Virtual Coins.');
@@ -635,11 +661,13 @@ $('ppDepositBtn').onclick = async () => {
     return;
   }
 
+  const gw = $('depositGateway').value;
+  const minAmt = gw === 'paisapay' ? 300 : 100;
   const amount = Number($('ppDepositAmount').value);
   const mobile = $('ppDepositMobile').value.replace(/\D/g, '');
 
-  if (!Number.isFinite(amount) || amount < 100 || amount > 50000) {
-    msg('ppDepositMsg', 'Minimum deposit amount is ₹100 (Max ₹50,000).');
+  if (!Number.isFinite(amount) || amount < minAmt || amount > 50000) {
+    msg('ppDepositMsg', `Minimum deposit amount is ₹${minAmt} (Max ₹50,000).`);
     return;
   }
   if (!/^[6-9]\d{9}$/.test(mobile)) {
@@ -651,30 +679,36 @@ $('ppDepositBtn').onclick = async () => {
   msg('ppDepositMsg', 'Creating secure payment session...');
 
   try {
-    const res = await api('paisapay_create_order', { amount, mobile });
-    msg('ppDepositMsg', 'Redirecting to PaisaPay checkout...');
+    if (gw === 'instentpayment') {
+      const res = await api('instent_create_order', { amount, mobile });
+      msg('ppDepositMsg', 'Redirecting to UPI payment...');
+      window.location.href = res.paymentUrl;
+    } else {
+      const res = await api('paisapay_create_order', { amount, mobile });
+      msg('ppDepositMsg', 'Redirecting to PaisaPay checkout...');
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = res.checkoutUrl;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = res.checkoutUrl;
 
-    for (const [k, v] of Object.entries(res.formFields || {})) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = k;
-      input.value = String(v);
-      form.appendChild(input);
+      for (const [k, v] of Object.entries(res.formFields || {})) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = k;
+        input.value = String(v);
+        form.appendChild(input);
+      }
+
+      document.body.appendChild(form);
+      form.submit();
     }
-
-    document.body.appendChild(form);
-    form.submit();
   } catch (err) {
     msg('ppDepositMsg', err.message || 'Could not start payment.');
     $('ppDepositBtn').disabled = false;
   }
 };
 
-// 🏦 PaisaPay Auto Bank Payout
+// 🏦 Dual-Gateway Auto Bank Payout (InstentPayment + PaisaPay)
 $('ppWithdrawBtn').onclick = async () => {
   if (!currentUser) {
     msg('ppWithdrawMsg', '⚠️ Please Login or Sign Up first to withdraw.');
@@ -682,11 +716,13 @@ $('ppWithdrawBtn').onclick = async () => {
     return;
   }
 
+  const gw = $('withdrawGateway').value;
   const amount = Number($('ppWithdrawAmount').value);
   const account_number = $('ppAccountNumber').value.replace(/\s+/g, '');
   const ifsc_code = $('ppIfscCode').value.trim().toUpperCase();
   const holder_name = $('ppHolderName').value.trim();
   const bank_name = $('ppBankName').value.trim();
+  const mobile = $('ppWithdrawMobile').value.replace(/\D/g, '');
 
   if (!Number.isFinite(amount) || amount < 2000 || amount > 50000) {
     msg('ppWithdrawMsg', 'Minimum withdrawal amount is ₹2,000 (20,000 VC).');
@@ -704,17 +740,24 @@ $('ppWithdrawBtn').onclick = async () => {
     msg('ppWithdrawMsg', 'Enter account holder name and bank name.');
     return;
   }
+  if (gw === 'instentpayment' && !/^[6-9]\d{9}$/.test(mobile)) {
+    msg('ppWithdrawMsg', 'Enter a valid 10-digit mobile number.');
+    return;
+  }
 
   $('ppWithdrawBtn').disabled = true;
   msg('ppWithdrawMsg', 'Processing instant bank payout...');
 
   try {
-    const res = await api('paisapay_create_payout', {
+    const action =
+      gw === 'instentpayment' ? 'instent_create_payout' : 'paisapay_create_payout';
+    const res = await api(action, {
       amount,
       account_number,
       ifsc_code,
       holder_name,
-      bank_name
+      bank_name,
+      mobile
     });
     msg(
       'ppWithdrawMsg',
