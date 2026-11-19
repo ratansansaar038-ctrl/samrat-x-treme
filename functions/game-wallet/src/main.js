@@ -1497,166 +1497,15 @@ async function handleTelegramWebhook(cb, key) {
 }
 
 // ============================================================================
-// OUTBOUND STATIC IP PROXY HELPER (FAST 4s HTTP -> SOCKS5 AUTO-FALLBACK)
+// OUTBOUND STATIC IP HTTP PROXY HELPER (http://u366_de5d4c96:...@185.155.223.55:10366)
 // ============================================================================
 
-function connectHttpProxy(proxy, target) {
+function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   return new Promise((resolve, reject) => {
-    const proxyPort = Number(proxy.port) || 80;
-    const auth =
-      proxy.username || proxy.password
-        ? "Proxy-Authorization: Basic " +
-          Buffer.from(
-            `${decodeURIComponent(proxy.username)}:${decodeURIComponent(
-              proxy.password
-            )}`
-          ).toString("base64") +
-          "\r\n"
-        : "";
+    const target = new URL(targetUrl);
+    const proxyRaw = String(process.env.PROXY_URL || "").trim();
 
-    const tcp = net.connect(proxyPort, proxy.hostname);
-    tcp.setTimeout(4000);
-    tcp.on("timeout", () => tcp.destroy(new Error("HTTP proxy timeout")));
-    tcp.on("error", reject);
-
-    tcp.on("connect", () => {
-      tcp.write(
-        `CONNECT ${target.hostname}:443 HTTP/1.1\r\n` +
-          `Host: ${target.hostname}:443\r\n` +
-          auth +
-          `Connection: keep-alive\r\n\r\n`
-      );
-    });
-
-    let headerBuf = "";
-    const onProxyData = (chunk) => {
-      headerBuf += chunk.toString("latin1");
-      const endIdx = headerBuf.indexOf("\r\n\r\n");
-      if (endIdx === -1) return;
-      tcp.removeListener("data", onProxyData);
-      const statusLine = headerBuf.slice(0, headerBuf.indexOf("\r\n"));
-      if (!/^HTTP\/1\.[01] 200\b/i.test(statusLine)) {
-        tcp.destroy();
-        return reject(new Error("HTTP proxy CONNECT failed: " + statusLine));
-      }
-      const tlsSocket = tls.connect({
-        socket: tcp,
-        servername: target.hostname,
-      });
-      tlsSocket.setTimeout(5000);
-      tlsSocket.on("timeout", () =>
-        tlsSocket.destroy(new Error("HTTP proxy TLS timeout"))
-      );
-      tlsSocket.on("error", reject);
-      resolve(tlsSocket);
-    };
-    tcp.on("data", onProxyData);
-  });
-}
-
-function connectSocks5Proxy(proxy, target) {
-  return new Promise((resolve, reject) => {
-    const proxyPort = Number(proxy.port) || 1080;
-    const user = decodeURIComponent(proxy.username || "");
-    const pass = decodeURIComponent(proxy.password || "");
-    const hasAuth = Boolean(user || pass);
-
-    const tcp = net.connect(proxyPort, proxy.hostname);
-    tcp.setTimeout(5000);
-    tcp.on("timeout", () => tcp.destroy(new Error("SOCKS5 proxy timeout")));
-    tcp.on("error", reject);
-
-    let step = 0;
-    let buf = Buffer.alloc(0);
-
-    const sendConnectRequest = () => {
-      const hostBuf = Buffer.from(target.hostname, "ascii");
-      const req = Buffer.alloc(7 + hostBuf.length);
-      req[0] = 0x05;
-      req[1] = 0x01;
-      req[2] = 0x00;
-      req[3] = 0x03;
-      req[4] = hostBuf.length;
-      hostBuf.copy(req, 5);
-      req.writeUInt16BE(443, 5 + hostBuf.length);
-      step = 2;
-      tcp.write(req);
-    };
-
-    tcp.on("connect", () => {
-      tcp.write(
-        hasAuth ? Buffer.from([0x05, 0x01, 0x02]) : Buffer.from([0x05, 0x01, 0x00])
-      );
-    });
-
-    const onData = (chunk) => {
-      buf = Buffer.concat([buf, chunk]);
-      if (step === 0 && buf.length >= 2) {
-        const method = buf[1];
-        buf = buf.subarray(2);
-        if (method === 0x00) {
-          sendConnectRequest();
-        } else if (method === 0x02 && hasAuth) {
-          const uBuf = Buffer.from(user, "utf8");
-          const pBuf = Buffer.from(pass, "utf8");
-          const authPacket = Buffer.concat([
-            Buffer.from([0x01, uBuf.length]),
-            uBuf,
-            Buffer.from([pBuf.length]),
-            pBuf,
-          ]);
-          step = 1;
-          tcp.write(authPacket);
-        } else {
-          tcp.destroy();
-          return reject(new Error("SOCKS5 auth rejected"));
-        }
-      } else if (step === 1 && buf.length >= 2) {
-        const status = buf[1];
-        buf = buf.subarray(2);
-        if (status !== 0x00) {
-          tcp.destroy();
-          return reject(new Error("SOCKS5 username/password invalid"));
-        }
-        sendConnectRequest();
-      } else if (step === 2 && buf.length >= 4) {
-        const rep = buf[1];
-        const atyp = buf[3];
-        let need = 4;
-        if (atyp === 0x01) need = 10;
-        else if (atyp === 0x03 && buf.length >= 5) need = 5 + buf[4] + 2;
-        else if (atyp === 0x04) need = 22;
-        if (buf.length < need) return;
-
-        tcp.removeListener("data", onData);
-        if (rep !== 0x00) {
-          tcp.destroy();
-          return reject(new Error("SOCKS5 connect error code: " + rep));
-        }
-        const tlsSocket = tls.connect({
-          socket: tcp,
-          servername: target.hostname,
-        });
-        tlsSocket.setTimeout(6000);
-        tlsSocket.on("timeout", () =>
-          tlsSocket.destroy(new Error("SOCKS5 TLS timeout"))
-        );
-        tlsSocket.on("error", reject);
-        resolve(tlsSocket);
-      }
-    };
-    tcp.on("data", onData);
-  });
-}
-
-let preferredProxyMode = "auto";
-
-async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
-  const target = new URL(targetUrl);
-  const proxyRaw = String(process.env.PROXY_URL || "").trim();
-
-  const sendHttpsRequest = (socket) =>
-    new Promise((resolve, reject) => {
+    const sendHttpsRequest = (socket) => {
       const req = https.request(
         {
           hostname: target.hostname,
@@ -1664,7 +1513,7 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
           path: target.pathname + target.search,
           method: "POST",
           ...(socket ? { socket, agent: false } : {}),
-          timeout: 8000,
+          timeout: 15000,
           headers: {
             "Content-Length": Buffer.byteLength(bodyString),
             Accept: "application/json,text/html,*/*",
@@ -1685,29 +1534,83 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
       req.on("error", reject);
       req.write(bodyString);
       req.end();
+    };
+
+    if (!proxyRaw) return sendHttpsRequest(null);
+
+    let proxy;
+    try {
+      const normalized = proxyRaw.includes("://")
+        ? proxyRaw
+        : "http://" + proxyRaw;
+      proxy = new URL(normalized);
+    } catch {
+      return reject(new Error("Invalid PROXY_URL format in Appwrite"));
+    }
+
+    const proxyPort = Number(proxy.port) || 80;
+    const auth =
+      proxy.username || proxy.password
+        ? "Proxy-Authorization: Basic " +
+          Buffer.from(
+            `${decodeURIComponent(proxy.username)}:${decodeURIComponent(
+              proxy.password
+            )}`
+          ).toString("base64") +
+          "\r\n"
+        : "";
+
+    const tcp = net.connect(proxyPort, proxy.hostname);
+    tcp.setTimeout(12000);
+    tcp.on("timeout", () => tcp.destroy(new Error("Static proxy TCP timeout")));
+    tcp.on("error", (err) =>
+      reject(new Error("Static proxy TCP error: " + err.message))
+    );
+
+    tcp.on("connect", () => {
+      tcp.write(
+        `CONNECT ${target.hostname}:443 HTTP/1.1\r\n` +
+          `Host: ${target.hostname}:443\r\n` +
+          auth +
+          `Proxy-Connection: keep-alive\r\n\r\n`
+      );
     });
 
-  if (!proxyRaw) return sendHttpsRequest(null);
+    let headerBuf = Buffer.alloc(0);
+    const onProxyData = (chunk) => {
+      headerBuf = Buffer.concat([headerBuf, chunk]);
+      const endIdx = headerBuf.indexOf("\r\n\r\n");
+      if (endIdx === -1) return;
 
-  const normalized = proxyRaw.includes("://") ? proxyRaw : "http://" + proxyRaw;
-  const proxy = new URL(normalized);
+      tcp.removeListener("data", onProxyData);
+      const headerStr = headerBuf.subarray(0, endIdx).toString("latin1");
+      const leftover = headerBuf.subarray(endIdx + 4);
+      const statusLine = headerStr.split("\r\n")[0];
 
-  if (proxy.protocol.startsWith("socks") || preferredProxyMode === "socks5") {
-    const sock = await connectSocks5Proxy(proxy, target);
-    return sendHttpsRequest(sock);
-  }
+      if (!/^HTTP\/1\.[01] 200\b/i.test(statusLine)) {
+        tcp.destroy();
+        return reject(new Error("Proxy CONNECT rejected: " + statusLine));
+      }
 
-  try {
-    const sock = await connectHttpProxy(proxy, target);
-    const res = await sendHttpsRequest(sock);
-    preferredProxyMode = "http";
-    return res;
-  } catch (err) {
-    const sock5 = await connectSocks5Proxy(proxy, target);
-    const res5 = await sendHttpsRequest(sock5);
-    preferredProxyMode = "socks5";
-    return res5;
-  }
+      if (leftover.length > 0) {
+        tcp.unshift(leftover);
+      }
+
+      const tlsSocket = tls.connect({
+        socket: tcp,
+        servername: target.hostname,
+      });
+      tlsSocket.setTimeout(12000);
+      tlsSocket.on("timeout", () =>
+        tlsSocket.destroy(new Error("Proxy TLS handshake timeout"))
+      );
+      tlsSocket.on("error", (err) =>
+        reject(new Error("Proxy TLS error: " + err.message))
+      );
+      sendHttpsRequest(tlsSocket);
+    };
+    tcp.on("data", onProxyData);
+  });
 }
 
 // ============================================================================
