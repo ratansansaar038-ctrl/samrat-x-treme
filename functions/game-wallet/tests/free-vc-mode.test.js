@@ -62,7 +62,17 @@ test("public pages have no paid checkout action but retain free VC redemption", 
   assert.match(home, /REQUEST FREE VC \/ REDEEM A FREE VOUCHER/);
   assert.match(draw, /api\('redeem_voucher'/);
   assert.match(draw, /REQUEST VC/);
-  assert.match(sw, /samrat-xtreme-v2-free-vc/);
+  assert.match(sw, /samrat-xtreme-v3-custom-vc/);
+  for (const id of ["vcRequestAmount", "stake"]) {
+    assert.match(draw, new RegExp(`<select id="${id}">[\\s\\S]*?<option value="100">100 VC`));
+  }
+  for (const id of ["vcRequestCustom", "stakeCustom"]) {
+    assert.match(draw, new RegExp(`id="${id}" type="number"`));
+  }
+  assert.match(draw, /<option value="500">500 VC<\/option>/);
+  assert.match(draw, /<option value="custom">Custom amount<\/option>/);
+  assert.match(draw, /stakeVC=readVCAmount\('stake','stakeCustom'\)/);
+  assert.match(draw, /amount=readVCAmount\('vcRequestAmount','vcRequestCustom'\)/);
 });
 
 test("live ticker no longer advertises paid Amazon vouchers", () => {
@@ -76,10 +86,21 @@ test("live ticker no longer advertises paid Amazon vouchers", () => {
 
 test("free VC request action reaches a validated handler in both functions", async () => {
   for (const handler of [gameWallet, legacyVcApproval]) {
-    const result = await invoke(handler, "request_vc", { amount: 1 });
-    assert.equal(result.code, 400);
-    assert.equal(result.body.ok, false);
-    assert.match(result.body.error, /Choose 20, 50, 100 or 200 VC/);
+    for (const amount of [0, -1, 1.5, 100001]) {
+      const result = await invoke(handler, "request_vc", { amount });
+      assert.equal(result.code, 400);
+      assert.equal(result.body.ok, false);
+      assert.match(result.body.error, /whole VC amount from 1 to 100000/);
+    }
+  }
+});
+
+test("both game backends validate custom draw stake limits", () => {
+  for (const path of ["../src/main.js", "../../vc-approval/src/main.js"]) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /Number\.isSafeInteger\(b\.stakeVC\)/);
+    assert.match(source, /b\.stakeVC > MAX_CUSTOM_VC/);
+    assert.match(source, /MAX_CUSTOM_VC = 100000/);
   }
 });
 
@@ -130,14 +151,14 @@ test("free VC request saves a pending row and notifies Telegram", async () => {
     return req;
   };
   try {
-    const result = await invoke(gameWallet, "request_vc", { amount: 20 });
+    const result = await invoke(gameWallet, "request_vc", { amount: 2500 });
     assert.equal(result.code, 200);
     assert.equal(result.body.ok, true);
     assert.equal(result.body.status, "pending");
     assert.equal(result.body.telegramNotified, true);
     const row = calls.find((call) => call.method === "POST" && call.path.includes("/vc_requests/"));
     assert.equal(row.payload.data.status, "pending");
-    assert.equal(row.payload.data.amount, 20);
+    assert.equal(row.payload.data.amount, 2500);
     assert.ok(calls.some((call) => call.path.includes("api.telegram.org") && call.payload.text.includes("NEW VC REQUEST")));
   } finally {
     https.request = originalRequest;

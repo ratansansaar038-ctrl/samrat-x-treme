@@ -14,6 +14,7 @@ const PROJECT = "6a7f2add0011a7bfc21a";
 const DB = "6a7f2d1d0035d9815939";
 const ROUND_MS = 1200000,
   OFFSET = 19800000;
+const MAX_CUSTOM_VC = 100000;
 
 const send = (res, code, obj) => res.json(obj, code);
 const eq = (attribute, value) => ({
@@ -728,7 +729,9 @@ async function placeEntry(user, b, key) {
     !Number.isInteger(b.number) ||
     b.number < 0 ||
     b.number > 99 ||
-    ![20, 50, 100].includes(b.stakeVC)
+    !Number.isSafeInteger(b.stakeVC) ||
+    b.stakeVC < 1 ||
+    b.stakeVC > MAX_CUSTOM_VC
   )
     return { ok: false, error: "Invalid number or VC amount" };
 
@@ -741,7 +744,7 @@ async function placeEntry(user, b, key) {
     return {
       ok: false,
       error:
-        "Not enough verified VC. Amazon ₹10 VC are visible but locked until admin verifies the PIN.",
+        "Not enough available VC in your wallet for this entry.",
     };
 
   const id =
@@ -1505,8 +1508,8 @@ async function handleTelegramWebhook(cb, key) {
 
 async function requestVC(user, b, key) {
   const amount = Number(b.amount);
-  if (![20, 50, 100, 200].includes(amount))
-    return { ok: false, error: "Choose 20, 50, 100 or 200 VC" };
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > MAX_CUSTOM_VC)
+    return { ok: false, error: "Choose a whole VC amount from 1 to 100000" };
 
   const table = vcRequestTable();
   const player = await profile(user, key);
