@@ -42,6 +42,11 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <a class="action" href="player-profile.html"><em>⚡</em> Leaderboards <span>Speed Tap and Memory X</span></a>
 </div><p class="hint">Number Challenge VC requests are saved in Appwrite and reported to Telegram. Review and approve/reject in VC Requests; approved VC is credited once.</p>
 </section>
+<section class="panel"><h2>Payment gateway connection check</h2>
+<p class="hint">Admin-only read-only test: checks the Appwrite proxy's outgoing IP against the InstentPayment whitelist, then checks token authentication only if the IP matches. No payment, payout, or wallet update is created. PaisaPay credentials are checked for presence only.</p>
+<button type="button" class="primary" id="runGatewayCheck">Run connection check</button>
+<p id="gatewayCheckStatus" class="hint" style="white-space:pre-wrap" role="status" aria-live="polite">Not checked yet.</p>
+</section>
 <div class="section-grid">
 <section class="panel"><h2>Players & wallets</h2><p class="hint">Recently registered players, up to 40. Search an exact Player User ID to find others.</p>
 <form id="searchForm" class="toolbar"><input id="playerId" maxlength="36" placeholder="Search exact Player User ID" aria-label="Player User ID"><button type="submit">Find</button><button type="button" id="clearSearch">Clear</button></form>
@@ -138,6 +143,24 @@ async function refresh(){if(!verified)return;el('refresh').disabled=true;message
  else {el('winReportStatus').textContent='No completed draw available yet.';el('winReportMetrics').replaceChildren();el('winReportPlayers').replaceChildren();}const partial=d.warnings?.length?' Some sections unavailable: '+d.warnings.join(', '):'';message('Dashboard updated. '+date(new Date().toISOString())+partial);}
  catch(e){message('Dashboard unavailable: '+e.message,true);}finally{el('refresh').disabled=false;}}
 el('refresh').addEventListener('click',refresh);
+el('runGatewayCheck').addEventListener('click',async()=>{
+ if(!verified)return;
+ const button=el('runGatewayCheck');button.disabled=true;
+ text('gatewayCheckStatus','Checking outbound IP and token authentication…');
+ try{
+   const d=await api('admin_gateway_diagnostics');
+   const lines=[
+     'Proxy IP check: '+d.proxyCheck,
+     'Appwrite outgoing IP: '+(d.outboundIp||'Not verified'),
+     'Whitelisted IP: '+d.whitelistIp,
+     'IP match: '+(d.whitelistMatch?'YES':'NO / NOT VERIFIED'),
+     'InstentPayment token authentication: '+d.instentToken,
+     'PaisaPay keys: '+d.paisapayConfig+' (no live API call)',
+   ];
+   text('gatewayCheckStatus',lines.join('\n'));
+ }catch(e){text('gatewayCheckStatus','Test unavailable: '+e.message);}
+ finally{button.disabled=false;}
+});
 el('searchForm').addEventListener('submit',async e=>{e.preventDefault();if(!verified)return;const userId=el('playerId').value.trim();if(!/^[a-zA-Z0-9._-]{1,36}$/.test(userId)){text('searchStatus','Enter a valid exact Player ID.');return;}
  text('searchStatus','Looking up player…');try{const d=await api('admin_find_player',{userId});renderPlayers(d.players);text('searchStatus',d.players?.length?'Player found. Clear to restore recent list.':'No matching player.');}catch(err){text('searchStatus','Lookup failed: '+err.message);}});
 el('clearSearch').addEventListener('click',()=>{el('playerId').value='';text('searchStatus','');refresh();});

@@ -1,6 +1,6 @@
 # Samrat X-Treme: dual payment gateway handover
 
-**Status:** Code prepared and local tests passed. **Do not enable real-money processing until the merchant providers approve the exact business model and its legal compliance has been checked.** No real transaction has been verified.
+**Status:** Code prepared and local tests passed. Neither gateway has been proven end-to-end with a real transaction. Keep real-money processing disabled until the following checks pass and the merchant's live configuration is confirmed.
 
 The existing `functions/game-wallet/src/main.js` already contains InstentPayment as primary and PaisaPay as secondary. The frontend uses `auto_create_order` and `auto_create_payout`. This change hardens those paths; it does not replace the existing wallet or Number Draw system.
 
@@ -26,12 +26,18 @@ In the **game-wallet Function → Settings → Environment variables**, configur
 
 ## Test checklist
 
-1. Confirm that the two merchant API endpoints are genuine and that proxy requests originate from the allowlisted IP.
-2. Start a **sandbox** deposit through InstentPayment; check that wallet credit occurs only after server-side verification of status, order, and amount.
-3. Confirm PaisaPay sandbox fallback works only for an eligible failed deposit, and the same callback twice does not credit VC twice.
-4. Confirm any missing/wrong payment amount causes **zero** wallet credit.
-5. Confirm a timed-out payout is held in a `*_payout_review` state, with **no** automatic refund or attempt at another gateway until the provider confirms the outcome.
-6. Reconcile pending/review payouts manually before authorising another attempt. PaisaPay payout completion reconciliation requires provider-specific API documentation before live activation.
+1. Before any test, rotate any proxy credentials previously exposed in screenshots and update `PROXY_URL` in Appwrite without sharing its value.
+2. In the admin dashboard, select **Run connection check**. This read-only action:
+   - Makes a `GET https://api.ipify.org?format=json` through the authenticated proxy, without transmitting merchant keys to that service.
+   - Compares the proxy's outbound IPv4 with `185.155.223.55`, the IP shown on the InstentPayment whitelist screenshot. If the provider changes the whitelist, update `INSTENT_WHITELIST_IP` in the function source before using this check.
+   - Attempts InstentPayment token authentication **only after** the outbound IP matches. The token and credentials never appear in the dashboard response.
+   - Reports whether PaisaPay credentials are configured, but does **not** authenticate to PaisaPay because a confirmed read-only endpoint is not available.
+3. Confirm that the two merchant API endpoints are genuine and that proxy requests originate from the allowlisted IP.
+4. Start a **sandbox** deposit through InstentPayment; check that wallet credit occurs only after server-side verification of status, order, and amount.
+5. Confirm PaisaPay sandbox fallback works only for an eligible failed deposit, and the same callback twice does not credit VC twice.
+6. Confirm any missing/wrong payment amount causes **zero** wallet credit.
+7. Confirm a timed-out payout is held in a `*_payout_review` state, with **no** automatic refund or attempt at another gateway until the provider confirms the outcome.
+8. Reconcile pending/review payouts manually before authorising another attempt. PaisaPay payout completion reconciliation requires provider-specific API documentation before live activation.
 
 ## Important limitations
 

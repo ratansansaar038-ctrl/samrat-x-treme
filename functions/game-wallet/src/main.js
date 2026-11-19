@@ -1501,7 +1501,7 @@ async function handleTelegramWebhook(cb, key) {
 // OUTBOUND STATIC IP PROXY HELPER (PURE BUILT-IN NODE MODULES)
 // ============================================================================
 
-function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
+function httpProxyTunnelRequest(proxy, target, method, bodyString, headersObj) {
   return new Promise((resolve, reject) => {
     const proxyPort = Number(proxy.port) || 80;
     const authHeader =
@@ -1548,11 +1548,13 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
             hostname: target.hostname,
             port: 443,
             path: target.pathname + target.search,
-            method: "POST",
+            method,
             agent,
             timeout: 15000,
             headers: {
-              "Content-Length": Buffer.byteLength(bodyString),
+              ...(method === "POST"
+                ? { "Content-Length": Buffer.byteLength(bodyString) }
+                : {}),
               Accept: "application/json,text/html,*/*",
               ...headersObj,
             },
@@ -1569,7 +1571,7 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
         req.on("timeout", () => req.destroy(new Error("Gateway API timeout")));
         req.on("error", reject);
         req.on("close", () => agent.destroy());
-        req.write(bodyString);
+        if (method === "POST") req.write(bodyString);
         req.end();
       });
 
@@ -1589,7 +1591,7 @@ function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
   });
 }
 
-async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
+async function requestViaStaticProxy(targetUrl, method, bodyString, headersObj) {
   const target = new URL(targetUrl);
   const proxyRaw = String(process.env.PROXY_URL || "").trim();
   if (!proxyRaw) throw new Error("PROXY_URL is required for payment API calls");
@@ -1600,10 +1602,18 @@ async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   if (proxy.protocol !== "http:")
     throw new Error("The configured gateway proxy must support HTTP CONNECT");
   // Never bypass the allowlisted source IP when the proxy fails.
-  return httpProxyTunnelPost(proxy, target, bodyString, headersObj);
+  return httpProxyTunnelRequest(proxy, target, method, bodyString, headersObj);
 }
 
-export { postViaStaticProxy };
+async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
+  return requestViaStaticProxy(targetUrl, "POST", bodyString, headersObj);
+}
+
+async function getViaStaticProxy(targetUrl) {
+  return requestViaStaticProxy(targetUrl, "GET", "", {});
+}
+
+export { postViaStaticProxy, getViaStaticProxy };
 
 // ============================================================================
 // GATEWAY 1: INSTENTPAYMENT (JSON V1)
@@ -1643,6 +1653,75 @@ async function instentGetToken() {
     );
   }
   return token;
+}
+
+// Admin-only, read-only gateway diagnostics. No order, payout, wallet write,
+// callback, or provider token is returned to the browser.
+// Match this address to the IP configured in the merchant's whitelist.
+const INSTENT_WHITELIST_IP = "185.155.223.55";
+
+async function adminGatewayDiagnostics(user) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: "Admin access denied" };
+
+  const result = {
+    ok: true,
+    mode: "read_only",
+    whitelistIp: INSTENT_WHITELIST_IP,
+    outboundIp: null,
+    proxyCheck: "not_run",
+    whitelistMatch: false,
+    instentToken: "skipped",
+    paisapayConfig:
+      process.env.PAISAPAY_TOKEN && process.env.PAISAPAY_SECRET_KEY
+        ? "present_not_authenticated"
+        : "missing",
+  };
+
+  if (!String(process.env.PROXY_URL || "").trim()) {
+    result.proxyCheck = "proxy_not_configured";
+    return result;
+  }
+
+  try {
+    // This request carries no merchant keys and uses the same CONNECT tunnel
+    // and certificate verification as the payment gateway requests.
+    const response = await getViaStaticProxy("https://api.ipify.org?format=json");
+    if (response.statusCode !== 200) {
+      result.proxyCheck = "ip_echo_http_error";
+      return result;
+    }
+    const ip = JSON.parse(response.raw)?.ip;
+    if (typeof ip !== "string" || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(ip)) {
+      result.proxyCheck = "invalid_ip_echo_response";
+      return result;
+    }
+    result.outboundIp = ip;
+    result.proxyCheck = "success";
+    result.whitelistMatch = ip === INSTENT_WHITELIST_IP;
+    // Do not send merchant credentials if the outbound IP is not whitelisted.
+    if (!result.whitelistMatch) return result;
+  } catch {
+    result.proxyCheck = "proxy_or_ip_echo_unreachable";
+    return result;
+  }
+
+  if (
+    !process.env.INSTENT_MERCHANT_ID ||
+    !process.env.INSTENT_MERCHANT_EMAIL ||
+    !process.env.INSTENT_API_SECRET
+  ) {
+    result.instentToken = "credentials_missing";
+    return result;
+  }
+  try {
+    await instentGetToken();
+    result.instentToken = "success";
+  } catch {
+    // Never return provider payloads, tokens, secrets, or proxy credentials.
+    result.instentToken = "authentication_or_network_failed";
+  }
+  return result;
 }
 
 async function instentCreateOrder(user, b, key) {
@@ -2988,6 +3067,7 @@ export default async ({ req, res, error }) => {
       "redeem_voucher",
       "generate_vouchers",
       "admin_dashboard",
+      "admin_gateway_diagnostics",
       "admin_round_report",
       "admin_find_player",
       "unused_vouchers",
@@ -3188,6 +3268,10 @@ export default async ({ req, res, error }) => {
 
     if (action === "admin_dashboard") {
       const d = await adminDashboard(user, key);
+      return send(res, d.ok ? 200 : 403, d);
+    }
+    if (action === "admin_gateway_diagnostics") {
+      const d = await adminGatewayDiagnostics(user);
       return send(res, d.ok ? 200 : 403, d);
     }
     if (action === "admin_round_report") {
