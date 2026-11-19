@@ -1,4 +1,5 @@
-const CACHE_NAME = "samrat-xtreme-v1";
+// New cache discards offline copies that still show the removed paid checkout.
+const CACHE_NAME = "samrat-xtreme-v2-free-vc";
 const APP_SHELL = [
   "./",
   "./index.html",

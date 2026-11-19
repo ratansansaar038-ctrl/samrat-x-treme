@@ -249,9 +249,9 @@
 <!-- 🔴 LIVE SCROLLING PATTI -->
 <div class="ticker-wrap">
   <div class="ticker-move" id="liveTicker">
-    <span class="ticker-item"><span class="ticker-dot">●</span>💳 Instant UPI Deposit (Min ₹100) & Auto Bank Payout now LIVE!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>🪙 FREE Virtual Coins • No deposits, purchases or cash withdrawals!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>🎯 Lucky Number Live Draw: every 20 minutes, 9 AM–10 PM IST — Win up to 50× VC!</span>
-    <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Request free VC or redeem an admin-issued free voucher!</span>
     <span class="ticker-item"><span class="ticker-dot">●</span>📢 Join @samratxtremegame on Telegram for live draw results & updates!</span>
   </div>
 </div>
@@ -262,7 +262,7 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • INSTANT WALLET
+      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • FREE VIRTUAL COINS
     </p>
     <a class="btn tg-btn" href="https://t.me/samratxtremegame" target="_blank" style="max-width:290px; margin:10px auto 0; padding:11px 16px;">
       📢 JOIN OFFICIAL TELEGRAM CHANNEL
@@ -313,76 +313,11 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
-  <!-- 💳 INSTANT DEPOSIT & AUTO WITHDRAWAL (SMART BACKEND ROUTING) -->
-  <section class="panel" id="instantWalletPanel" style="text-align:center; border: 1px solid #5cff9d;">
-    <h3 style="color:#89ffb4; margin-bottom:4px;">⚡ INSTANT DEPOSIT & WITHDRAWAL</h3>
-    <p class="small" style="margin-top:0;">
-      24×7 Automated UPI Pay-In & Instant Bank Payout (<strong>₹1 = 10 VC</strong>)
-    </p>
-
-    <div class="tab-bar">
-      <button type="button" class="tab-btn active" id="tabDepositBtn">💳 ADD VC (UPI)</button>
-      <button type="button" class="tab-btn" id="tabWithdrawBtn">🏦 WITHDRAW (BANK)</button>
-    </div>
-
-    <!-- DEPOSIT TAB -->
-    <div id="depositTabBox">
-      <div class="guide-box">
-        • Minimum Deposit: <strong>₹100 = 1,000 VC</strong> (Max ₹50,000)<br>
-        • Payment complete hote hi Virtual Coins <strong>automatically</strong> wallet mein credit ho jayenge.
-      </div>
-      <input id="ppDepositAmount" type="number" min="100" max="50000" step="1" value="100" placeholder="Enter Amount in INR (Min ₹100)">
-      <input id="ppDepositMobile" type="tel" maxlength="10" placeholder="10-Digit Mobile Number (e.g. 9876543210)">
-      <div class="small" id="ppDepositPreview" style="color:#89ffb4; font-weight:700;">You will receive: 1,000 VC</div>
-      <button class="btn green-btn" id="ppDepositBtn">PAY NOW & GET INSTANT VC →</button>
-      <div class="status" id="ppDepositMsg"></div>
-    </div>
-
-    <!-- WITHDRAW TAB -->
-    <div id="withdrawTabBox" class="hide">
-      <div class="guide-box">
-        • Minimum Withdrawal: <strong>₹2,000 (20,000 VC)</strong> · Rate: 10 VC = ₹1<br>
-        • Amount seedha aapke bank account mein IMPS/NEFT ke zariye transfer hoga.
-      </div>
-      <input id="ppWithdrawAmount" type="number" min="2000" max="50000" step="1" placeholder="Withdrawal Amount in INR (Min ₹2000)">
-      <input id="ppAccountNumber" type="text" inputmode="numeric" maxlength="18" placeholder="Bank Account Number">
-      <input id="ppIfscCode" type="text" maxlength="11" placeholder="IFSC Code (e.g. SBIN0001234)" style="text-transform:uppercase;">
-      <input id="ppHolderName" type="text" maxlength="80" placeholder="Account Holder Name">
-      <input id="ppBankName" type="text" maxlength="80" placeholder="Bank Name (e.g. State Bank of India)">
-      <input id="ppWithdrawMobile" type="tel" maxlength="10" placeholder="10-Digit Mobile Number">
-      <div class="small" id="ppWithdrawPreview" style="color:#ffe080; font-weight:700;">VC to deduct: 20,000 VC</div>
-      <button class="btn" id="ppWithdrawBtn">INSTANT BANK WITHDRAWAL →</button>
-      <div class="status" id="ppWithdrawMsg"></div>
-    </div>
-  </section>
-
-  <!-- 🪙 VIRTUAL COINS STORE (AMAZON PAY E-VOUCHER) -->
-  <section class="panel" style="text-align:center; border: 1px solid #ffd15c;">
-    <h3 style="color:#ffe080; margin-bottom:4px;">🪙 AMAZON PAY E-VOUCHER</h3>
-    <p class="small" style="margin-top:0;">
-      Start Small from ₹10 via <strong>Amazon Pay E-Voucher</strong>
-    </p>
-
-    <div class="guide-box">
-      <strong style="color:#ffe080;">How to get Voucher PIN (10 Sec):</strong><br>
-      1. Open <b>PhonePe, Paytm, or GPay</b> → Search <b>Amazon Pay E-Voucher</b>.<br>
-      2. Buy voucher of your chosen amount.<br>
-      3. Copy the <b>14-Character PIN</b> (e.g. <code>C6MR-R4XFRA-DMPF</code>) and submit below.
-    </div>
-
-    <select id="voucherSlab">
-      <option value="10|100">₹10 Voucher = 100 VC</option>
-      <option value="50|500" selected>₹50 Voucher = 500 VC</option>
-      <option value="100|1000">₹100 Voucher = 1,000 VC</option>
-      <option value="200|2000">₹200 Voucher = 2,000 VC</option>
-      <option value="500|5000">₹500 Voucher = 5,000 VC</option>
-    </select>
-
-    <input id="voucherCode" maxlength="18" placeholder="Enter 14-Char PIN (XXXX-XXXXXX-XXXX)" style="text-align:center; text-transform:uppercase; letter-spacing:1px;">
-    <p class="small" style="color:#ffe080;border:1px solid #80619e;border-radius:10px;padding:9px;margin:10px 0;">10 PM ke baad submit kiye gaye Amazon Gift Cards subah 9:00 AM ke draw se pehle approve ho jayenge.</p>
-    <p class="small" style="margin:4px 0 10px">*₹10 pack: 100 VC instantly shown in wallet but locked until PIN verification. ₹50+ packs: no instant credit. No Amazon code is confirmed valid by its format alone.</p>
-    <button class="btn" id="redeemBtn" style="margin-top:8px;">SUBMIT VOUCHER PIN</button>
-    <div class="status" id="voucherMsg"></div>
+  <section class="panel" id="freeVcPanel" style="text-align:center; border: 1px solid #5cff9d;">
+    <h3 style="color:#89ffb4; margin-bottom:4px;">🪙 FREE VIRTUAL COINS</h3>
+    <p class="small">Play with free VC. Coins are for in-game entertainment only and have no cash value.</p>
+    <p class="small">No UPI deposits, paid gift cards, bank withdrawals or cash rewards.</p>
+    <a class="btn green-btn" href="number-draw.html">REQUEST FREE VC / REDEEM A FREE VOUCHER →</a>
   </section>
 
   <section class="skill-grid">
@@ -595,180 +530,6 @@ $('logout').onclick = async () => {
     await refreshUser();
   } catch (error) {
     msg('signedMsg', error.message);
-  }
-};
-
-$('tabDepositBtn').onclick = () => {
-  $('tabDepositBtn').classList.add('active');
-  $('tabWithdrawBtn').classList.remove('active');
-  $('depositTabBox').classList.remove('hide');
-  $('withdrawTabBox').classList.add('hide');
-};
-
-$('tabWithdrawBtn').onclick = () => {
-  $('tabWithdrawBtn').classList.add('active');
-  $('tabDepositBtn').classList.remove('active');
-  $('withdrawTabBox').classList.remove('hide');
-  $('depositTabBox').classList.add('hide');
-};
-
-$('ppDepositAmount').oninput = () => {
-  const amt = Math.max(0, Math.floor(Number($('ppDepositAmount').value) || 0));
-  $('ppDepositPreview').textContent = `You will receive: ${(amt * 10).toLocaleString()} VC`;
-};
-
-$('ppWithdrawAmount').oninput = () => {
-  const amt = Math.max(0, Math.floor(Number($('ppWithdrawAmount').value) || 0));
-  $('ppWithdrawPreview').textContent = `VC to deduct: ${(amt * 10).toLocaleString()} VC`;
-};
-
-// 💳 Automatic Backend Gateway Pay-In
-$('ppDepositBtn').onclick = async () => {
-  if (!currentUser) {
-    msg('ppDepositMsg', '⚠️ Please Login or Sign Up first to add Virtual Coins.');
-    $('authPanel').scrollIntoView({ behavior: 'smooth' });
-    return;
-  }
-
-  const amount = Number($('ppDepositAmount').value);
-  const mobile = $('ppDepositMobile').value.replace(/\D/g, '');
-
-  if (!Number.isFinite(amount) || amount < 100 || amount > 50000) {
-    msg('ppDepositMsg', 'Minimum deposit amount is ₹100 (Max ₹50,000).');
-    return;
-  }
-  if (!/^[6-9]\d{9}$/.test(mobile)) {
-    msg('ppDepositMsg', 'Enter a valid 10-digit Indian mobile number.');
-    return;
-  }
-
-  $('ppDepositBtn').disabled = true;
-  msg('ppDepositMsg', 'Creating secure payment session...');
-
-  try {
-    const res = await api('auto_create_order', { amount, mobile });
-    if (res.gateway === 'instentpayment') {
-      msg('ppDepositMsg', 'Redirecting to UPI payment...');
-      window.location.href = res.paymentUrl;
-    } else {
-      msg('ppDepositMsg', 'Redirecting to checkout...');
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = res.checkoutUrl;
-
-      for (const [k, v] of Object.entries(res.formFields || {})) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = k;
-        input.value = String(v);
-        form.appendChild(input);
-      }
-
-      document.body.appendChild(form);
-      form.submit();
-    }
-  } catch (err) {
-    msg('ppDepositMsg', err.message || 'Could not start payment.');
-    $('ppDepositBtn').disabled = false;
-  }
-};
-
-// 🏦 Automatic Backend Gateway Bank Payout
-$('ppWithdrawBtn').onclick = async () => {
-  if (!currentUser) {
-    msg('ppWithdrawMsg', '⚠️ Please Login or Sign Up first to withdraw.');
-    $('authPanel').scrollIntoView({ behavior: 'smooth' });
-    return;
-  }
-
-  const amount = Number($('ppWithdrawAmount').value);
-  const account_number = $('ppAccountNumber').value.replace(/\s+/g, '');
-  const ifsc_code = $('ppIfscCode').value.trim().toUpperCase();
-  const holder_name = $('ppHolderName').value.trim();
-  const bank_name = $('ppBankName').value.trim();
-  const mobile = $('ppWithdrawMobile').value.replace(/\D/g, '');
-
-  if (!Number.isFinite(amount) || amount < 2000 || amount > 50000) {
-    msg('ppWithdrawMsg', 'Minimum withdrawal amount is ₹2,000 (20,000 VC).');
-    return;
-  }
-  if (!/^\d{9,18}$/.test(account_number)) {
-    msg('ppWithdrawMsg', 'Enter a valid bank account number (9–18 digits).');
-    return;
-  }
-  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc_code)) {
-    msg('ppWithdrawMsg', 'Enter a valid 11-character IFSC code.');
-    return;
-  }
-  if (holder_name.length < 2 || bank_name.length < 2) {
-    msg('ppWithdrawMsg', 'Enter account holder name and bank name.');
-    return;
-  }
-  if (!/^[6-9]\d{9}$/.test(mobile)) {
-    msg('ppWithdrawMsg', 'Enter a valid 10-digit mobile number.');
-    return;
-  }
-
-  $('ppWithdrawBtn').disabled = true;
-  msg('ppWithdrawMsg', 'Processing instant bank payout...');
-
-  try {
-    const res = await api('auto_create_payout', {
-      amount,
-      account_number,
-      ifsc_code,
-      holder_name,
-      bank_name,
-      mobile
-    });
-    msg(
-      'ppWithdrawMsg',
-      `✅ Payout Initiated! Order ID: ${res.orderId} · Status: ${res.status} (₹${res.amountInr})`
-    );
-    $('ppWithdrawAmount').value = '';
-    await refreshWalletSummary();
-  } catch (err) {
-    msg('ppWithdrawMsg', err.message || 'Withdrawal failed.');
-  } finally {
-    $('ppWithdrawBtn').disabled = false;
-  }
-};
-
-// Amazon Pay Gift Card PIN Handler
-$('redeemBtn').onclick = async () => {
-  if (!currentUser) {
-    msg('voucherMsg', '⚠️ Please Login or Sign Up first before submitting a voucher PIN.');
-    $('authPanel').scrollIntoView({ behavior: 'smooth' });
-    return;
-  }
-
-  const rawPin = $('voucherCode').value.trim().toUpperCase();
-  const cleanPin = rawPin.replace(/[^A-Z0-9]/g, '');
-  const [amount, coins] = $('voucherSlab').value.split('|').map(Number);
-
-  if (cleanPin.length !== 14) {
-    msg('voucherMsg', 'Please enter a valid 14-character PIN (not the 16-digit card number).');
-    return;
-  }
-
-  $('redeemBtn').disabled = true;
-  msg('voucherMsg', 'Submitting voucher PIN for verification...');
-
-  try {
-    const result = await api('submit_gift_card', {
-      code: cleanPin,
-      amount: amount,
-      coins: coins
-    });
-    msg('voucherMsg', result.instantCredited
-      ? '✅ 100 VC wallet mein turant add hue, lekin admin verification tak locked rahenge. Koi withdrawal ya game entry mein ye 100 VC use nahin honge.'
-      : '₹50+ packs subah 9:00 AM se pehle verify hokar wallet mein add honge' +
-        (result.telegramNotified ? ' · Admin alerted on Telegram.' : ' · Admin notification not confirmed.'));
-    $('voucherCode').value = '';
-  } catch (err) {
-    msg('voucherMsg', err.message || 'Error submitting voucher PIN.');
-  } finally {
-    $('redeemBtn').disabled = false;
   }
 };
 
