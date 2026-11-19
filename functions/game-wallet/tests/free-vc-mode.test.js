@@ -62,3 +62,12 @@ test("public pages have no paid checkout action but retain free VC redemption", 
   assert.match(draw, /REQUEST VC/);
   assert.match(sw, /samrat-xtreme-v2-free-vc/);
 });
+
+test("live ticker no longer advertises paid Amazon vouchers", () => {
+  const walletSource = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
+  const approvalSource = readFileSync(new URL("../../vc-approval/src/main.js", import.meta.url), "utf8");
+  for (const source of [walletSource, approvalSource]) {
+    assert.doesNotMatch(source, /items\.push\("🎁 Start with ₹10 Amazon Pay E-Voucher/);
+    assert.match(source, /items\.push\("🎁 Request free VC or redeem an admin-issued free voucher!/);
+  }
+});
