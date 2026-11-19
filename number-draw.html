@@ -56,11 +56,7 @@
     </div>
   </form>
   <div id="voucherRedeemMessage" class="status" role="status" aria-live="polite"></div>
-  <p class="small">Need Coins?
-    <a href="#" id="buyArcadeVoucher" style="color:#86efac;text-decoration:underline">
-      Buy Arcade Voucher (Instant Delivery)
-    </a>
-  </p>
+  <p class="small">These free vouchers are issued by the game admin. You can request free VC below.</p>
   <p class="small">Coins are strictly virtual tokens with no cash value.
     Non-withdrawable and for in-game entertainment only.</p>
 </section>
@@ -323,10 +319,5 @@ $('voucherRedeemForm').addEventListener('submit', async event => {
   } finally {
     button.disabled = false;
   }
-});
-$('buyArcadeVoucher').addEventListener('click', event => {
-  event.preventDefault();
-  msg('voucherRedeemMessage',
-      'Voucher store link will be added after checkout setup.');
 });
 $('grant').onclick=async()=>{const btn=$('grant');btn.disabled=true;try{const x=await api('grant_coins',{targetUserId:$('targetUser').value.trim(),amount:Number($('coinAmount').value)});msg('adminMsg',`${x.amount} VC added to ${x.targetUserId}`);await refreshWallet()}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}};(async()=>{await Promise.all([refreshRound(),refreshResult(),loadUser(),refreshDrawTrends()]);setInterval(updateCountdown,1000);setInterval(async()=>{await refreshRound();await refreshResult();if(user)await Promise.all([refreshWallet(),refreshEntry(),drawRefreshLoyalty()])},30000)})();</script></body></html>

@@ -2694,6 +2694,17 @@ export default async ({ req, res, error }) => {
   const action = b.action;
   const user = req.headers["x-appwrite-user-id"];
 
+  // The legacy function may still be invoked by cached clients. Only free
+  // VC operations are open; preserve earlier payment callbacks for settlement.
+  if (
+    ["paisapay_create_order", "paisapay_create_payout", "submit_gift_card"].includes(action)
+  ) {
+    return send(res, 410, {
+      ok: false,
+      error: "Paid deposits, gift card submissions and cash withdrawals are disabled. VC is free and has no cash value.",
+    });
+  }
+
   if (
     ![
       "get_wallet",

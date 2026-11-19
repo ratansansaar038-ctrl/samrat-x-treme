@@ -2964,6 +2964,27 @@ export default async ({ req, res, error }) => {
   const action = b.action;
   const user = req.headers["x-appwrite-user-id"];
 
+  // Free-VC-only mode: block all new financial operations at the server,
+  // including callers running an old cached version of the website.
+  // Existing gateway callbacks remain available for reconciling payments
+  // initiated before this change; do not delete historical transactions.
+  if (
+    [
+      "auto_create_order",
+      "auto_create_payout",
+      "instent_create_order",
+      "instent_create_payout",
+      "paisapay_create_order",
+      "paisapay_create_payout",
+      "submit_gift_card",
+    ].includes(action)
+  ) {
+    return send(res, 410, {
+      ok: false,
+      error: "Paid deposits, gift card submissions and cash withdrawals are disabled. VC is free and has no cash value.",
+    });
+  }
+
   if (
     ![
       "get_wallet",

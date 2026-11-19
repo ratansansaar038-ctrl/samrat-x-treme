@@ -51,7 +51,7 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <section class="panel"><h2>Recent Number Draws</h2><p class="hint">Latest 8 recorded rounds. The result comes from stored game data.</p><div id="rounds"></div></section>
 <section class="panel" id="winReportPanel">
 <!-- SAMRAT_ADMIN_NEAR_MISS_V1 --><h2>🎯 Winning Number Report</h2>
-<p class="hint">Draw complete होने के बाद Winning Players, VC और Wallet Payout देखें। Recent Number Draws से कोई Round चुनें।</p>
+<p class="hint">Draw complete होने के बाद Winning Players और उनके Virtual Coin Rewards देखें। Recent Number Draws से कोई Round चुनें।</p>
 <p class="hint" id="winReportStatus" role="status">Loading last winning draw…</p>
 <div id="winReportMetrics" class="metrics"></div>
 <div id="winReportPlayers"></div>
@@ -107,14 +107,14 @@ async function loadWinningReport(roundId){
    for(const [label,value] of [
      ['Winning Number',fmt2(d.winningNumber)],['Winning Players',d.winningPlayers],
      ['Winning Entries',d.winningEntries],['VC on Winning Number',d.winningStakedVC+' VC'],
-     ['Expected Payout',d.expectedPayoutVC+' VC'],['Credited Payout',d.creditedPayoutVC+' VC'],
-     ['Near-Miss Bonus Paid',String(d.nearMissPayoutVC??0)+' VC'],
-     ['Awaiting / Check Payout',d.unpaidPayoutVC+' VC'],['Pending Entries (all numbers)',d.pendingEntries],
+     ['Expected VC Reward',d.expectedPayoutVC+' VC'],['Credited VC Reward',d.creditedPayoutVC+' VC'],
+     ['Near-Miss Bonus VC',String(d.nearMissPayoutVC??0)+' VC'],
+     ['Pending / Check VC Reward',d.unpaidPayoutVC+' VC'],['Pending Entries (all numbers)',d.pendingEntries],
      ['Total Players',d.totalPlayers],['Total VC Staked',d.totalStakedVC+' VC']
    ]){
      const card=node('div',null,'metric');card.append(node('small',label),node('strong',String(value)));metrics.append(card);
    }
-   players.append(node('h3','Winning players & payout'));
+   players.append(node('h3','Winning players & VC rewards'));
    if(!d.players?.length)players.append(node('p',d.totalEntries===0?'इस Round में कोई Entry नहीं लगी।':'इस Round में किसी ने Winning Number नहीं चुना।','blank'));
    for(const p of d.players||[]){
      const remaining=p.expectedPayoutVC-p.creditedPayoutVC;
