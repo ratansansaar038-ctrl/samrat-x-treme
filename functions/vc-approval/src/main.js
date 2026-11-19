@@ -2893,6 +2893,11 @@ export default async ({ req, res, error }) => {
       return send(res, x.ok ? 200 : 400, x);
     }
 
+    if (action === "request_vc") {
+      const x = await requestVC(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
     if (action === "admin_list_vc_requests") {
       const x = await adminListVCRequests(user, key);
       return send(res, x.ok ? 200 : 403, x);
