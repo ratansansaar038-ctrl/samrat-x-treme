@@ -1,6 +1,5 @@
 import https from "node:https";
-import net from "node:net";
-import tls from "node:tls";
+import { ProxyAgent } from "undici";
 import {
   randomInt,
   createHash,
@@ -1497,120 +1496,39 @@ async function handleTelegramWebhook(cb, key) {
 }
 
 // ============================================================================
-// OUTBOUND STATIC IP HTTP PROXY HELPER (http://u366_de5d4c96:...@185.155.223.55:10366)
+// OUTBOUND STATIC IP PROXY HELPER (UNDICI BUILT-IN PROXY AGENT)
 // ============================================================================
 
-function postViaStaticProxy(targetUrl, bodyString, headersObj) {
-  return new Promise((resolve, reject) => {
-    const target = new URL(targetUrl);
-    const proxyRaw = String(process.env.PROXY_URL || "").trim();
+let cachedProxyUrl = "";
+let cachedDispatcher = null;
 
-    const sendHttpsRequest = (socket) => {
-      const req = https.request(
-        {
-          hostname: target.hostname,
-          port: 443,
-          path: target.pathname + target.search,
-          method: "POST",
-          ...(socket ? { socket, agent: false } : {}),
-          timeout: 15000,
-          headers: {
-            "Content-Length": Buffer.byteLength(bodyString),
-            Accept: "application/json,text/html,*/*",
-            ...headersObj,
-          },
-        },
-        (r) => {
-          let raw = "";
-          r.on("data", (c) => {
-            raw += c;
-            if (raw.length > 500000)
-              r.destroy(new Error("Gateway response too large"));
-          });
-          r.on("end", () => resolve({ statusCode: r.statusCode, raw }));
-        }
-      );
-      req.on("timeout", () => req.destroy(new Error("Gateway API timeout")));
-      req.on("error", reject);
-      req.write(bodyString);
-      req.end();
-    };
-
-    if (!proxyRaw) return sendHttpsRequest(null);
-
-    let proxy;
-    try {
-      const normalized = proxyRaw.includes("://")
-        ? proxyRaw
-        : "http://" + proxyRaw;
-      proxy = new URL(normalized);
-    } catch {
-      return reject(new Error("Invalid PROXY_URL format in Appwrite"));
-    }
-
-    const proxyPort = Number(proxy.port) || 80;
-    const auth =
-      proxy.username || proxy.password
-        ? "Proxy-Authorization: Basic " +
-          Buffer.from(
-            `${decodeURIComponent(proxy.username)}:${decodeURIComponent(
-              proxy.password
-            )}`
-          ).toString("base64") +
-          "\r\n"
-        : "";
-
-    const tcp = net.connect(proxyPort, proxy.hostname);
-    tcp.setTimeout(12000);
-    tcp.on("timeout", () => tcp.destroy(new Error("Static proxy TCP timeout")));
-    tcp.on("error", (err) =>
-      reject(new Error("Static proxy TCP error: " + err.message))
-    );
-
-    tcp.on("connect", () => {
-      tcp.write(
-        `CONNECT ${target.hostname}:443 HTTP/1.1\r\n` +
-          `Host: ${target.hostname}:443\r\n` +
-          auth +
-          `Proxy-Connection: keep-alive\r\n\r\n`
-      );
+function getProxyDispatcher() {
+  const proxyRaw = String(process.env.PROXY_URL || "").trim();
+  if (!proxyRaw) return undefined;
+  const normalized = proxyRaw.includes("://") ? proxyRaw : "http://" + proxyRaw;
+  if (normalized !== cachedProxyUrl) {
+    cachedProxyUrl = normalized;
+    cachedDispatcher = new ProxyAgent({
+      uri: normalized,
+      connect: { timeout: 15000 },
     });
+  }
+  return cachedDispatcher;
+}
 
-    let headerBuf = Buffer.alloc(0);
-    const onProxyData = (chunk) => {
-      headerBuf = Buffer.concat([headerBuf, chunk]);
-      const endIdx = headerBuf.indexOf("\r\n\r\n");
-      if (endIdx === -1) return;
-
-      tcp.removeListener("data", onProxyData);
-      const headerStr = headerBuf.subarray(0, endIdx).toString("latin1");
-      const leftover = headerBuf.subarray(endIdx + 4);
-      const statusLine = headerStr.split("\r\n")[0];
-
-      if (!/^HTTP\/1\.[01] 200\b/i.test(statusLine)) {
-        tcp.destroy();
-        return reject(new Error("Proxy CONNECT rejected: " + statusLine));
-      }
-
-      if (leftover.length > 0) {
-        tcp.unshift(leftover);
-      }
-
-      const tlsSocket = tls.connect({
-        socket: tcp,
-        servername: target.hostname,
-      });
-      tlsSocket.setTimeout(12000);
-      tlsSocket.on("timeout", () =>
-        tlsSocket.destroy(new Error("Proxy TLS handshake timeout"))
-      );
-      tlsSocket.on("error", (err) =>
-        reject(new Error("Proxy TLS error: " + err.message))
-      );
-      sendHttpsRequest(tlsSocket);
-    };
-    tcp.on("data", onProxyData);
+async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
+  const dispatcher = getProxyDispatcher();
+  const res = await fetch(targetUrl, {
+    method: "POST",
+    body: bodyString,
+    headers: {
+      Accept: "application/json,text/html,*/*",
+      ...headersObj,
+    },
+    ...(dispatcher ? { dispatcher } : {}),
   });
+  const raw = await res.text();
+  return { statusCode: res.status, raw };
 }
 
 // ============================================================================
@@ -2235,7 +2153,8 @@ async function autoCreateOrder(user, b, key) {
         if (fallback.ok) return fallback;
       } catch {}
     }
-    return { ok: false, error: e.message || "Payment gateway error" };
+    const detail = e?.cause?.message || e.message || "Payment gateway error";
+    return { ok: false, error: detail };
   }
 }
 
@@ -2250,7 +2169,8 @@ async function autoCreatePayout(user, b, key) {
       const fallback = await paisaCreatePayout(user, b, key);
       if (fallback.ok) return fallback;
     } catch {}
-    return { ok: false, error: e.message || "Payout gateway error" };
+    const detail = e?.cause?.message || e.message || "Payout gateway error";
+    return { ok: false, error: detail };
   }
 }
 
@@ -3249,7 +3169,7 @@ export default async ({ req, res, error }) => {
     error("Game backend: " + e.message);
     return send(res, e.status === 409 ? 409 : 500, {
       ok: false,
-      error: e.message || "Game service error. Check function logs.",
+      error: e?.cause?.message || e.message || "Game service error. Check function logs.",
       code: e.status || 500,
     });
   }
