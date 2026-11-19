@@ -2854,7 +2854,7 @@ async function getRecentActivity(key) {
     }
   }
 
-  items.push("🎁 Start with ₹10 Amazon Pay E-Voucher = 100 VC!");
+  items.push("🎁 Request free VC or redeem an admin-issued free voucher!");
   items.push("📢 Join @samratxtremegame on Telegram for live draw results!");
 
   return {
