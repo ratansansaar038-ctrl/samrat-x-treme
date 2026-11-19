@@ -1,5 +1,7 @@
 import https from "node:https";
-import { ProxyAgent } from "undici";
+import http from "node:http";
+import net from "node:net";
+import tls from "node:tls";
 import {
   randomInt,
   createHash,
@@ -1496,39 +1498,146 @@ async function handleTelegramWebhook(cb, key) {
 }
 
 // ============================================================================
-// OUTBOUND STATIC IP PROXY HELPER (UNDICI BUILT-IN PROXY AGENT)
+// OUTBOUND STATIC IP PROXY HELPER (PURE BUILT-IN NODE MODULES)
 // ============================================================================
 
-let cachedProxyUrl = "";
-let cachedDispatcher = null;
+function directHttpsPost(target, bodyString, headersObj) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: target.hostname,
+        port: 443,
+        path: target.pathname + target.search,
+        method: "POST",
+        timeout: 12000,
+        headers: {
+          "Content-Length": Buffer.byteLength(bodyString),
+          Accept: "application/json,text/html,*/*",
+          ...headersObj,
+        },
+      },
+      (r) => {
+        let raw = "";
+        r.on("data", (c) => {
+          raw += c;
+          if (raw.length > 500000) r.destroy(new Error("Response too large"));
+        });
+        r.on("end", () => resolve({ statusCode: r.statusCode, raw }));
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("Direct API timeout")));
+    req.on("error", reject);
+    req.write(bodyString);
+    req.end();
+  });
+}
 
-function getProxyDispatcher() {
-  const proxyRaw = String(process.env.PROXY_URL || "").trim();
-  if (!proxyRaw) return undefined;
-  const normalized = proxyRaw.includes("://") ? proxyRaw : "http://" + proxyRaw;
-  if (normalized !== cachedProxyUrl) {
-    cachedProxyUrl = normalized;
-    cachedDispatcher = new ProxyAgent({
-      uri: normalized,
-      connect: { timeout: 15000 },
+function httpProxyTunnelPost(proxy, target, bodyString, headersObj) {
+  return new Promise((resolve, reject) => {
+    const proxyPort = Number(proxy.port) || 80;
+    const authHeader =
+      proxy.username || proxy.password
+        ? "Basic " +
+          Buffer.from(
+            `${decodeURIComponent(proxy.username)}:${decodeURIComponent(
+              proxy.password
+            )}`
+          ).toString("base64")
+        : null;
+
+    const connectReq = http.request({
+      host: proxy.hostname,
+      port: proxyPort,
+      method: "CONNECT",
+      path: `${target.hostname}:443`,
+      timeout: 12000,
+      headers: {
+        Host: `${target.hostname}:443`,
+        ...(authHeader ? { "Proxy-Authorization": authHeader } : {}),
+      },
     });
-  }
-  return cachedDispatcher;
+
+    connectReq.on("connect", (proxyRes, socket, head) => {
+      if (proxyRes.statusCode !== 200) {
+        socket.destroy();
+        return reject(
+          new Error(`Proxy CONNECT HTTP ${proxyRes.statusCode}: ${proxyRes.statusMessage}`)
+        );
+      }
+
+      const tlsOptions = {
+        socket,
+        servername: target.hostname,
+        rejectUnauthorized: false,
+      };
+      const tlsSocket = tls.connect(tlsOptions, () => {
+        const req = https.request(
+          {
+            hostname: target.hostname,
+            port: 443,
+            path: target.pathname + target.search,
+            method: "POST",
+            createConnection: () => tlsSocket,
+            timeout: 15000,
+            headers: {
+              "Content-Length": Buffer.byteLength(bodyString),
+              Accept: "application/json,text/html,*/*",
+              ...headersObj,
+            },
+          },
+          (r) => {
+            let raw = "";
+            r.on("data", (c) => {
+              raw += c;
+              if (raw.length > 500000) r.destroy(new Error("Response too large"));
+            });
+            r.on("end", () => resolve({ statusCode: r.statusCode, raw }));
+          }
+        );
+        req.on("timeout", () => req.destroy(new Error("Gateway API timeout")));
+        req.on("error", reject);
+        req.write(bodyString);
+        req.end();
+      });
+
+      if (head && head.length > 0) socket.unshift(head);
+      tlsSocket.on("error", (err) =>
+        reject(new Error("Proxy TLS error: " + err.message))
+      );
+    });
+
+    connectReq.on("timeout", () =>
+      connectReq.destroy(new Error("Static proxy connect timeout"))
+    );
+    connectReq.on("error", (err) =>
+      reject(new Error("Static proxy error: " + err.message))
+    );
+    connectReq.end();
+  });
 }
 
 async function postViaStaticProxy(targetUrl, bodyString, headersObj) {
-  const dispatcher = getProxyDispatcher();
-  const res = await fetch(targetUrl, {
-    method: "POST",
-    body: bodyString,
-    headers: {
-      Accept: "application/json,text/html,*/*",
-      ...headersObj,
-    },
-    ...(dispatcher ? { dispatcher } : {}),
-  });
-  const raw = await res.text();
-  return { statusCode: res.status, raw };
+  const target = new URL(targetUrl);
+  const proxyRaw = String(process.env.PROXY_URL || "").trim();
+
+  if (proxyRaw) {
+    const normalized = proxyRaw.includes("://")
+      ? proxyRaw
+      : "http://" + proxyRaw;
+    const proxy = new URL(normalized);
+    try {
+      return await httpProxyTunnelPost(proxy, target, bodyString, headersObj);
+    } catch (proxyErr) {
+      // If proxy TLS fails, try direct connection as backup
+      try {
+        return await directHttpsPost(target, bodyString, headersObj);
+      } catch {
+        throw proxyErr;
+      }
+    }
+  }
+
+  return directHttpsPost(target, bodyString, headersObj);
 }
 
 // ============================================================================
@@ -2153,8 +2262,7 @@ async function autoCreateOrder(user, b, key) {
         if (fallback.ok) return fallback;
       } catch {}
     }
-    const detail = e?.cause?.message || e.message || "Payment gateway error";
-    return { ok: false, error: detail };
+    return { ok: false, error: e.message || "Payment gateway error" };
   }
 }
 
@@ -2169,8 +2277,7 @@ async function autoCreatePayout(user, b, key) {
       const fallback = await paisaCreatePayout(user, b, key);
       if (fallback.ok) return fallback;
     } catch {}
-    const detail = e?.cause?.message || e.message || "Payout gateway error";
-    return { ok: false, error: detail };
+    return { ok: false, error: e.message || "Payout gateway error" };
   }
 }
 
@@ -3169,7 +3276,7 @@ export default async ({ req, res, error }) => {
     error("Game backend: " + e.message);
     return send(res, e.status === 409 ? 409 : 500, {
       ok: false,
-      error: e?.cause?.message || e.message || "Game service error. Check function logs.",
+      error: e.message || "Game service error. Check function logs.",
       code: e.status || 500,
     });
   }
