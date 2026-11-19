@@ -172,7 +172,6 @@ async function transact(key, operations) {
 }
 
 // SAMRAT_TWO_DIGIT_00_99_V1 — 100 uniform server-side possibilities (00..99); 50x standard, 1500 finale.
-// SAMRAT_HOT_COLD_NEAR_MISS_V1: Last ten results are descriptive, not predictions.
 function drawTrendStats(rounds) {
   const last10 = rounds
     .filter((r) => valid(r) && Number.isFinite(Date.parse(r.endsAt)))
@@ -220,7 +219,6 @@ async function getDrawTrends(key) {
   return { ok: true, ...drawTrendStats(recent) };
 }
 
-// Exactly one +10 VC bonus per player per round, only if they had no winning pick.
 function nearMissBonus(entry, userEntries, winningNumber) {
   if (
     Math.abs(entry.selectNumber - winningNumber) !== 1 ||
@@ -237,7 +235,6 @@ function nearMissBonus(entry, userEntries, winningNumber) {
   return candidates[0]?.$id === entry.$id ? 10 : 0;
 }
 
-// SAMRAT_DAILY_STREAK_FINALE_V1 — server-authoritative daily session from 9 AM IST.
 const STREAK_REWARD_VC = 50,
   FREE_FINALE_WIN_VC = 1500;
 function samratDay(ts = Date.now()) {
@@ -1707,46 +1704,12 @@ async function adminDecideVCRequest(user, b, key) {
 }
 
 // ============================================================================
-// PAISAPAY PAYMENT GATEWAY (PAY-IN, STATIC-IP PAYOUT & ENCRYPTED CALLBACK)
+// OUTBOUND STATIC IP HTTP PROXY HELPER (TrueIP 185.155.223.55:10366)
 // ============================================================================
 
-function paisaKeyBuffer(secretKey) {
-  const raw = Buffer.from(String(secretKey || "").trim(), "utf8");
-  const key = Buffer.alloc(32, 0);
-  raw.copy(key, 0, 0, Math.min(raw.length, 32));
-  return key;
-}
-
-function paisaEncrypt(obj, secretKey) {
-  const cipher = createCipheriv("aes-256-ecb", paisaKeyBuffer(secretKey), null);
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(obj), "utf8"),
-    cipher.final(),
-  ]);
-  return encrypted.toString("base64");
-}
-
-function paisaDecrypt(base64Str, secretKey) {
-  const clean = String(base64Str || "")
-    .trim()
-    .replace(/ /g, "+");
-  const decipher = createDecipheriv(
-    "aes-256-ecb",
-    paisaKeyBuffer(secretKey),
-    null
-  );
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(clean, "base64")),
-    decipher.final(),
-  ]);
-  return JSON.parse(decrypted.toString("utf8"));
-}
-
-// Routes outbound HTTPS requests through TrueIP Static IPv4 HTTP Proxy (185.155.223.55:10366)
-function postFormViaStaticProxy(targetUrl, formObj) {
+function postViaStaticProxy(targetUrl, bodyString, headersObj) {
   return new Promise((resolve, reject) => {
     const target = new URL(targetUrl);
-    const body = new URLSearchParams(formObj).toString();
     const proxyRaw = process.env.PROXY_URL;
 
     const sendHttpsRequest = (socket) => {
@@ -1759,9 +1722,9 @@ function postFormViaStaticProxy(targetUrl, formObj) {
           ...(socket ? { socket, agent: false } : {}),
           timeout: 20000,
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Content-Length": Buffer.byteLength(body),
+            "Content-Length": Buffer.byteLength(bodyString),
             Accept: "application/json,text/html,*/*",
+            ...headersObj,
           },
         },
         (r) => {
@@ -1776,7 +1739,7 @@ function postFormViaStaticProxy(targetUrl, formObj) {
       );
       req.on("timeout", () => req.destroy(new Error("Gateway timeout")));
       req.on("error", reject);
-      req.write(body);
+      req.write(bodyString);
       req.end();
     };
 
@@ -1831,7 +1794,407 @@ function postFormViaStaticProxy(targetUrl, formObj) {
   });
 }
 
-// 1. CREATE PAY-IN ORDER (Minimum ₹300 -> 3000 VC)
+// ============================================================================
+// GATEWAY 1: INSTENTPAYMENT (JSON V1 — PAY-IN, PAYOUT, STATUS & CALLBACKS)
+// ============================================================================
+
+const INSTENT_BASE = "https://transaction.instentpayment.com";
+
+async function instentGetToken() {
+  const merchant_id = String(process.env.INSTENT_MERCHANT_ID || "").trim();
+  const merchant_email = String(process.env.INSTENT_MERCHANT_EMAIL || "").trim();
+  const api_secret = String(process.env.INSTENT_API_SECRET || "").trim();
+
+  if (!merchant_id || !merchant_email || !api_secret) {
+    throw new Error("InstentPayment credentials not configured");
+  }
+
+  const resHttp = await postViaStaticProxy(
+    `${INSTENT_BASE}/api/v1/jwt/token/generate`,
+    JSON.stringify({ merchant_id, merchant_email, api_secret }),
+    { "Content-Type": "application/json" }
+  );
+
+  let parsed;
+  try {
+    parsed = JSON.parse(resHttp.raw);
+  } catch {
+    throw new Error("InstentPayment token invalid response");
+  }
+
+  const token = parsed?.token || parsed?.data?.token;
+  if (!token) {
+    throw new Error(
+      parsed?.message || "InstentPayment token error (Check IP whitelist)"
+    );
+  }
+  return token;
+}
+
+// 1A. INSTENTPAYMENT CREATE PAY-IN (Min ₹100 -> 1000 VC)
+async function instentCreateOrder(user, b, key) {
+  const amountInr = Number(b.amount);
+  if (!Number.isFinite(amountInr) || amountInr < 100 || amountInr > 50000)
+    return { ok: false, error: "Minimum deposit amount is ₹100 (Max ₹50,000)" };
+
+  const mobile = String(b.mobile || "").replace(/\D/g, "");
+  if (!/^[6-9]\d{9}$/.test(mobile))
+    return { ok: false, error: "Enter a valid 10-digit Indian mobile number" };
+
+  const player = await profile(user, key);
+  const coins = Math.round(amountInr * 10);
+  const orderId =
+    "IP_" + Date.now() + "_" + randomBytes(4).toString("hex").toUpperCase();
+  const table = vcRequestTable();
+
+  const bearer = await instentGetToken();
+
+  const safeName =
+    String(player.name || "Samrat Player")
+      .replace(/[^a-zA-Z0-9 ]/g, " ")
+      .trim()
+      .slice(0, 50) || "Samrat Player";
+  const safeEmail =
+    typeof player.email === "string" && player.email.includes("@")
+      ? player.email.trim()
+      : "player@samratxtreme.online";
+
+  const resHttp = await postViaStaticProxy(
+    `${INSTENT_BASE}/api/v1/payin/create`,
+    JSON.stringify({
+      order_id: orderId,
+      amount: Number(amountInr.toFixed(2)),
+      name: safeName,
+      email: safeEmail,
+      mobile,
+    }),
+    {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${bearer}`,
+    }
+  );
+
+  let gw;
+  try {
+    gw = JSON.parse(resHttp.raw);
+  } catch {
+    return { ok: false, error: "InstentPayment invalid JSON response" };
+  }
+
+  if (gw?.status !== 1 || (!gw?.data?.payment_url && !gw?.data?.intent)) {
+    return {
+      ok: false,
+      error: gw?.message || "InstentPayment could not create payment order",
+    };
+  }
+
+  await request("POST", tablePath(table), key, {
+    rowId: orderId,
+    data: {
+      userId: user,
+      amount: coins,
+      status: "ip_pending",
+    },
+  });
+
+  await sendVCTelegram(
+    [
+      "⚡ INSTENTPAYMENT DEPOSIT CREATED",
+      "Order ID: " + orderId,
+      "Txn ID: " + vcClean(gw.data.txn_id || ""),
+      "Player: " + vcClean(player.name) + " (" + vcClean(user) + ")",
+      "Amount: ₹" + amountInr.toFixed(2) + " => " + coins + " VC",
+    ].join("\n")
+  );
+
+  return {
+    ok: true,
+    gateway: "instentpayment",
+    orderId,
+    amountInr: amountInr.toFixed(2),
+    coins,
+    paymentUrl: gw.data.payment_url || gw.data.intent,
+    intentUrl: gw.data.intent || null,
+  };
+}
+
+// 1B. INSTENTPAYMENT CREATE PAYOUT (Min ₹2000 = 20000 VC)
+async function instentCreatePayout(user, b, key) {
+  const amountInr = Number(b.amount);
+  if (!Number.isFinite(amountInr) || amountInr < 2000 || amountInr > 50000)
+    return { ok: false, error: "Minimum payout amount is ₹2,000 (20,000 VC)" };
+
+  const accountNumber = String(b.account_number || "").replace(/\s+/g, "");
+  const ifscCode = String(b.ifsc_code || "")
+    .trim()
+    .toUpperCase();
+  const holderName = String(b.holder_name || "").trim();
+  const bankName = String(b.bank_name || "").trim();
+  const mobile = String(b.mobile || "").replace(/\D/g, "");
+
+  if (!/^\d{9,18}$/.test(accountNumber))
+    return {
+      ok: false,
+      error: "Enter a valid bank account number (9-18 digits)",
+    };
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode))
+    return { ok: false, error: "Enter a valid 11-character IFSC code" };
+  if (holderName.length < 2 || bankName.length < 2)
+    return { ok: false, error: "Enter account holder name and bank name" };
+  if (!/^[6-9]\d{9}$/.test(mobile))
+    return { ok: false, error: "Enter a valid 10-digit mobile number" };
+
+  const player = await profile(user, key);
+  if (safeReservedVC(player) > 0 || player.canWithdraw === false)
+    return {
+      ok: false,
+      error: "Withdrawals are locked until pending verification clears",
+    };
+
+  const coinsToDebit = Math.round(amountInr * 10);
+  if (player.wallet < coinsToDebit)
+    return {
+      ok: false,
+      error: `Insufficient VC balance (Need ${coinsToDebit} VC)`,
+    };
+
+  const orderId =
+    "IPO_" + Date.now() + "_" + randomBytes(4).toString("hex").toUpperCase();
+  const table = vcRequestTable();
+  const safeEmail =
+    typeof player.email === "string" && player.email.includes("@")
+      ? player.email.trim()
+      : "player@samratxtreme.online";
+
+  await transact(key, [
+    op("create", table, orderId, {
+      userId: user,
+      amount: coinsToDebit,
+      status: "ip_payout_processing",
+    }),
+    op("decrement", "user_profiles", player.$id, {
+      column: "wallet",
+      value: coinsToDebit,
+      min: 0,
+    }),
+  ]);
+
+  let gw;
+  try {
+    const bearer = await instentGetToken();
+    const resHttp = await postViaStaticProxy(
+      `${INSTENT_BASE}/api/v1/payout/create`,
+      JSON.stringify({
+        order_id: orderId,
+        amount: Number(amountInr.toFixed(2)),
+        account_holder_name: holderName,
+        account_number: accountNumber,
+        ifsc_code: ifscCode,
+        bank_name: bankName,
+        mobile_number: mobile,
+        email: safeEmail,
+      }),
+      {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${bearer}`,
+      }
+    );
+    gw = JSON.parse(resHttp.raw);
+  } catch (err) {
+    await transact(key, [
+      op("update", table, orderId, { status: "ip_payout_failed" }),
+      op("increment", "user_profiles", player.$id, {
+        column: "wallet",
+        value: coinsToDebit,
+        max: 900000000,
+      }),
+    ]);
+    return {
+      ok: false,
+      error: "InstentPayment payout error: " + err.message,
+    };
+  }
+
+  const txnStatus = String(gw?.data?.txn_status || "").toUpperCase();
+  if (gw?.status !== 1 || !["PENDING", "SUCCESS", "PROCESSING"].includes(txnStatus)) {
+    await transact(key, [
+      op("update", table, orderId, { status: "ip_payout_rejected" }),
+      op("increment", "user_profiles", player.$id, {
+        column: "wallet",
+        value: coinsToDebit,
+        max: 900000000,
+      }),
+    ]);
+    return {
+      ok: false,
+      error: gw?.message || "Payout rejected by InstentPayment; VC refunded",
+    };
+  }
+
+  await request("PATCH", tablePath(table) + "/" + orderId, key, {
+    data: { status: "ip_payout_" + txnStatus.toLowerCase() },
+  });
+
+  await sendVCTelegram(
+    [
+      "💸 INSTENTPAYMENT AUTO-PAYOUT SENT",
+      "Order ID: " + orderId,
+      "Player: " + vcClean(player.name) + " (" + vcClean(user) + ")",
+      "Amount: ₹" + amountInr.toFixed(2) + " (-" + coinsToDebit + " VC)",
+      "A/C: " + accountNumber + " | IFSC: " + ifscCode,
+      "Status: " + txnStatus,
+    ].join("\n")
+  );
+
+  return {
+    ok: true,
+    orderId,
+    status: txnStatus,
+    amountInr: amountInr.toFixed(2),
+    coinsDebited: coinsToDebit,
+  };
+}
+
+// 1C. INSTENTPAYMENT WEBHOOK CALLBACK (service_id: 1 = Payin, 2 = Payout)
+async function handleInstentCallback(cb, key) {
+  const orderId = String(cb?.order_id || "").trim();
+  const serviceId = Number(cb?.service_id);
+  const txnStatus = String(cb?.txn_status || "").toUpperCase();
+  const utr = String(cb?.utr || "").trim();
+
+  if (!/^[a-zA-Z0-9._-]{1,40}$/.test(orderId)) return { ok: false };
+
+  const table = vcRequestTable();
+  let entry;
+  try {
+    entry = await request("GET", tablePath(table) + "/" + orderId, key);
+  } catch (e) {
+    if (e.status === 404) return { ok: true, status: "order_not_found" };
+    throw e;
+  }
+
+  // Verify status directly from InstentPayment /api/v1/status for tamper-proof security
+  const bearer = await instentGetToken();
+  const statusRes = await postViaStaticProxy(
+    `${INSTENT_BASE}/api/v1/status`,
+    JSON.stringify({ order_id: orderId, service_id: serviceId }),
+    {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${bearer}`,
+    }
+  );
+  const verifiedJson = JSON.parse(statusRes.raw);
+  const verifiedStatus = String(
+    verifiedJson?.data?.txn_status || txnStatus
+  ).toUpperCase();
+  const verifiedAmount = Number(verifiedJson?.data?.amount || cb?.amount || 0);
+
+  if (serviceId === 1) {
+    if (entry.status !== "ip_pending") return { ok: true };
+    if (
+      verifiedStatus === "SUCCESS" &&
+      Math.round(verifiedAmount * 10) === entry.amount
+    ) {
+      const player = await profile(entry.userId, key);
+      try {
+        await transact(key, [
+          op("update", table, orderId, { status: "approved" }),
+          op("increment", "user_profiles", player.$id, {
+            column: "wallet",
+            value: entry.amount,
+            max: 900000000,
+          }),
+        ]);
+        await sendVCTelegram(
+          [
+            "✅ INSTENTPAYMENT DEPOSIT SUCCESS",
+            "Order ID: " + orderId,
+            "Player ID: " + vcClean(entry.userId),
+            "Credited: +" + entry.amount + " VC (₹" + verifiedAmount + ")",
+            "UTR: " + vcClean(utr),
+          ].join("\n")
+        );
+      } catch (e) {
+        if (e.status !== 409) throw e;
+      }
+    } else if (["FAILED", "CANCELLED", "EXPIRED"].includes(verifiedStatus)) {
+      await request("PATCH", tablePath(table) + "/" + orderId, key, {
+        data: { status: "rejected" },
+      });
+    }
+  } else if (serviceId === 2) {
+    if (!String(entry.status || "").startsWith("ip_payout_p")) return { ok: true };
+    if (verifiedStatus === "SUCCESS") {
+      await request("PATCH", tablePath(table) + "/" + orderId, key, {
+        data: { status: "ip_payout_success" },
+      });
+      await sendVCTelegram(
+        [
+          "✅ INSTENTPAYMENT PAYOUT COMPLETED",
+          "Order ID: " + orderId,
+          "Player ID: " + vcClean(entry.userId),
+          "UTR: " + vcClean(utr),
+        ].join("\n")
+      );
+    } else if (["FAILED", "REVERSED"].includes(verifiedStatus)) {
+      const player = await profile(entry.userId, key);
+      await transact(key, [
+        op("update", table, orderId, { status: "ip_payout_failed" }),
+        op("increment", "user_profiles", player.$id, {
+          column: "wallet",
+          value: entry.amount,
+          max: 900000000,
+        }),
+      ]);
+      await sendVCTelegram(
+        [
+          "⚠️ INSTENTPAYMENT PAYOUT FAILED (VC REFUNDED)",
+          "Order ID: " + orderId,
+          "Refunded: +" + entry.amount + " VC",
+        ].join("\n")
+      );
+    }
+  }
+
+  return { ok: true };
+}
+
+// ============================================================================
+// GATEWAY 2: PAISAPAY (PAY-IN, STATIC-IP PAYOUT & ENCRYPTED CALLBACK)
+// ============================================================================
+
+function paisaKeyBuffer(secretKey) {
+  const raw = Buffer.from(String(secretKey || "").trim(), "utf8");
+  const key = Buffer.alloc(32, 0);
+  raw.copy(key, 0, 0, Math.min(raw.length, 32));
+  return key;
+}
+
+function paisaEncrypt(obj, secretKey) {
+  const cipher = createCipheriv("aes-256-ecb", paisaKeyBuffer(secretKey), null);
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(obj), "utf8"),
+    cipher.final(),
+  ]);
+  return encrypted.toString("base64");
+}
+
+function paisaDecrypt(base64Str, secretKey) {
+  const clean = String(base64Str || "")
+    .trim()
+    .replace(/ /g, "+");
+  const decipher = createDecipheriv(
+    "aes-256-ecb",
+    paisaKeyBuffer(secretKey),
+    null
+  );
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(clean, "base64")),
+    decipher.final(),
+  ]);
+  return JSON.parse(decrypted.toString("utf8"));
+}
+
 async function paisaCreateOrder(user, b, key) {
   const token = process.env.PAISAPAY_TOKEN;
   const secretKey = process.env.PAISAPAY_SECRET_KEY;
@@ -1840,7 +2203,10 @@ async function paisaCreateOrder(user, b, key) {
 
   const amountInr = Number(b.amount);
   if (!Number.isFinite(amountInr) || amountInr < 300 || amountInr > 50000)
-    return { ok: false, error: "Minimum deposit amount is ₹300 (Max ₹50,000)" };
+    return {
+      ok: false,
+      error: "PaisaPay minimum deposit is ₹300 (Use InstentPayment for ₹100+)",
+    };
 
   const mobile = String(b.mobile || "").replace(/\D/g, "");
   if (!/^[6-9]\d{9}$/.test(mobile))
@@ -1879,6 +2245,7 @@ async function paisaCreateOrder(user, b, key) {
 
   return {
     ok: true,
+    gateway: "paisapay",
     orderId,
     amountInr: amountInr.toFixed(2),
     coins,
@@ -1890,7 +2257,6 @@ async function paisaCreateOrder(user, b, key) {
   };
 }
 
-// 2. CREATE PAYOUT VIA STATIC IP (Minimum ₹2000 = 20000 VC)
 async function paisaCreatePayout(user, b, key) {
   const token = process.env.PAISAPAY_TOKEN;
   const secretKey = process.env.PAISAPAY_SECRET_KEY;
@@ -1961,9 +2327,10 @@ async function paisaCreatePayout(user, b, key) {
 
   let gwResponse;
   try {
-    const resHttp = await postFormViaStaticProxy(
+    const resHttp = await postViaStaticProxy(
       "https://pay.paisapay.site/create_payout.php",
-      { token, payload: encryptedPayload }
+      new URLSearchParams({ token, payload: encryptedPayload }).toString(),
+      { "Content-Type": "application/x-www-form-urlencoded" }
     );
     gwResponse = JSON.parse(resHttp.raw);
   } catch (err) {
@@ -2018,11 +2385,9 @@ async function paisaCreatePayout(user, b, key) {
     status: gwStatus,
     amountInr: amountInr.toFixed(2),
     coinsDebited: coinsToDebit,
-    gateway: gwResponse,
   };
 }
 
-// 3. HANDLE PAISAPAY CALLBACK WEBHOOK (Auto-credits VC on SUCCESS)
 async function handlePaisaPayCallback(encryptedPayload, key) {
   const secretKey = process.env.PAISAPAY_SECRET_KEY;
   if (!secretKey) throw new Error("PAISAPAY_SECRET_KEY missing");
@@ -2513,7 +2878,6 @@ async function getLeaderboard(gameId, key) {
   };
 }
 
-// 🔴 LIVE SCROLLING TICKER: FETCHES 100% REAL RECENT ACTIVITY FROM DATABASE
 async function getRecentActivity(key) {
   const [playersRes, winsRes, roundsRes, scoresRes] = await Promise.allSettled([
     rows("user_profiles", [order("$createdAt", "desc"), lim(8)], key),
@@ -2616,27 +2980,44 @@ export default async ({ req, res, error }) => {
   const rawBody = typeof req.body === "string" ? req.body : "";
   const contentType = String(req.headers["content-type"] || "").toLowerCase();
 
-  // Direct PaisaPay Server-to-Server Callback (form-urlencoded or JSON with payload)
+  // Direct Server-to-Server Payment Webhooks (InstentPayment JSON or PaisaPay payload)
   if (
     req.headers["x-appwrite-trigger"] !== "schedule" &&
     !req.headers["x-appwrite-user-id"]
   ) {
+    let parsedJson = null;
+    if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
+      parsedJson = req.body;
+    } else if (rawBody.startsWith("{")) {
+      try {
+        parsedJson = JSON.parse(rawBody);
+      } catch {}
+    }
+
+    // InstentPayment Payin/Payout Callback
+    if (
+      parsedJson &&
+      parsedJson.order_id &&
+      parsedJson.txn_status &&
+      !parsedJson.action
+    ) {
+      const key = req.headers["x-appwrite-key"] || process.env.APPWRITE_API_KEY;
+      if (!key) return send(res, 503, { ok: false, error: "key_missing" });
+      try {
+        const reply = await handleInstentCallback(parsedJson, key);
+        return send(res, 200, reply);
+      } catch (e) {
+        error("InstentPayment callback error: " + e.message);
+        return send(res, 400, { ok: false, error: e.message });
+      }
+    }
+
+    // PaisaPay Encrypted Callback
     let incomingPayload = null;
     if (contentType.includes("application/x-www-form-urlencoded")) {
       incomingPayload = new URLSearchParams(rawBody).get("payload");
-    } else if (
-      req.body &&
-      typeof req.body === "object" &&
-      req.body.payload &&
-      !req.body.action
-    ) {
-      incomingPayload = req.body.payload;
-    } else if (rawBody.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(rawBody);
-        if (parsed?.payload && !parsed?.action)
-          incomingPayload = parsed.payload;
-      } catch {}
+    } else if (parsedJson?.payload && !parsedJson?.action) {
+      incomingPayload = parsedJson.payload;
     }
 
     if (incomingPayload) {
@@ -2707,6 +3088,8 @@ export default async ({ req, res, error }) => {
       "grant_coins",
       "request_vc",
       "submit_gift_card",
+      "instent_create_order",
+      "instent_create_payout",
       "paisapay_create_order",
       "paisapay_create_payout",
       "admin_list_vc_requests",
@@ -2869,6 +3252,16 @@ export default async ({ req, res, error }) => {
 
     if (action === "submit_gift_card") {
       const x = await submitGiftCard(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
+    if (action === "instent_create_order") {
+      const x = await instentCreateOrder(user, b, key);
+      return send(res, x.ok ? 200 : 400, x);
+    }
+
+    if (action === "instent_create_payout") {
+      const x = await instentCreatePayout(user, b, key);
       return send(res, x.ok ? 200 : 400, x);
     }
 
