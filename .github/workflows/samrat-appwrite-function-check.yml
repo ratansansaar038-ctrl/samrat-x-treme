@@ -1,0 +1,51 @@
+name: Samrat Appwrite Function Check
+
+on:
+  push:
+    paths:
+      - ".github/workflows/samrat-appwrite-function-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check function, deployment and schedule without printing secrets
+        env:
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          APPWRITE_FUNCTION_ID: ${{ secrets.APPWRITE_FUNCTION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$APPWRITE_PROJECT" || -z "$APPWRITE_API_KEY" || -z "$APPWRITE_FUNCTION_ID" ]]; then
+            echo "Required Appwrite secret missing."
+            exit 1
+          fi
+          api="https://sgp.cloud.appwrite.io/v1/functions/$APPWRITE_FUNCTION_ID"
+          fetch() {
+            local url="$1"
+            local dest="$2"
+            local status
+            status=$(curl --silent --show-error --output "$dest" --write-out "%{http_code}" \
+              --header "X-Appwrite-Project: $APPWRITE_PROJECT" \
+              --header "X-Appwrite-Key: $APPWRITE_API_KEY" \
+              "$url")
+            if [[ "$status" != "200" ]]; then
+              echo "Appwrite read-only check failed with HTTP $status."
+              exit 1
+            fi
+          }
+          fetch "$api" function.json
+          echo "FUNCTION:"
+          jq '{name, runtime, schedule, interval, entrypoint, providerRootDirectory, providerBranch, deploymentCreatedAt, latestDeploymentCreatedAt, latestDeploymentStatus, live}' function.json
+          fetch "$api/deployments" deployments.json
+          echo "DEPLOYMENTS:"
+          jq '[.deployments[:5][] | {status, createdAt: ."$createdAt", entrypoint, activate}]' deployments.json
+          fetch "$api/executions" executions.json
+          echo "RECENT EXECUTIONS:"
+          jq '[.executions[:8][] | {createdAt: ."$createdAt", trigger, status, responseStatusCode}]' executions.json
