@@ -49,3 +49,5 @@ jobs:
           fetch "$api/executions" executions.json
           echo "RECENT EXECUTIONS:"
           jq '[.executions[:8][] | {createdAt: ."$createdAt", trigger, status, responseStatusCode}]' executions.json
+
+# Read-only deployment audit. No secrets are printed.
