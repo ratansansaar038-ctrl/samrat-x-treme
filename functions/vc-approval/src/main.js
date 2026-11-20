@@ -576,6 +576,55 @@ async function settleRound(round, key) {
   return total;
 }
 
+// One Telegram alert per newly created, settled draw. No schema changes required.
+async function winningUsersForRound(round, key) {
+  const users = new Set();
+  let entries = 0;
+  let cursor = null;
+  for (let page = 0; page < 1000; page++) {
+    const queries = [
+      eq("roundId", round.roundId),
+      eq("status", "won"),
+      order("$createdAt", "asc"),
+      lim(100),
+    ];
+    if (cursor) queries.push({ method: "cursorAfter", values: [cursor] });
+    const batch = await rows("game_entries", queries, key);
+    for (const entry of batch) {
+      if (entry.selectNumber === round.winningNumber && entry.userId) {
+        users.add(entry.userId);
+        entries++;
+      }
+    }
+    if (batch.length < 100)
+      return { winningUsers: users.size, winningEntries: entries };
+    const next = batch[batch.length - 1]?.$id;
+    if (!next || next === cursor) throw Error("Draw winner pagination stalled");
+    cursor = next;
+  }
+  throw Error("Draw winner count exceeded pagination limit");
+}
+
+function drawResultTelegramText(round, stats) {
+  const ended = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(round.endsAt));
+  return [
+    "🎯 SAMRAT X-TREME | 20-MIN DRAW RESULT",
+    "🕒 Draw ended: " + ended + " IST",
+    "🏆 Winning Number: " + String(round.winningNumber).padStart(2, "0"),
+    "👥 Winning Users: " + stats.winningUsers,
+    "🎟 Winning Entries: " + stats.winningEntries,
+    "✅ Result settled",
+  ].join("\n");
+}
+
 async function lastResult(key) {
   const previous = roundFor(Date.now() - ROUND_MS);
   if (!roundIsDaytime(previous)) {
@@ -596,6 +645,7 @@ async function lastResult(key) {
       recovery,
     };
   }
+  let created = false;
   let r = await stored(previous.roundId, key);
 
   if (!r) {
@@ -611,6 +661,7 @@ async function lastResult(key) {
           winningNumber: randomInt(0, 100),
         },
       });
+      created = true;
     } catch (e) {
       if (e.status !== 409) throw e;
       r = await stored(previous.roundId, key);
@@ -625,8 +676,23 @@ async function lastResult(key) {
     console.error("Number draw recovery failed: " + e.message);
     recovery = { ok: false, error: "Recovery temporarily unavailable" };
   }
+  // A unique game_rounds row is the idempotency marker: repeat page refreshes
+  // and scheduled retries do not resend the same Telegram result.
+  let drawAlert = null;
+  if (created && valid(r)) {
+    try {
+      const stats = await winningUsersForRound(r, key);
+      const telegramNotified = await sendVCTelegram(drawResultTelegramText(r, stats));
+      drawAlert = { ...stats, telegramNotified };
+      if (!telegramNotified) console.error("Draw Telegram alert not delivered: " + r.roundId);
+    } catch (e) {
+      console.error("Draw Telegram alert failed: " + e.message);
+      drawAlert = { telegramNotified: false };
+    }
+  }
   return {
     ok: true,
+    ...(drawAlert ? { drawAlert } : {}),
     available: valid(r),
     roundId: previous.roundId,
     winningNumber: valid(r) ? r.winningNumber : null,
