@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /admin-
+Disallow: /dashboard.html
+Disallow: /login.html
+Disallow: /signup.html
+Disallow: /forgot-password.html
+Disallow: /reset-password.html
+Disallow: /profile.html
+Disallow: /player-profile.html
+
+Sitemap: https://samratxtreme.online/sitemap.xml
