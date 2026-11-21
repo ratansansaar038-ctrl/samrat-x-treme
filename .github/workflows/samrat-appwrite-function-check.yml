@@ -1,4 +1,4 @@
-name: Samrat Appwrite Function Check
+name: Samrat Public Scheduler Compatibility Check
 
 on:
   push:
@@ -14,40 +14,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Check function, deployment and schedule without printing secrets
+      - name: Test public get_round without any API key
         env:
           APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
-          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
           APPWRITE_FUNCTION_ID: ${{ secrets.APPWRITE_FUNCTION_ID }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$APPWRITE_PROJECT" || -z "$APPWRITE_API_KEY" || -z "$APPWRITE_FUNCTION_ID" ]]; then
-            echo "Required Appwrite secret missing."
+          if [[ -z "$APPWRITE_PROJECT" || -z "$APPWRITE_FUNCTION_ID" ]]; then
+            echo "Project or Function ID configuration missing."
             exit 1
           fi
-          api="https://sgp.cloud.appwrite.io/v1/functions/$APPWRITE_FUNCTION_ID"
-          fetch() {
-            local url="$1"
-            local dest="$2"
-            local status
-            status=$(curl --silent --show-error --output "$dest" --write-out "%{http_code}" \
-              --header "X-Appwrite-Project: $APPWRITE_PROJECT" \
-              --header "X-Appwrite-Key: $APPWRITE_API_KEY" \
-              "$url")
-            if [[ "$status" != "200" ]]; then
-              echo "Appwrite read-only check failed with HTTP $status."
-              exit 1
-            fi
-          }
-          fetch "$api" function.json
-          echo "FUNCTION:"
-          jq '{name, runtime, schedule, interval, entrypoint, providerRootDirectory, providerBranch, deploymentCreatedAt, latestDeploymentCreatedAt, latestDeploymentStatus, live}' function.json
-          fetch "$api/deployments" deployments.json
-          echo "DEPLOYMENTS:"
-          jq '[.deployments[:5][] | {status, createdAt: ."$createdAt", entrypoint, activate}]' deployments.json
-          fetch "$api/executions" executions.json
-          echo "RECENT EXECUTIONS:"
-          jq '[.executions[:8][] | {createdAt: ."$createdAt", trigger, status, responseStatusCode}]' executions.json
-
-# Read-only deployment audit. No secrets are printed.
+          status=$(curl --silent --show-error --output execution.json --write-out "%{http_code}" \
+            --request POST \
+            --url "https://sgp.cloud.appwrite.io/v1/functions/${APPWRITE_FUNCTION_ID}/executions" \
+            --header "X-Appwrite-Project: ${APPWRITE_PROJECT}" \
+            --header "Content-Type: application/json" \
+            --data '{"body":"{\"action\":\"get_round\"}","async":false,"method":"POST","path":"/"}')
+          echo "Public Appwrite execution HTTP status: $status"
+          if [[ "$status" != "201" && "$status" != "200" ]]; then
+            echo "Appwrite refused public execution; do not store a privileged API key with an external scheduler."
+            exit 1
+          fi
+          jq '{status, responseStatusCode, roundActionOk: (.responseBody | fromjson? | .ok)}' execution.json
+          jq -e '.responseStatusCode == 200 and (.responseBody | fromjson | .ok == true)' execution.json >/dev/null
