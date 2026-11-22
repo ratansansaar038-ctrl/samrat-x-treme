@@ -36,6 +36,7 @@ const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
 const account=new Appwrite.Account(client);
 const db=new Appwrite.TablesDB(client); const functions=new Appwrite.Functions(client);
 const REFERRAL_FUNCTION="6adf3c3a003718eab6c2"; 
+const WALLET_FUNCTION="6ae1bcc500208a5a7efb";
 const form=document.getElementById('form');
 const button=document.getElementById('submit');
 const message=document.getElementById('message');
@@ -43,6 +44,24 @@ const referralInput=document.getElementById('ref');
 referralInput.value=(new URLSearchParams(location.search).get('ref')||'').trim().toUpperCase().slice(0,32);
 function notify(text,good=false){message.textContent=text;message.style.color=good?'#60ff9a':'#ffb7db'}
 function ownCode(name,id){const prefix=(name||'SAMRAT').replace(/[^a-z0-9]/gi,'').toUpperCase().slice(0,5)||'SAMRAT';return prefix+id.replace(/[^a-z0-9]/gi,'').toUpperCase().slice(-6)}
+function isExistingEmailError(error){return ['user_already_exists','user_email_already_exists'].includes(error?.type)||(error?.code===409&&/already exists|already used|already in use/i.test(error?.message||''))}
+async function signInOrUseCurrentSession(email,password){
+ try{await account.createEmailPasswordSession({email,password})}
+ catch(error){const signedIn=await account.get().catch(()=>null);if(signedIn?.email?.toLowerCase()!==email.toLowerCase())throw error}
+}
+async function finishWalletProfile(user,name,email,entered){
+ try{
+  await db.createRow({databaseId:DATABASE,tableId:TABLE,rowId:user.$id,data:{userId:user.$id,name,email,wallet:1000,wins:0,losses:0,rounds:0,referralCode:ownCode(name,user.$id),referredBy:entered,referralPoints:0}});
+  return true;
+ }catch(error){
+  // A duplicate row or missing client write permission should not strand a newly created Auth user.
+  // The server function checks for an existing profile before granting the bonus.
+  const execution=await functions.createExecution({functionId:WALLET_FUNCTION,body:JSON.stringify({action:'register_profile',name,email}),async:false});
+  const result=JSON.parse(execution.responseBody||'{}');
+  if(!result.ok)throw Error(result.error||'Wallet profile setup failed');
+  return result.created===true&&result.signupBonusVC===1000;
+ }
+}
 async function prepare(){try{await account.get();location.replace('index.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(button.disabled)return;
@@ -53,11 +72,18 @@ form.addEventListener('submit',async e=>{
  const entered=referralInput.value.trim().toUpperCase();
  if(!name||password.length<8||password!==confirm){notify('Name, password aur confirm password check karo.');return}
  button.disabled=true;button.textContent='CREATING ACCOUNT...';notify('Account create ho raha hai...');
- let created=false;
+ let authReady=false,accountCreated=false;
  try{
-  const user=await account.create({userId:Appwrite.ID.unique(),email,password,name});created=true;
-  await account.createEmailPasswordSession({email,password});
-  await db.createRow({databaseId:DATABASE,tableId:TABLE,rowId:user.$id,data:{userId:user.$id,name,email,wallet:1000,wins:0,losses:0,rounds:0,referralCode:ownCode(name,user.$id),referredBy:entered,referralPoints:0}});
+  let user,created=false;
+  try{user=await account.create({userId:Appwrite.ID.unique(),email,password,name});created=true;accountCreated=true}
+  catch(error){
+   if(!isExistingEmailError(error))throw error;
+   try{await signInOrUseCurrentSession(email,password);user=await account.get()}
+   catch{throw Error('Email already registered. Agar pehle signup kiya tha to LOGIN dabao, warna Forgot Password use karo.')}
+  }
+  if(created)await signInOrUseCurrentSession(email,password);
+  authReady=true;
+  const bonusAdded=await finishWalletProfile(user,name,email,entered);
   
 if (entered) {
   try {
@@ -78,10 +104,10 @@ if (entered) {
 }
   
   ['samratWallet','samratHistory','samratRound'].forEach(key=>localStorage.removeItem(key));
-  try { sessionStorage.setItem('samratSignupBonusVC', String(1000)); } catch {}
-  notify('🎁 Sign Up Bonus: 1,000 VC added to your wallet! Referral verification is paused.',true);
+  if(bonusAdded){try{sessionStorage.setItem('samratSignupBonusVC','1000')}catch{}}
+  notify(bonusAdded?'🎁 Sign Up Bonus: 1,000 VC added to your wallet!':'Account pehle se registered hai. Wallet ka existing balance safe hai.',true);
   location.replace('index.html');
- }catch(err){console.error('Signup failed',err);notify(created?'Account bana hai, lekin profile setup fail hua. Dobara signup mat karo; support se contact karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
+ }catch(err){console.error('Signup failed',err);notify(authReady?'Account login ho gaya, lekin wallet setup fail hua. Dobara signup mat karo; support se contact karo.':accountCreated?'Account ban gaya hai, lekin login complete nahi hua. LOGIN se sign in karo; dobara signup mat karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
 });
 prepare();
 </script>

@@ -507,12 +507,23 @@ async function refreshUser() {
   }
 }
 
+function isExistingEmailError(error) {
+  return ['user_already_exists', 'user_email_already_exists'].includes(error?.type) ||
+    (error?.code === 409 && /already exists|already used|already in use/i.test(error?.message || ''));
+}
+
+async function signInOrUseCurrentSession(email, password) {
+  try {
+    await account.createEmailPasswordSession({ email, password });
+  } catch (error) {
+    const signedIn = await account.get().catch(() => null);
+    if (signedIn?.email?.toLowerCase() !== email.toLowerCase()) throw error;
+  }
+}
+
 $('login').onclick = async () => {
   try {
-    await account.createEmailPasswordSession({
-      email: $('email').value.trim(),
-      password: $('password').value
-    });
+    await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
   } catch (error) {
     msg('authMsg', error.message);
@@ -520,6 +531,9 @@ $('login').onclick = async () => {
 };
 
 $('signup').onclick = async () => {
+  const signupButton = $('signup');
+  if (signupButton.disabled) return;
+  signupButton.disabled = true;
   try {
     const name = $('name').value.trim();
     const email = $('email').value.trim();
@@ -527,22 +541,42 @@ $('signup').onclick = async () => {
 
     if (!name) throw Error('Enter your name');
 
-    await account.create({ userId: ID.unique(), email, password, name });
-    await account.createEmailPasswordSession({ email, password });
+    let newAccount = false;
+    try {
+      await account.create({ userId: ID.unique(), email, password, name });
+      newAccount = true;
+    } catch (error) {
+      if (!isExistingEmailError(error)) throw error;
+      // A previous attempt may have created the Auth account but failed to set up its wallet.
+      // Only resume after proving ownership with the same email and password.
+      try {
+        await signInOrUseCurrentSession(email, password);
+      } catch {
+        throw Error('Email already registered. Agar pehle signup kiya tha to LOGIN dabao, warna Forgot Password use karo.');
+      }
+    }
+    if (newAccount) await signInOrUseCurrentSession(email, password);
 
     let profileResult;
+    let profileError;
     try {
       profileResult = await api('register_profile', { name, email });
     } catch (error) {
-      msg('authMsg', 'Account created. Profile setup: ' + error.message);
+      profileError = error;
     }
 
     await refreshUser();
-    if (profileResult?.created && profileResult.signupBonusVC === 1000) {
+    if (profileError) {
+      msg('signedMsg', 'Account login ho gaya, lekin wallet setup pending hai: ' + profileError.message + '. Dobara SIGN UP mat karo.');
+    } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
+    } else if (!newAccount) {
+      msg('signedMsg', 'Welcome back! Ye account pehle se bana hua tha; wallet mein duplicate bonus nahi diya gaya.');
     }
   } catch (error) {
     msg('authMsg', error.message);
+  } finally {
+    signupButton.disabled = false;
   }
 };
 
