@@ -284,7 +284,7 @@
 
   <section class="panel" id="authPanel">
     <h3>Player Login / Signup</h3>
-    <div class="welcome-badge">🎁 New Players: Sign up now & get FREE Welcome VC to start playing!</div>
+    <div class="welcome-badge">🎁 Sign Up Bonus: Get 1,000 FREE VC once when you create your account! No cash value.</div>
 
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
     <input id="password" type="password" placeholder="Password (8+ characters)">
@@ -493,6 +493,13 @@ async function refreshUser() {
     $('signedPanel').classList.remove('hide');
     msg('signedName', currentUser.name || currentUser.email);
     await refreshWalletSummary();
+    try {
+      const bonus = Number(sessionStorage.getItem('samratSignupBonusVC'));
+      if (bonus === 1000) {
+        msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
+        sessionStorage.removeItem('samratSignupBonusVC');
+      }
+    } catch {}
   } catch {
     currentUser = null;
     $('authPanel').classList.remove('hide');
@@ -523,13 +530,17 @@ $('signup').onclick = async () => {
     await account.create({ userId: ID.unique(), email, password, name });
     await account.createEmailPasswordSession({ email, password });
 
+    let profileResult;
     try {
-      await api('register_profile', { name, email });
+      profileResult = await api('register_profile', { name, email });
     } catch (error) {
       msg('authMsg', 'Account created. Profile setup: ' + error.message);
     }
 
     await refreshUser();
+    if (profileResult?.created && profileResult.signupBonusVC === 1000) {
+      msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
+    }
   } catch (error) {
     msg('authMsg', error.message);
   }
