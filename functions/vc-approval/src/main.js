@@ -15,6 +15,7 @@ const DB = "6a7f2d1d0035d9815939";
 const ROUND_MS = 1200000,
   OFFSET = 19800000;
 const MAX_CUSTOM_VC = 100000;
+const SIGN_UP_BONUS_VC = 1000; // One-time, at new player profile creation
 
 const send = (res, code, obj) => res.json(obj, code);
 const eq = (attribute, value) => ({
@@ -2886,8 +2887,10 @@ export default async ({ req, res, error }) => {
         return send(res, 200, {
           ok: true,
           created: false,
+          signupBonusVC: 0,
         });
 
+      let created = false;
       try {
         await request("POST", tablePath("user_profiles"), key, {
           rowId: user,
@@ -2895,7 +2898,7 @@ export default async ({ req, res, error }) => {
             userId: user,
             name: typeof b.name === "string" ? b.name.slice(0, 80) : "",
             email: typeof b.email === "string" ? b.email.slice(0, 160) : "",
-            wallet: 0,
+            wallet: SIGN_UP_BONUS_VC,
             dailyDrawsPlayed: 0,
             lastPlayDate: "",
             wins: 0,
@@ -2906,13 +2909,16 @@ export default async ({ req, res, error }) => {
             totalRewardsClaimed: 0,
           },
         });
+        created = true;
       } catch (e) {
         if (e.status !== 409) throw e;
       }
 
       return send(res, 200, {
         ok: true,
-        created: true,
+        created,
+        signupBonusVC: created ? SIGN_UP_BONUS_VC : 0,
+        signupBonusLabel: "Sign Up Bonus",
       });
     }
 
