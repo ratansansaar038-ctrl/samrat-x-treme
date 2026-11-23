@@ -1029,6 +1029,23 @@ async function unusedVouchers(user, key) {
   };
 }
 
+// Anonymous site analytics, deduplicated by a randomly generated browser token.
+ // No IP address, phone number or email is stored in the visitor table.
+async function trackSiteVisit(body, key) {
+  const browserId = typeof body.browserId === "string" ? body.browserId.trim() : "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(browserId))
+    return { ok: false, error: "Invalid browser identifier" };
+  const digest = createHash("sha256").update(PROJECT + ":browser:" + browserId).digest("hex");
+  const rowId = "visitor_" + digest.slice(0, 28);
+  try {
+    await request("POST", tablePath("site_visitors"), key, { rowId, data: {} });
+    return { ok: true, created: true };
+  } catch (e) {
+    if (e.status === 409) return { ok: true, created: false };
+    throw e;
+  }
+}
+
 const dashboardIsAdmin = (user) =>
   typeof user === "string" &&
   (process.env.ADMIN_USER_IDS || "")
@@ -1051,6 +1068,7 @@ async function adminDashboard(user, key) {
 
   const items = [
     ["players", "user_profiles", [order("$createdAt", "desc"), lim(40)]],
+    ["visitors", "site_visitors", [lim(1)]],
     ["vouchers", "vouchers", [order("$createdAt", "desc"), lim(60)]],
     ["unused", "vouchers", [eq("isRedeemed", false), lim(1)]],
     ["redeemed", "vouchers", [eq("isRedeemed", true), lim(1)]],
@@ -1079,6 +1097,7 @@ async function adminDashboard(user, key) {
     ok: true,
     stats: {
       players: data.players?.total ?? null,
+      visitors: data.visitors?.total ?? null,
       vouchers: data.vouchers?.total ?? null,
       unused: data.unused?.total ?? null,
       redeemed: data.redeemed?.total ?? null,
@@ -3514,6 +3533,7 @@ export default async ({ req, res, error }) => {
       "my_entries",
       "my_history",
       "register_profile",
+      "track_site_visit",
       "get_leaderboard",
       "start_game",
       "finish_game",
@@ -3532,6 +3552,7 @@ export default async ({ req, res, error }) => {
       "get_leaderboard",
       "get_recent_activity",
       "get_draw_trends",
+      "track_site_visit",
     ].includes(action)
   )
     return send(res, 401, {
@@ -3540,6 +3561,10 @@ export default async ({ req, res, error }) => {
     });
 
   try {
+    if (action === "track_site_visit") {
+      const result = await trackSiteVisit(b, key);
+      return send(res, result.ok ? 200 : 400, result);
+    }
     if (action === "get_recent_activity") {
       return send(res, 200, await getRecentActivity(key));
     }
