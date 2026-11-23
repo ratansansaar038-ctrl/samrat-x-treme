@@ -16,7 +16,7 @@ on:
       - 'functions/game-wallet/tests/**'
       - '.github/workflows/test-player-auth-navigation.yml'
   push:
-    branches: [main]
+    branches: [main, feat/required-phone-visitor-count-20261123]
     paths:
       - 'index.html'
       - 'login.html'
