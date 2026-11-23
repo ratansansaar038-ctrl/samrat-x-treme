@@ -18,7 +18,7 @@
 <form id="form">
 <label for="name">Name</label><input id="name" required maxlength="128" autocomplete="name">
 <label for="email">Email</label><input id="email" type="email" required autocomplete="email">
-<label for="phone">Mobile Number (+91 India, required)</label><input id="phone" type="tel" required inputmode="numeric" pattern="(?:\\+?91)?[6-9][0-9]{9}" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number">
+<label for="phone">Mobile Number (+91 India, required)</label><input id="phone" type="tel" required inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number">
 <label for="password">Password</label><input id="password" type="password" required minlength="8" autocomplete="new-password">
 <label for="confirm">Confirm Password</label><input id="confirm" type="password" required minlength="8" autocomplete="new-password">
 <label for="ref">Referral Code (Optional)</label><input id="ref" maxlength="32" autocomplete="off" placeholder="Referral code">
@@ -58,7 +58,7 @@ async function finishWalletProfile(user,name,email,entered){
  if(execution.responseStatusCode!==200||result.ok!==true)throw Error(result.error||'Wallet profile setup failed');
  return result.created===true&&result.signupBonusVC===1000;
 }
-async function prepare(){try{const u=await account.get();if(u.phone&&!u.phoneVerification)location.replace('verify-phone.html');else if(u.phoneVerification)location.replace('number-draw.html');else{button.disabled=false;button.textContent='COMPLETE SIGNUP';notify('Add and verify your mobile number to finish signup.')}}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
+async function prepare(){try{const u=await account.get();if(!u.phone){button.disabled=false;button.textContent='COMPLETE SIGNUP';notify('Add and verify your mobile number to finish signup.');return}const s=await SamratPhone.getPhoneOtpStatus(functions);location.replace(s.verified?'number-draw.html':'verify-phone.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(button.disabled)return;
  const name=document.getElementById('name').value.trim();
@@ -82,7 +82,7 @@ form.addEventListener('submit',async e=>{
   if(created)await signInOrUseCurrentSession(email,password);
   authReady=true;
   // The phone must be saved to Auth before the signup bonus can be issued.
-  const phoneStatus = await SamratPhone.beginPhoneVerification(account,password,phone);
+  const phoneStatus = await SamratPhone.beginPhoneVerification(account,functions,password,phone);
   if(!phoneStatus.verified){location.replace('verify-phone.html');return}
   const bonusAdded=await finishWalletProfile(user,name,email,entered);
   
