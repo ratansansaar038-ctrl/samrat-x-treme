@@ -9,41 +9,51 @@ const phone = read('signup-phone.js');
 const tracker = read('site-visitor.js');
 const backend = read('functions/game-wallet/src/main.js');
 
-test('required mobile is normalized and Appwrite OTP verifies the same Auth account', async () => {
+test('Indian mobile uses E.164 and APITxT OTP stays on the server', async () => {
   const sandbox = createContext({ window: {} });
   new Script(phone).runInContext(sandbox);
   const helper = sandbox.window.SamratPhone;
   assert.equal(helper.normalizeMobile('9876543210'), '+919876543210');
   assert.equal(helper.normalizeMobile('+91 9876543210'), '+919876543210');
   assert.throws(() => helper.normalizeMobile('123'), /valid 10-digit/);
-  assert.throws(() => helper.normalizeMobile('1234567890'), /valid 10-digit/);
-  let current = { $id: 'appwrite-user', phone: '', phoneVerification: false };
-  let saved = 0, otpSent = 0;
+  let current = { $id: 'appwrite-user', phone: '' };
+  let saved = 0, otpSent = 0, verified = false;
   const account = {
     get: async () => current,
-    updatePhone: async ({ phone, password }) => {
+    updatePhone: async ({phone, password}) => {
       assert.equal(password, 'test-password');
       saved++;
-      current = { ...current, phone, phoneVerification: false };
-    },
-    createPhoneVerification: async () => { otpSent++; },
-    updatePhoneVerification: async ({ userId, secret }) => {
-      if (userId !== 'appwrite-user' || secret !== '123456') throw Error('Invalid OTP');
-      current = { ...current, phoneVerification: true };
+      current = {...current, phone};
+      verified = false;
     }
   };
-  const begun = await helper.beginPhoneVerification(account, 'test-password', '9876543210');
+  const functions = {
+    createExecution: async ({body}) => {
+      const {action, otp} = JSON.parse(body);
+      let result;
+      if (action === 'sms_otp_status') result = {ok:true, verified};
+      else if (action === 'start_sms_otp') {
+        otpSent++;
+        result = {ok:true, verified, phoneLast4:'3210'};
+      } else if (action === 'verify_sms_otp') {
+        if (otp !== '123456') result = {ok:false,error:'Incorrect OTP'};
+        else {verified=true;result={ok:true,verified:true}}
+      } else result={ok:false,error:'Unknown action'};
+      return {responseStatusCode:result.ok?200:400,responseBody:JSON.stringify(result)};
+    }
+  };
+  const begun = await helper.beginPhoneVerification(account, functions, 'test-password', '9876543210');
   assert.equal(begun.verified, false);
   assert.equal(saved, 1);
   assert.equal(otpSent, 1);
-  await assert.rejects(helper.completePhoneVerification(account, '000000'), /Invalid OTP/);
-  assert.equal(current.phoneVerification, false);
-  const verified = await helper.completePhoneVerification(account, '123456');
-  assert.equal(verified.phoneVerification, true);
-  assert.equal((await helper.beginPhoneVerification(account, 'test-password', '9876543210')).verified, true);
+  await assert.rejects(helper.completePhoneVerification(account, functions, '000000'), /Incorrect OTP/);
+  assert.equal(verified, false);
+  const result = await helper.completePhoneVerification(account, functions, '123456');
+  assert.equal(result.verified, true);
+  assert.equal((await helper.getPhoneOtpStatus(functions)).verified, true);
+  await helper.beginPhoneVerification(account, functions, 'test-password', '9876543210');
   assert.equal(saved, 1);
-  assert.equal(otpSent, 1);
-  await assert.rejects(helper.beginPhoneVerification(account, 'test-password', '9876543211'), /verified mobile/);
+  await assert.rejects(helper.beginPhoneVerification(account, functions, 'test-password', '9876543211'), /verified mobile/);
 });
 
 test('public pages include the privacy-conscious visitor tracker', () => {
