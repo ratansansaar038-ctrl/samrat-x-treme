@@ -1,4 +1,5 @@
 import https from "node:https";
+import { createOtpService } from "./otp.js";
 import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
@@ -1027,6 +1028,69 @@ async function unusedVouchers(user, key) {
       .map((x) => ({ code: x.code, coins: x.coins })),
     limit: 100,
   };
+}
+
+// SMS OTP is delivered by APITxT; verification and one-time VC grants remain server-side.
+async function deliverApitxtOtp(phone, code) {
+  const authkey = process.env.APITXT_SMS_AUTHKEY || "";
+  if (!authkey) throw Error("APITxT SMS key not configured. Ask the admin.");
+  const body = new URLSearchParams({
+    authkey,
+    mobile: phone.replace(/^\+/, ""),
+    otp: code,
+    channel: "sms",
+  });
+  if (process.env.APITXT_SMS_TEMPLATE_ID)
+    body.set("template_id", process.env.APITXT_SMS_TEMPLATE_ID);
+  return new Promise((resolve, reject) => {
+    const req = https.request("https://apitxt.com/api/sendOTP", {
+      method: "POST",
+      timeout: 15000,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body.toString()),
+        Accept: "application/json",
+      },
+    }, (response) => {
+      let raw = "";
+      response.on("data", part => {
+        raw += part;
+        if (raw.length > 20000) response.destroy(Error("SMS gateway response too large"));
+      });
+      response.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(raw); }
+        catch { return reject(Error("Invalid SMS gateway response")); }
+        if (response.statusCode < 200 || response.statusCode >= 300 ||
+            String(parsed.status || "").toLowerCase() !== "success")
+          return reject(Error("SMS gateway rejected this OTP request. Check APITxT SMS access and credits."));
+        resolve();
+      });
+    });
+    req.on("timeout", () => req.destroy(Error("SMS gateway timeout")));
+    req.on("error", () => reject(Error("SMS gateway unavailable. Please try later.")));
+    req.end(body.toString());
+  });
+}
+
+function smsOtpService(key) {
+  const table = "phone_otp_challenges";
+  const basePath = tablePath(table);
+  return createOtpService({
+    secret: process.env.SAMRAT_SMS_OTP_SECRET,
+    authUser: uid => request("GET", "/users/" + encodeURIComponent(uid), key),
+    readRecord: async rowId => {
+      try { return await request("GET", basePath + "/" + encodeURIComponent(rowId), key); }
+      catch (e) { if (e.status === 404) return null; throw e; }
+    },
+    writeRecord: (rowId, data, exists) => request(
+      exists ? "PATCH" : "POST",
+      exists ? basePath + "/" + encodeURIComponent(rowId) : basePath,
+      key,
+      exists ? { data } : { rowId, data },
+    ),
+    sendSms: deliverApitxtOtp,
+  });
 }
 
 // Anonymous site analytics, deduplicated by a randomly generated browser token.
@@ -3534,6 +3598,9 @@ export default async ({ req, res, error }) => {
       "my_history",
       "register_profile",
       "track_site_visit",
+      "start_sms_otp",
+      "verify_sms_otp",
+      "sms_otp_status",
       "get_leaderboard",
       "start_game",
       "finish_game",
@@ -3564,6 +3631,17 @@ export default async ({ req, res, error }) => {
     if (action === "track_site_visit") {
       const result = await trackSiteVisit(b, key);
       return send(res, result.ok ? 200 : 400, result);
+    }
+    if (action === "start_sms_otp") {
+      const result = await smsOtpService(key).begin(user);
+      return send(res, result.ok ? 200 : 429, result);
+    }
+    if (action === "verify_sms_otp") {
+      const result = await smsOtpService(key).verify(user, b.otp);
+      return send(res, result.ok ? 200 : 400, result);
+    }
+    if (action === "sms_otp_status") {
+      return send(res, 200, await smsOtpService(key).status(user));
     }
     if (action === "get_recent_activity") {
       return send(res, 200, await getRecentActivity(key));
@@ -3632,23 +3710,12 @@ export default async ({ req, res, error }) => {
           signupBonusVC: 0,
         });
 
-      // Never issue the 1,000 VC signup bonus on the strength of client-side OTP UI alone.
-      // Appwrite must confirm phoneVerification on the authenticated user's Auth record.
-      let verifiedAuth;
-      try {
-        verifiedAuth = await request("GET", "/users/" + encodeURIComponent(user), key);
-      } catch (e) {
-        if (e.status === 401 || e.status === 403)
-          return send(res, 503, {
-            ok: false,
-            error: "Phone verification check is unavailable. Appwrite game-wallet Function needs users.read permission.",
-          });
-        throw e;
-      }
-      if (!verifiedAuth?.phone || verifiedAuth?.phoneVerification !== true)
+      // Verify the APITxT SMS challenge on the server. Client claims are never trusted.
+      // Existing profiles were returned above and keep their current balances.
+      if (!(await smsOtpService(key).isVerified(user)))
         return send(res, 403, {
           ok: false,
-          error: "Verify your mobile number using Appwrite SMS OTP before claiming Sign Up Bonus.",
+          error: "Verify the SMS OTP sent via APITxT before claiming your Sign Up Bonus.",
         });
 
       let created = false;
