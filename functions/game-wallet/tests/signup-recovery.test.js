@@ -195,7 +195,8 @@ test('main Lucky Draw card is promoted ahead of signup and free coins', () => {
   assert.ok(card < homepage.indexOf('id="freeVcPanel"'));
   assert.ok(homepage.indexOf('id="freeVcPanel"') < homepage.indexOf('class="skill-card speed"'));
   assert.match(loginPage, /: "number-draw\.html";/);
-  assert.equal(signupPage.match(/location\.replace\('number-draw\.html'\)/g)?.length, 2);
+  assert.equal(signupPage.match(/location\.replace\('number-draw\.html'\)/g)?.length, 1);
+  assert.match(signupPage, /s\.verified\?'number-draw\.html':'verify-phone\.html'/);
   assert.match(drawPage, /id="signupBonusNotice"/);
 });
 
