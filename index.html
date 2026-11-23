@@ -7,6 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <title>Lucky Number Draw 00–99 & Free Games | Samrat X-Treme</title><meta name="description" content="Play the free Lucky Number Draw (00–99) on Samrat X-Treme with results every 20 minutes, plus Speed Tap, Memory X and Math Challenge. No cash prizes."><link rel="canonical" href="https://samratxtreme.online/">
   <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+  <script src="signup-phone.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -302,6 +303,8 @@
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
     <input id="password" type="password" placeholder="Password (8+ characters)">
     <input id="name" placeholder="Name (only for new signup)">
+    <label for="phone" class="small" style="display:block;margin-top:8px">Mobile number (required for SIGN UP, +91 India)</label>
+    <input id="phone" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number" aria-label="Mobile number required for new signup">
 
     <div class="row">
       <button class="btn" id="login">LOGIN</button>
@@ -543,6 +546,7 @@ $('signup').onclick = async () => {
     const name = $('name').value.trim();
     const email = $('email').value.trim();
     const password = $('password').value;
+    const phone = SamratPhone.normalizeMobile($('phone').value);
 
     if (!name) throw Error('Enter your name');
 
@@ -561,6 +565,8 @@ $('signup').onclick = async () => {
       }
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
+    // Save a required mobile number in Appwrite Auth before provisioning the 1,000 VC wallet.
+    await SamratPhone.saveSignupMobile(account, password, phone);
 
     let profileResult;
     let profileError;
