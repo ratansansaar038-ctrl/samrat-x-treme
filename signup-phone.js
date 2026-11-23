@@ -1,4 +1,4 @@
-/* Samrat X-Treme signup mobile: India's +91 country code, not OTP verified. */
+/* Samrat X-Treme: phone input validation and Appwrite's own SMS OTP verification. */
 (function (global) {
   'use strict';
   function normalizeMobile(input) {
@@ -9,16 +9,35 @@
     }
     return '+91' + digits;
   }
-  async function saveSignupMobile(account, password, input) {
+  async function beginPhoneVerification(account, password, input) {
     const phone = normalizeMobile(input);
     const current = await account.get();
-    if (current.phone === phone) return phone;
-    if (current.phone && current.phone !== phone) {
-      throw Error('This account already has a different mobile number. Use LOGIN or contact support.');
+    if (current.phone && current.phone !== phone && current.phoneVerification) {
+      throw Error('This account already has a verified mobile number. Use LOGIN or contact support.');
     }
-    // Appwrite stores the number on the signed-in Auth account; it does not send an OTP automatically.
-    await account.updatePhone({ phone, password });
-    return phone;
+    if (current.phone !== phone) {
+      await account.updatePhone({ phone, password });
+    }
+    const updated = await account.get();
+    if (updated.phone !== phone) throw Error('Mobile number could not be saved to your account.');
+    if (updated.phoneVerification === true) return { verified: true, phone };
+    // The OTP is generated and delivered by Appwrite Cloud, not our website.
+    await account.createPhoneVerification();
+    return { verified: false, phone };
   }
-  global.SamratPhone = { normalizeMobile, saveSignupMobile };
+  async function completePhoneVerification(account, secret) {
+    const code = String(secret || '').trim();
+    if (!/^\d{4,8}$/.test(code)) throw Error('Enter the OTP sent by Appwrite.');
+    const user = await account.get();
+    if (!user.phone) throw Error('Mobile number missing. Return to signup.');
+    if (!user.phoneVerification) {
+      await account.updatePhoneVerification({ userId: user.$id, secret: code });
+    }
+    const checked = await account.get();
+    if (checked.phoneVerification !== true) {
+      throw Error('Mobile OTP verification has not completed.');
+    }
+    return checked;
+  }
+  global.SamratPhone = { normalizeMobile, beginPhoneVerification, completePhoneVerification };
 })(window);
