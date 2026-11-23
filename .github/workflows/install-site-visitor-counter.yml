@@ -27,7 +27,7 @@ jobs:
         run: |
           node --check functions/game-wallet/src/main.js
           if [ -z "$APPWRITE_DEPLOY_KEY" ]; then
-            echo "::error::Add APPWRITE_DEPLOY_KEY GitHub secret with tablesdb.write and functions.write scopes; deployment not attempted."
+            echo "::error::Add APPWRITE_DEPLOY_KEY GitHub secret with tables.read, tables.write, functions.read and functions.write scopes; deployment not attempted."
             exit 1
           fi
       - name: Create private visitor table if missing (does not touch user wallets)
