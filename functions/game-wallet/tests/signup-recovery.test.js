@@ -9,6 +9,10 @@ const signupPage = readFileSync(new URL('signup.html', root), 'utf8');
 const loginPage = readFileSync(new URL('login.html', root), 'utf8');
 const drawPage = readFileSync(new URL('number-draw.html', root), 'utf8');
 const phoneHelper = readFileSync(new URL('signup-phone.js', root), 'utf8');
+const otpPage = readFileSync(new URL('verify-phone.html', root), 'utf8');
+const server = readFileSync(new URL('functions/game-wallet/src/main.js', root), 'utf8');
+const admin = readFileSync(new URL('admin-dashboard.html', root), 'utf8');
+const visitor = readFileSync(new URL('site-visitor.js', root), 'utf8');
 
 function inlineScript(html) {
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
@@ -16,13 +20,14 @@ function inlineScript(html) {
   return match[1];
 }
 
-function fakeHome({ createError, signInError, profile }) {
+function fakeHome({ createError, signInError, profile, verifiedPhone = false, otpSendError }) {
   const elements = new Map();
   const calls = [];
   const redirects = [];
   const storage = new Map();
   let signedIn = false;
-  let storedPhone = '';
+  let storedPhone = verifiedPhone ? '+919876543210' : '';
+  let isPhoneVerified = verifiedPhone;
   const email = 'brand-new-player@example.com';
   const data = { email, password: 'Safe-Test-Pass-123', name: 'Player', phone: '9876543210' };
   const getElement = (id) => {
@@ -52,12 +57,23 @@ function fakeHome({ createError, signInError, profile }) {
     }
     async get() {
       if (!signedIn) throw Error('Not signed in');
-      return { $id: 'new-id', email, name: 'Player', phone: storedPhone };
+      return { $id: 'new-id', email, name: 'Player', phone: storedPhone, phoneVerification: isPhoneVerified };
     }
     async updatePhone({phone, password}) {
       if (!signedIn || password !== data.password) throw Error('Invalid credentials');
       storedPhone = phone;
+      isPhoneVerified = false;
       calls.push('updatePhone');
+    }
+    async createPhoneVerification() {
+      calls.push('sendOtp');
+      if (otpSendError) throw otpSendError;
+      return { userId: 'new-id' };
+    }
+    async updatePhoneVerification({ userId, secret }) {
+      calls.push('verifyOtp');
+      if (userId !== 'new-id' || secret !== '123456') throw Error('Invalid OTP');
+      isPhoneVerified = true;
     }
   }
   class Functions {
@@ -83,19 +99,20 @@ function fakeHome({ createError, signInError, profile }) {
   // Browser window properties also resolve as globals; vm context needs an explicit alias.
   context.SamratPhone = context.window.SamratPhone;
   new Script(inlineScript(homepage), { filename: 'index.html' }).runInContext(context);
-  return { elements, getElement, calls, redirects, storage, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
+  return { elements, getElement, calls, redirects, storage, account: new Account(), phoneHelper: context.SamratPhone, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
 }
 
 test('homepage signup resumes a partially created Auth account and awards missing profile bonus', async () => {
   const h = fakeHome({
     createError: { type: 'user_already_exists', code: 409, message: 'User already exists' },
-    profile: { ok: true, created: true, signupBonusVC: 1000, wallet: 1000 }
+    profile: { ok: true, created: true, signupBonusVC: 1000, wallet: 1000 },
+    verifiedPhone: true
   });
   await h.clickSignup();
   assert.equal(h.calls.filter(x => x === 'create').length, 1);
   assert.equal(h.calls.filter(x => x === 'login').length, 1);
   assert.equal(h.calls.filter(x => x === 'register_profile').length, 1);
-  assert.equal(h.calls.filter(x => x === 'updatePhone').length, 1);
+  assert.equal(h.calls.filter(x => x === 'updatePhone').length, 0);
   assert.match(h.elements.get('signedMsg').textContent, /Sign Up Bonus.*1,000 VC/);
   assert.match(h.elements.get('walletSummary').textContent, /Wallet: 1000 VC/);
   assert.deepEqual(h.redirects, ['number-draw.html']);
@@ -105,7 +122,8 @@ test('homepage signup resumes a partially created Auth account and awards missin
 test('repeated signup signs in but does not credit another bonus when profile already exists', async () => {
   const h = fakeHome({
     createError: { type: 'user_already_exists', code: 409, message: 'User already exists' },
-    profile: { ok: true, created: false, signupBonusVC: 0, wallet: 210 }
+    profile: { ok: true, created: false, signupBonusVC: 0, wallet: 210 },
+    verifiedPhone: true
   });
   await h.clickSignup();
   assert.match(h.elements.get('signedMsg').textContent, /duplicate bonus nahi/);
@@ -127,11 +145,32 @@ test('existing email with wrong password cannot get a bonus or bypass login', as
   assert.equal(h.redirects.length, 0);
 });
 
-test('new signup still receives its original one-time bonus', async () => {
+test('new signup must send phone OTP and cannot claim the bonus before verification', async () => {
   const h = fakeHome({ profile: { ok: true, created: true, signupBonusVC: 1000, wallet: 1000 } });
   await h.clickSignup();
-  assert.match(h.elements.get('signedMsg').textContent, /Sign Up Bonus.*1,000 VC/);
-  assert.deepEqual(h.redirects, ['number-draw.html']);
+  assert.ok(h.calls.includes('updatePhone'));
+  assert.ok(h.calls.includes('sendOtp'));
+  assert.ok(!h.calls.includes('register_profile'));
+  assert.deepEqual(h.redirects, ['verify-phone.html']);
+  assert.equal(h.storage.get('samratSignupBonusVC'), undefined);
+});
+
+test('Appwrite phone OTP must verify before profile can be created', async () => {
+  const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
+  await h.clickLogin();
+  await h.phoneHelper.beginPhoneVerification(h.account, 'Safe-Test-Pass-123', '9876543210');
+  await assert.rejects(() => h.phoneHelper.completePhoneVerification(h.account, '000000'), /Invalid OTP/);
+  assert.equal((await h.account.get()).phoneVerification, false);
+  await h.phoneHelper.completePhoneVerification(h.account, '123456');
+  assert.equal((await h.account.get()).phoneVerification, true);
+});
+
+test('SMS OTP send errors must not grant a wallet bonus', async () => {
+  const h = fakeHome({ profile: { ok: true, created: true, signupBonusVC: 1000 }, otpSendError: Error('SMS service not enabled') });
+  await h.clickSignup();
+  assert.ok(!h.calls.includes('register_profile'));
+  assert.equal(h.redirects.length, 0);
+  assert.match(h.elements.get('authMsg').textContent, /SMS service not enabled/);
 });
 
 test('homepage login redirects only after successful authentication', async () => {
@@ -144,7 +183,7 @@ test('homepage login redirects only after successful authentication', async () =
 });
 
 test('wallet setup failure does not redirect to a broken game session', async () => {
-  const h = fakeHome({ profile: { ok: false, error: 'Wallet setup failed', wallet: 0 } });
+  const h = fakeHome({ profile: { ok: false, error: 'Wallet setup failed', wallet: 0 }, verifiedPhone: true });
   await h.clickSignup();
   assert.equal(h.redirects.length, 0);
   assert.match(h.elements.get('signedMsg').textContent, /wallet setup pending/);
@@ -176,9 +215,18 @@ test('both homepage and referral signup scripts parse and implement recovery', (
   new Script(inlineScript(signupPage));
   new Script(inlineScript(loginPage));
   new Script(inlineScript(drawPage));
+  new Script(inlineScript(otpPage));
+  new Script(phoneHelper);
   assert.match(signupPage, /finishWalletProfile\(user,name,email,entered\)/);
-  assert.match(signupPage, /SamratPhone\.saveSignupMobile\(account,password,phone\)/);
-  assert.match(homepage, /SamratPhone\.saveSignupMobile\(account, password, phone\)/);
+  assert.match(signupPage, /SamratPhone\.beginPhoneVerification\(account,password,phone\)/);
+  assert.match(homepage, /SamratPhone\.beginPhoneVerification\(account, password, phone\)/);
+  assert.match(otpPage, /completePhoneVerification\(account/);
+  assert.match(otpPage, /updatePhoneVerification|completePhoneVerification/);
+  assert.doesNotMatch(signupPage, /db\.createRow/);
+  assert.match(server, /verifiedAuth\?\.phoneVerification !== true/);
+  assert.match(server, /track_site_visit/);
+  assert.match(admin, /id="mVisitors"/);
+  assert.match(visitor, /samratSiteVisitorIdV1/);
   assert.match(signupPage, /WALLET_FUNCTION="6ae1bcc500208a5a7efb"/);
   assert.match(homepage, /if \(signupButton\.disabled\) return/);
 });
