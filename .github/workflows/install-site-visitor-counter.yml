@@ -1,0 +1,94 @@
+name: Install Samrat Visitor Counter in Appwrite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/game-wallet/src/main.js'
+      - '.github/workflows/install-site-visitor-counter.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  setup-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APPWRITE_DEPLOY_KEY: ${{ secrets.APPWRITE_DEPLOY_KEY }}
+      PROJECT_ID: 6a7f2add0011a7bfc21a
+      DATABASE_ID: 6a7f2d1d0035d9815939
+      FUNCTION_ID: 6ae1bcc500208a5a7efb
+      ENDPOINT: https://sgp.cloud.appwrite.io/v1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate code and deployment credential
+        run: |
+          node --check functions/game-wallet/src/main.js
+          if [ -z "$APPWRITE_DEPLOY_KEY" ]; then
+            echo "::error::Add APPWRITE_DEPLOY_KEY GitHub secret with tablesdb.write and functions.write scopes; deployment not attempted."
+            exit 1
+          fi
+      - name: Create private visitor table if missing (does not touch user wallets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$ENDPOINT/tablesdb/$DATABASE_ID/tables/site_visitors"
+          STATUS=$(curl -sS -o /tmp/table.json -w "%{http_code}" \
+            -H "X-Appwrite-Project: $PROJECT_ID" \
+            -H "X-Appwrite-Key: $APPWRITE_DEPLOY_KEY" \
+            "$URL")
+          if [ "$STATUS" = 200 ]; then
+            echo "Existing visitor table kept; no migration to existing rows"
+          elif [ "$STATUS" = 404 ]; then
+            STATUS=$(curl -sS -o /tmp/create.json -w "%{http_code}" \
+              -X POST "$ENDPOINT/tablesdb/$DATABASE_ID/tables" \
+              -H "X-Appwrite-Project: $PROJECT_ID" \
+              -H "X-Appwrite-Key: $APPWRITE_DEPLOY_KEY" \
+              -H "Content-Type: application/json" \
+              --data '{"tableId":"site_visitors","name":"Website Visitors","rowSecurity":false,"permissions":[],"enabled":true,"columns":[],"indexes":[]}')
+            if [ "$STATUS" != 201 ]; then
+              echo "::error::Visitor table could not be created (HTTP $STATUS); check key scopes and DB ID"
+              exit 1
+            fi
+            echo "Created private site_visitors table (no columns, no public permissions)"
+          else
+            echo "::error::Visitor table check failed (HTTP $STATUS)"
+            exit 1
+          fi
+      - name: Deploy updated game-wallet function
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/samrat-game-wallet.tar.gz -C functions/game-wallet package.json src/main.js
+          STATUS=$(curl -sS -o /tmp/deploy.json -w "%{http_code}" \
+            -X POST "$ENDPOINT/functions/$FUNCTION_ID/deployments" \
+            -H "X-Appwrite-Project: $PROJECT_ID" \
+            -H "X-Appwrite-Key: $APPWRITE_DEPLOY_KEY" \
+            -F 'entrypoint=src/main.js' \
+            -F 'activate=true' \
+            -F 'code=@/tmp/samrat-game-wallet.tar.gz;type=application/gzip')
+          if [ "$STATUS" != 202 ]; then
+            echo "::error::Backend deploy request failed (HTTP $STATUS); existing deployment untouched"
+            exit 1
+          fi
+          DEPLOYMENT_ID=$(jq -r '."$id" // empty' /tmp/deploy.json)
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::error::Deployment was accepted but returned no ID"
+            exit 1
+          fi
+          echo "Deployment accepted: $DEPLOYMENT_ID"
+          for i in $(seq 1 45); do
+            sleep 8
+            STATUS=$(curl -sS -o /tmp/deployment-status.json -w "%{http_code}" \
+              -H "X-Appwrite-Project: $PROJECT_ID" \
+              -H "X-Appwrite-Key: $APPWRITE_DEPLOY_KEY" \
+              "$ENDPOINT/functions/$FUNCTION_ID/deployments/$DEPLOYMENT_ID")
+            if [ "$STATUS" != 200 ]; then echo "::error::Deployment status fetch failed (HTTP $STATUS)";exit 1;fi
+            STATE=$(jq -r '.status // "unknown"' /tmp/deployment-status.json)
+            if [ "$STATE" = ready ]; then echo "Appwrite backend build READY";exit 0;fi
+            if [ "$STATE" = failed ]; then echo "::error::Appwrite backend build failed";exit 1;fi
+          done
+          echo "::error::Deployment not ready within polling window; review Appwrite Console"
+          exit 1

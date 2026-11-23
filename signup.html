@@ -6,10 +6,11 @@
 <meta name="theme-color" content="#08010f">
 <title>Elite Signup | Samrat X-Treme</title>
 <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<script src="signup-phone.js"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:18px;background:radial-gradient(circle at top,#431267,#14051f 50%,#030106);color:white;font-family:Arial,sans-serif}.card{width:100%;max-width:420px;padding:26px 20px;background:linear-gradient(145deg,#171027,#281047);border:1px solid #7046d8;border-radius:22px;box-shadow:0 0 32px #6f32ff55}.logo{display:block;width:210px;max-width:80%;margin:0 auto 15px}h1{text-align:center;color:#ffe16a;margin:0 0 6px}.sub{text-align:center;color:#a99bc5;font-size:12px;margin-bottom:20px}label{display:block;margin:14px 0 6px;color:#d2c4f0;font-size:12px}input{width:100%;padding:13px;background:#0e0819;color:#fff;border:1px solid #51388d;border-radius:12px;font-size:14px}button{width:100%;margin-top:20px;padding:15px;border:0;border-radius:14px;background:linear-gradient(90deg,#ffe033,#ff8b00,#ff2b9d);color:#210014;font-weight:900;font-size:15px}button:disabled{opacity:.5}.note{color:#a99bc5;text-align:center;font-size:11px;line-height:1.6;margin-top:14px}a{color:#ffe16a}#message{min-height:30px;color:#ffb7db;text-align:center;font-size:12px;margin-top:12px;line-height:1.5}
 </style>
-</head>
+<script src="site-visitor.js" defer></script></head>
 <body>
 <main class="card">
 <img src="samrat-logo.png" alt="Samrat X-Treme" class="logo">
@@ -17,6 +18,7 @@
 <form id="form">
 <label for="name">Name</label><input id="name" required maxlength="128" autocomplete="name">
 <label for="email">Email</label><input id="email" type="email" required autocomplete="email">
+<label for="phone">Mobile Number (+91 India, required)</label><input id="phone" type="tel" required inputmode="numeric" pattern="(?:\\+?91)?[6-9][0-9]{9}" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number">
 <label for="password">Password</label><input id="password" type="password" required minlength="8" autocomplete="new-password">
 <label for="confirm">Confirm Password</label><input id="confirm" type="password" required minlength="8" autocomplete="new-password">
 <label for="ref">Referral Code (Optional)</label><input id="ref" maxlength="32" autocomplete="off" placeholder="Referral code">
@@ -68,6 +70,8 @@ form.addEventListener('submit',async e=>{
  const name=document.getElementById('name').value.trim();
  const email=document.getElementById('email').value.trim();
  const password=document.getElementById('password').value;
+ let phone;
+ try{phone=SamratPhone.normalizeMobile(document.getElementById('phone').value)}catch(error){notify(error.message);return}
  const confirm=document.getElementById('confirm').value;
  const entered=referralInput.value.trim().toUpperCase();
  if(!name||password.length<8||password!==confirm){notify('Name, password aur confirm password check karo.');return}
@@ -83,6 +87,8 @@ form.addEventListener('submit',async e=>{
   }
   if(created)await signInOrUseCurrentSession(email,password);
   authReady=true;
+  // The phone must be saved to Auth before the signup bonus can be issued.
+  await SamratPhone.saveSignupMobile(account,password,phone);
   const bonusAdded=await finishWalletProfile(user,name,email,entered);
   
 if (entered) {
@@ -107,7 +113,7 @@ if (entered) {
   if(bonusAdded){try{sessionStorage.setItem('samratSignupBonusVC','1000')}catch{}}
   notify(bonusAdded?'🎁 Sign Up Bonus: 1,000 VC added to your wallet!':'Account pehle se registered hai. Wallet ka existing balance safe hai.',true);
   location.replace('number-draw.html');
- }catch(err){console.error('Signup failed',err);notify(authReady?'Account login ho gaya, lekin wallet setup fail hua. Dobara signup mat karo; support se contact karo.':accountCreated?'Account ban gaya hai, lekin login complete nahi hua. LOGIN se sign in karo; dobara signup mat karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
+ }catch(err){console.error('Signup failed',err);notify(authReady?'Account login ho gaya, lekin mobile/wallet setup pending hai: '+(err?.message||'Contact support')+'. Dobara signup mat karo.':accountCreated?'Account ban gaya hai, lekin login complete nahi hua. LOGIN se sign in karo; dobara signup mat karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
 });
 prepare();
 </script>

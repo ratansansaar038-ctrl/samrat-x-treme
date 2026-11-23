@@ -7,6 +7,10 @@ on:
       - 'login.html'
       - 'signup.html'
       - 'number-draw.html'
+      - 'admin-dashboard.html'
+      - 'signup-phone.js'
+      - 'site-visitor.js'
+      - 'functions/game-wallet/src/main.js'
       - 'functions/game-wallet/tests/**'
       - '.github/workflows/test-player-auth-navigation.yml'
   push:
@@ -16,6 +20,10 @@ on:
       - 'login.html'
       - 'signup.html'
       - 'number-draw.html'
+      - 'admin-dashboard.html'
+      - 'signup-phone.js'
+      - 'site-visitor.js'
+      - 'functions/game-wallet/src/main.js'
       - 'functions/game-wallet/tests/**'
       - '.github/workflows/test-player-auth-navigation.yml'
 
@@ -31,4 +39,6 @@ jobs:
       - name: Verify JavaScript test runtime
         run: node --version
       - name: Test signup recovery, bonus and Lucky Draw redirects
-        run: node --test functions/game-wallet/tests/signup-recovery.test.js
+        run: |
+          node --check functions/game-wallet/src/main.js
+          node --test functions/game-wallet/tests/signup-recovery.test.js functions/game-wallet/tests/visitor-phone.test.js

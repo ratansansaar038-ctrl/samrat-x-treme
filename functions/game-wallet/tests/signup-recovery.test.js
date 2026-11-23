@@ -8,6 +8,7 @@ const homepage = readFileSync(new URL('index.html', root), 'utf8');
 const signupPage = readFileSync(new URL('signup.html', root), 'utf8');
 const loginPage = readFileSync(new URL('login.html', root), 'utf8');
 const drawPage = readFileSync(new URL('number-draw.html', root), 'utf8');
+const phoneHelper = readFileSync(new URL('signup-phone.js', root), 'utf8');
 
 function inlineScript(html) {
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
@@ -21,8 +22,9 @@ function fakeHome({ createError, signInError, profile }) {
   const redirects = [];
   const storage = new Map();
   let signedIn = false;
+  let storedPhone = '';
   const email = 'brand-new-player@example.com';
-  const data = { email, password: 'Safe-Test-Pass-123', name: 'Player' };
+  const data = { email, password: 'Safe-Test-Pass-123', name: 'Player', phone: '9876543210' };
   const getElement = (id) => {
     if (!elements.has(id)) {
       elements.set(id, {
@@ -50,7 +52,12 @@ function fakeHome({ createError, signInError, profile }) {
     }
     async get() {
       if (!signedIn) throw Error('Not signed in');
-      return { $id: 'new-id', email, name: 'Player' };
+      return { $id: 'new-id', email, name: 'Player', phone: storedPhone };
+    }
+    async updatePhone({phone, password}) {
+      if (!signedIn || password !== data.password) throw Error('Invalid credentials');
+      storedPhone = phone;
+      calls.push('updatePhone');
     }
   }
   class Functions {
@@ -72,8 +79,11 @@ function fakeHome({ createError, signInError, profile }) {
     sessionStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)), removeItem: (key) => storage.delete(key) },
     setInterval() {}, console,
   });
+  new Script(phoneHelper, { filename: 'signup-phone.js' }).runInContext(context);
+  // Browser window properties also resolve as globals; vm context needs an explicit alias.
+  context.SamratPhone = context.window.SamratPhone;
   new Script(inlineScript(homepage), { filename: 'index.html' }).runInContext(context);
-  return { elements, calls, redirects, storage, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
+  return { elements, getElement, calls, redirects, storage, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
 }
 
 test('homepage signup resumes a partially created Auth account and awards missing profile bonus', async () => {
@@ -85,6 +95,7 @@ test('homepage signup resumes a partially created Auth account and awards missin
   assert.equal(h.calls.filter(x => x === 'create').length, 1);
   assert.equal(h.calls.filter(x => x === 'login').length, 1);
   assert.equal(h.calls.filter(x => x === 'register_profile').length, 1);
+  assert.equal(h.calls.filter(x => x === 'updatePhone').length, 1);
   assert.match(h.elements.get('signedMsg').textContent, /Sign Up Bonus.*1,000 VC/);
   assert.match(h.elements.get('walletSummary').textContent, /Wallet: 1000 VC/);
   assert.deepEqual(h.redirects, ['number-draw.html']);
@@ -111,6 +122,7 @@ test('existing email with wrong password cannot get a bonus or bypass login', as
   });
   await h.clickSignup();
   assert.ok(!h.calls.includes('register_profile'));
+  assert.ok(!h.calls.includes('updatePhone'));
   assert.match(h.elements.get('authMsg').textContent, /Email already registered/);
   assert.equal(h.redirects.length, 0);
 });
@@ -149,12 +161,24 @@ test('main Lucky Draw card is promoted ahead of signup and free coins', () => {
   assert.match(drawPage, /id="signupBonusNotice"/);
 });
 
+test('signup mobile validation rejects invalid or missing numbers before new Auth account', async () => {
+  const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
+  h.getElement('phone').value = '000';
+  await h.clickSignup();
+  assert.equal(h.calls.includes('create'), false);
+  assert.equal(h.calls.includes('register_profile'), false);
+  assert.equal(h.redirects.length, 0);
+  assert.match(h.elements.get('authMsg').textContent, /valid 10-digit Indian mobile/);
+});
+
 test('both homepage and referral signup scripts parse and implement recovery', () => {
   new Script(inlineScript(homepage));
   new Script(inlineScript(signupPage));
   new Script(inlineScript(loginPage));
   new Script(inlineScript(drawPage));
   assert.match(signupPage, /finishWalletProfile\(user,name,email,entered\)/);
+  assert.match(signupPage, /SamratPhone\.saveSignupMobile\(account,password,phone\)/);
+  assert.match(homepage, /SamratPhone\.saveSignupMobile\(account, password, phone\)/);
   assert.match(signupPage, /WALLET_FUNCTION="6ae1bcc500208a5a7efb"/);
   assert.match(homepage, /if \(signupButton\.disabled\) return/);
 });

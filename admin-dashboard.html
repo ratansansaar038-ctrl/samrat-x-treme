@@ -28,6 +28,7 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <section id="dashboard" hidden>
 <section class="metrics" aria-label="System statistics">
 <div class="metric"><small>Registered players</small><strong id="mPlayers">—</strong></div>
+<div class="metric"><small>Website visitors (estimated)</small><strong id="mVisitors">—</strong><small>Unique browsers counted since tracking was enabled; not exact people.</small></div>
 <div class="metric"><small>Total vouchers</small><strong id="mVouchers">—</strong></div>
 <div class="metric"><small>Unused vouchers</small><strong id="mUnused">—</strong></div>
 <div class="metric"><small>Redeemed vouchers</small><strong id="mUsed">—</strong></div>
@@ -131,7 +132,7 @@ async function loadWinningReport(roundId){
 function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
  for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
 async function refresh(){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
- try{const d=await api('admin_dashboard');text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
+ try{const d=await api('admin_dashboard');text('mPlayers',fmt(d.stats?.players));text('mVisitors',fmt(d.stats?.visitors));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
  renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
  const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
  if(latest)loadWinningReport(latest.roundId);
