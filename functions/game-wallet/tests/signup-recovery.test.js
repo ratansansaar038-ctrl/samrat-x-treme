@@ -65,27 +65,27 @@ function fakeHome({ createError, signInError, profile, verifiedPhone = false, ot
       isPhoneVerified = false;
       calls.push('updatePhone');
     }
-    async createPhoneVerification() {
-      calls.push('sendOtp');
-      if (otpSendError) throw otpSendError;
-      return { userId: 'new-id' };
-    }
-    async updatePhoneVerification({ userId, secret }) {
-      calls.push('verifyOtp');
-      if (userId !== 'new-id' || secret !== '123456') throw Error('Invalid OTP');
-      isPhoneVerified = true;
-    }
+
   }
   class Functions {
     async createExecution({ body }) {
-      const { action } = JSON.parse(body);
+      const { action, otp } = JSON.parse(body);
       calls.push(action);
-      const result = action === 'register_profile'
-        ? profile
-        : action === 'get_wallet'
-          ? { ok: true, wallet: profile.wallet ?? 1000, spendableVC: profile.wallet ?? 1000 }
-          : { ok: true, items: [] };
-      return { responseBody: JSON.stringify(result) };
+      let result;
+      if (action === 'register_profile') result = profile;
+      else if (action === 'get_wallet')
+        result = { ok: true, wallet: profile.wallet ?? 1000, spendableVC: profile.wallet ?? 1000 };
+      else if (action === 'sms_otp_status')
+        result = { ok: true, verified: isPhoneVerified, phoneLast4: storedPhone.slice(-4) };
+      else if (action === 'start_sms_otp')
+        result = otpSendError
+          ? { ok: false, error: otpSendError.message }
+          : { ok: true, verified: isPhoneVerified, phoneLast4: storedPhone.slice(-4) };
+      else if (action === 'verify_sms_otp') {
+        if (otp === '123456') { isPhoneVerified = true; result = { ok: true, verified: true }; }
+        else result = { ok: false, error: 'Incorrect OTP' };
+      } else result = { ok: true, items: [] };
+      return { responseBody: JSON.stringify(result), responseStatusCode: result.ok ? 200 : 400 };
     }
   }
   const context = createContext({
@@ -99,7 +99,7 @@ function fakeHome({ createError, signInError, profile, verifiedPhone = false, ot
   // Browser window properties also resolve as globals; vm context needs an explicit alias.
   context.SamratPhone = context.window.SamratPhone;
   new Script(inlineScript(homepage), { filename: 'index.html' }).runInContext(context);
-  return { elements, getElement, calls, redirects, storage, account: new Account(), phoneHelper: context.SamratPhone, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
+  return { elements, getElement, calls, redirects, storage, account: new Account(), functions: new Functions(), phoneHelper: context.SamratPhone, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
 }
 
 test('homepage signup resumes a partially created Auth account and awards missing profile bonus', async () => {
@@ -149,20 +149,19 @@ test('new signup must send phone OTP and cannot claim the bonus before verificat
   const h = fakeHome({ profile: { ok: true, created: true, signupBonusVC: 1000, wallet: 1000 } });
   await h.clickSignup();
   assert.ok(h.calls.includes('updatePhone'));
-  assert.ok(h.calls.includes('sendOtp'));
+  assert.ok(h.calls.includes('start_sms_otp'));
   assert.ok(!h.calls.includes('register_profile'));
   assert.deepEqual(h.redirects, ['verify-phone.html']);
   assert.equal(h.storage.get('samratSignupBonusVC'), undefined);
 });
 
-test('Appwrite phone OTP must verify before profile can be created', async () => {
+test('APITxT OTP must verify through the backend before the profile is created', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
   await h.clickLogin();
-  await h.phoneHelper.beginPhoneVerification(h.account, 'Safe-Test-Pass-123', '9876543210');
-  await assert.rejects(() => h.phoneHelper.completePhoneVerification(h.account, '000000'), /Invalid OTP/);
-  assert.equal((await h.account.get()).phoneVerification, false);
-  await h.phoneHelper.completePhoneVerification(h.account, '123456');
-  assert.equal((await h.account.get()).phoneVerification, true);
+  await h.phoneHelper.beginPhoneVerification(h.account, h.functions, 'Safe-Test-Pass-123', '9876543210');
+  await assert.rejects(() => h.phoneHelper.completePhoneVerification(h.account, h.functions, '000000'), /Incorrect OTP/);
+  await h.phoneHelper.completePhoneVerification(h.account, h.functions, '123456');
+  assert.equal((await h.phoneHelper.getPhoneOtpStatus(h.functions)).verified, true);
 });
 
 test('SMS OTP send errors must not grant a wallet bonus', async () => {
@@ -218,12 +217,14 @@ test('both homepage and referral signup scripts parse and implement recovery', (
   new Script(inlineScript(otpPage));
   new Script(phoneHelper);
   assert.match(signupPage, /finishWalletProfile\(user,name,email,entered\)/);
-  assert.match(signupPage, /SamratPhone\.beginPhoneVerification\(account,password,phone\)/);
-  assert.match(homepage, /SamratPhone\.beginPhoneVerification\(account, password, phone\)/);
+  assert.match(signupPage, /SamratPhone\.beginPhoneVerification\(account,functions,password,phone\)/);
+  assert.match(homepage, /SamratPhone\.beginPhoneVerification\(account, functions, password, phone\)/);
   assert.match(otpPage, /completePhoneVerification\(account/);
-  assert.match(otpPage, /updatePhoneVerification|completePhoneVerification/);
+  assert.match(otpPage, /SamratPhone\.getPhoneOtpStatus\(functions\)/);
   assert.doesNotMatch(signupPage, /db\.createRow/);
-  assert.match(server, /verifiedAuth\?\.phoneVerification !== true/);
+  assert.match(server, /smsOtpService\(key\)\.isVerified\(user\)/);
+  assert.match(server, /https:\/\/apitxt\.com\/api\/sendOTP/);
+  assert.doesNotMatch(server, /await account\.createPhoneVerification\(/);
   assert.match(server, /track_site_visit/);
   assert.match(admin, /id="mVisitors"/);
   assert.match(visitor, /samratSiteVisitorIdV1/);
