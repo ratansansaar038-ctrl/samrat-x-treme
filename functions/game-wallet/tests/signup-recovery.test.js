@@ -80,8 +80,10 @@ function fakeHome({ createError, signInError, profile }) {
     setInterval() {}, console,
   });
   new Script(phoneHelper, { filename: 'signup-phone.js' }).runInContext(context);
+  // Browser window properties also resolve as globals; vm context needs an explicit alias.
+  context.SamratPhone = context.window.SamratPhone;
   new Script(inlineScript(homepage), { filename: 'index.html' }).runInContext(context);
-  return { elements, calls, redirects, storage, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
+  return { elements, getElement, calls, redirects, storage, clickSignup: () => getElement('signup').onclick(), clickLogin: () => getElement('login').onclick() };
 }
 
 test('homepage signup resumes a partially created Auth account and awards missing profile bonus', async () => {
@@ -161,7 +163,7 @@ test('main Lucky Draw card is promoted ahead of signup and free coins', () => {
 
 test('signup mobile validation rejects invalid or missing numbers before new Auth account', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
-  h.elements.get('phone').value = '000';
+  h.getElement('phone').value = '000';
   await h.clickSignup();
   assert.equal(h.calls.includes('create'), false);
   assert.equal(h.calls.includes('register_profile'), false);
