@@ -26,12 +26,12 @@
     <p id="phoneHint" class="small">Checking your account...</p>
     <form id="otpForm" hidden>
       <label for="otp">Enter the SMS OTP</label>
-      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,8}" maxlength="8" required placeholder="••••••" aria-label="SMS verification code">
+      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="••••••" aria-label="SMS verification code">
       <button id="verifyButton" type="submit">VERIFY OTP & CONTINUE</button>
     </form>
     <button class="secondary" id="resend" type="button" hidden>RESEND OTP</button>
     <div id="message" role="status" aria-live="polite"></div>
-    <p class="small">Your 1,000 VC Sign Up Bonus will be credited only after your mobile number is verified. VC has no cash value.</p>
+    <p class="small">SMS is delivered by APITxT. The 6-digit code expires in 5 minutes; resend is rate-limited. Your 1,000 VC Sign Up Bonus is credited only after server verification. VC has no cash value.</p>
     <p class="small"><a href="signup.html">← Signup</a> · <a href="privacy.html">Privacy</a></p>
   </main>
 <script>
@@ -44,7 +44,8 @@ let busy=false;
 function notice(s){message.textContent=String(s)}
 async function finishVerifiedSignup(){
   const user=await account.get();
-  if(user.phoneVerification!==true)throw Error('Phone is not verified. Enter your OTP first.');
+  const status=await SamratPhone.getPhoneOtpStatus(functions);
+  if(status.verified!==true)throw Error('Mobile not verified. Enter your APITxT SMS OTP first.');
   const execution=await functions.createExecution({
     functionId:'6ae1bcc500208a5a7efb',
     body:JSON.stringify({action:'register_profile',name:user.name||'',email:user.email||''}),
@@ -61,16 +62,18 @@ async function prepare(){
   try{
     const user=await account.get();
     if(!user.phone){hint.textContent='Mobile number missing. Return to signup.';notice('Your mobile number must be entered before requesting OTP.');return}
-    hint.textContent='Appwrite has sent an SMS code to the number ending '+user.phone.slice(-4)+'.';
-    if(user.phoneVerification===true){hint.textContent='Mobile number is verified. Finishing wallet setup...';await finishVerifiedSignup();return}
+    const status=await SamratPhone.getPhoneOtpStatus(functions);
+    hint.textContent='SMS OTP for the number ending '+user.phone.slice(-4)+'.';
+    if(status.verified===true){hint.textContent='Mobile verified. Finishing wallet setup...';await finishVerifiedSignup();return}
     form.hidden=false;resend.hidden=false;
-    notice('Enter your SMS OTP to unlock your one-time signup bonus.');
+    notice(status.pending?'Enter the APITxT SMS OTP sent to your mobile.':'No active OTP. Tap SEND OTP to receive a new code.');
+    resend.textContent=status.pending?'RESEND OTP':'SEND OTP';
   }catch(e){notice(e.message||'Please sign in and try again.')}
 }
 form.addEventListener('submit',async e=>{
   e.preventDefault();if(busy)return;busy=true;verifyButton.disabled=true;notice('Verifying your OTP...');
   try{
-    await SamratPhone.completePhoneVerification(account,document.getElementById('otp').value);
+    await SamratPhone.completePhoneVerification(account,functions,document.getElementById('otp').value);
     notice('Mobile verified! Finalizing signup...');
     await finishVerifiedSignup();
   }catch(error){notice(error.message||'Verification failed. Check your OTP.')}
@@ -79,9 +82,14 @@ form.addEventListener('submit',async e=>{
 resend.addEventListener('click',async()=>{
   if(busy)return;busy=true;resend.disabled=true;notice('Sending OTP again...');
   try{
-    const user=await account.get();if(user.phoneVerification)await finishVerifiedSignup();
-    else{await account.createPhoneVerification();notice('New Appwrite OTP requested. Check your SMS messages.')}
-  }catch(e){notice(e.message||'Unable to send OTP. Check Appwrite Phone SMS settings.')}
+    const user=await account.get();
+    const status=await SamratPhone.getPhoneOtpStatus(functions);
+    if(status.verified)await finishVerifiedSignup();
+    else{
+      await SamratPhone.beginPhoneVerification(account,functions,null,user.phone);
+      notice('APITxT SMS OTP requested. Check your messages. Code expires in 5 minutes.');
+    }
+  }catch(e){notice(e.message||'Unable to send APITxT SMS OTP. Contact support.')}
   finally{busy=false;resend.disabled=false}
 });
 prepare();
