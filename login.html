@@ -210,6 +210,7 @@ const message=document.getElementById("message");
 
 function loginDestination() {
   const allowed = [
+    "number-draw.html",
     "speed-tap.html",
     "memory-x.html",
     "math-challenge.html"
@@ -221,7 +222,7 @@ function loginDestination() {
 
   return allowed.includes(next)
     ? next
-    : "index.html";
+    : "number-draw.html";
 }
 
 async function prepareLoginPage(){
