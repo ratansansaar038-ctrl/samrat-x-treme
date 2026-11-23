@@ -3632,6 +3632,25 @@ export default async ({ req, res, error }) => {
           signupBonusVC: 0,
         });
 
+      // Never issue the 1,000 VC signup bonus on the strength of client-side OTP UI alone.
+      // Appwrite must confirm phoneVerification on the authenticated user's Auth record.
+      let verifiedAuth;
+      try {
+        verifiedAuth = await request("GET", "/users/" + encodeURIComponent(user), key);
+      } catch (e) {
+        if (e.status === 401 || e.status === 403)
+          return send(res, 503, {
+            ok: false,
+            error: "Phone verification check is unavailable. Appwrite game-wallet Function needs users.read permission.",
+          });
+        throw e;
+      }
+      if (!verifiedAuth?.phone || verifiedAuth?.phoneVerification !== true)
+        return send(res, 403, {
+          ok: false,
+          error: "Verify your mobile number using Appwrite SMS OTP before claiming Sign Up Bonus.",
+        });
+
       let created = false;
       try {
         await request("POST", tablePath("user_profiles"), key, {
