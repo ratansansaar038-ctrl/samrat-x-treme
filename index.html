@@ -282,6 +282,19 @@
     <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
   </div>
 
+  <section class="skill-grid" aria-label="Lucky Number Live Draw">
+    <a class="skill-card draw" href="number-draw.html">
+      <span class="skill-icon">🎯</span>
+      <div>
+        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
+        <h2>LUCKY NUMBER LIVE DRAW</h2>
+        <p>Pick 00–99 • Win 50× Virtual Coins</p>
+        <strong>PLAY FREE NUMBER DRAW →</strong>
+      </div>
+    </a>
+
+  </section>
+
   <section class="panel" id="authPanel">
     <h3>Player Login / Signup</h3>
     <div class="welcome-badge">🎁 Sign Up Bonus: Get 1,000 FREE VC once when you create your account! No cash value.</div>
@@ -320,17 +333,7 @@
     <a class="btn green-btn" href="number-draw.html">REQUEST FREE VC / REDEEM A FREE VOUCHER →</a>
   </section>
 
-  <section class="skill-grid">
-    <a class="skill-card draw" href="player-profile.html">
-      <span class="skill-icon">🎯</span>
-      <div>
-        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
-        <h2>LUCKY NUMBER LIVE DRAW</h2>
-        <p>Pick 00–99 • Win 50× Virtual Coins</p>
-        <strong>PLAY FREE NUMBER DRAW →</strong>
-      </div>
-    </a>
-
+  <section class="skill-grid" aria-label="Other skill games">
     <a class="skill-card speed" href="speed-tap.html">
       <span class="skill-icon">⚡</span>
       <div>
@@ -525,6 +528,8 @@ $('login').onclick = async () => {
   try {
     await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
+    if (!currentUser) throw Error('Login session could not be verified');
+    window.location.replace('number-draw.html');
   } catch (error) {
     msg('authMsg', error.message);
   }
@@ -570,8 +575,13 @@ $('signup').onclick = async () => {
       msg('signedMsg', 'Account login ho gaya, lekin wallet setup pending hai: ' + profileError.message + '. Dobara SIGN UP mat karo.');
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
+      try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
     } else if (!newAccount) {
       msg('signedMsg', 'Welcome back! Ye account pehle se bana hua tha; wallet mein duplicate bonus nahi diya gaya.');
+    }
+    if (!profileError) {
+      if (!currentUser) throw Error('Login session could not be verified');
+      window.location.replace('number-draw.html');
     }
   } catch (error) {
     msg('authMsg', error.message);

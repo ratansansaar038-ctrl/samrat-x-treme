@@ -62,7 +62,7 @@ async function finishWalletProfile(user,name,email,entered){
   return result.created===true&&result.signupBonusVC===1000;
  }
 }
-async function prepare(){try{await account.get();location.replace('index.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
+async function prepare(){try{await account.get();location.replace('number-draw.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(button.disabled)return;
  const name=document.getElementById('name').value.trim();
@@ -106,7 +106,7 @@ if (entered) {
   ['samratWallet','samratHistory','samratRound'].forEach(key=>localStorage.removeItem(key));
   if(bonusAdded){try{sessionStorage.setItem('samratSignupBonusVC','1000')}catch{}}
   notify(bonusAdded?'🎁 Sign Up Bonus: 1,000 VC added to your wallet!':'Account pehle se registered hai. Wallet ka existing balance safe hai.',true);
-  location.replace('index.html');
+  location.replace('number-draw.html');
  }catch(err){console.error('Signup failed',err);notify(authReady?'Account login ho gaya, lekin wallet setup fail hua. Dobara signup mat karo; support se contact karo.':accountCreated?'Account ban gaya hai, lekin login complete nahi hua. LOGIN se sign in karo; dobara signup mat karo.':(err?.message||'Signup failed.'));button.disabled=false;button.textContent='ACTIVATE ACCOUNT'}
 });
 prepare();
