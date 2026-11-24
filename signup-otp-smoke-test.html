@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#130821">
+<title>New Signup OTP Test — Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#10071f;color:#fff;display:flex;justify-content:center;align-items:center;padding:22px;font:15px Arial,sans-serif}
+.panel{width:100%;max-width:460px;background:#231334;border:1px solid #8757bd;border-radius:20px;padding:24px}
+h1{font-size:24px;margin:0 0 8px;color:#ffe27d}p{line-height:1.5;color:#e2d5ec}
+label{display:block;margin:14px 0 7px}input,button{width:100%;font:inherit;padding:13px;border-radius:10px}
+input{background:#120921;color:#fff;border:1px solid #795b99}button{border:none;background:#ffdb42;color:#261231;font-weight:bold;margin-top:14px}
+button:disabled{opacity:.6}button.secondary{background:#432d5c;color:#fff;border:1px solid #9266bb}
+.box{padding:12px;border:1px solid #7a559e;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;margin:15px 0}
+.small{font-size:12px}a{color:#ffe27d} [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="panel">
+<h1>Samrat X-Treme — New Signup Test</h1>
+<p class="small">Test a completely new account with a second, unused mobile number. New users get 1,000 free VC only after SMS OTP verification. This page does not modify other users' wallets. SMS charges may apply.</p>
+<div id="session" class="small">Checking session…</div>
+<div id="notice" role="status" aria-live="polite" class="box">Checking your account.</div>
+<button id="logout" class="secondary" type="button" hidden>Sign out current account from this browser</button>
+<form id="signup" hidden>
+<label for="name">Test Account Name</label>
+<input id="name" required maxlength="80" value="Samrat Test">
+<label for="email">New Test Email</label>
+<input id="email" type="email" autocomplete="off" required value="keralaspahome+samrattest@gmail.com">
+<label for="phone">Second Mobile Number (10 digits)</label>
+<input id="phone" type="tel" inputmode="numeric" maxlength="15" required placeholder="Your second mobile number">
+<label for="password">Choose a Password (8+ characters)</label>
+<input id="password" type="password" minlength="8" autocomplete="new-password" required>
+<label for="confirm">Confirm Password</label>
+<input id="confirm" type="password" minlength="8" autocomplete="new-password" required>
+<button id="create" type="submit">Create Test Account & Send SMS OTP</button>
+</form>
+<div id="verification" hidden>
+<p id="phoneHint" class="small"></p>
+<label for="otp">6-digit SMS OTP</label>
+<input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter OTP">
+<button id="verify" type="button">Verify OTP & Test 1,000 VC Bonus</button>
+<button id="resend" class="secondary" type="button">Resend SMS OTP (60-sec cooldown)</button>
+</div>
+<button id="finish" type="button" hidden>Finish Wallet Signup (verified only)</button>
+<button id="again" class="secondary" type="button" hidden>Check Bonus Again (must not duplicate)</button>
+<p class="small">Do not share your password, OTP, or full mobile number in chat. This is an isolated test page; the normal public Signup flow is unchanged.</p>
+</main>
+<script>
+(async function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
+const account=new Appwrite.Account(client), functions=new Appwrite.Functions(client);
+const FUNCTION='6ae1bcc500208a5a7efb';
+let busy=false;
+const say=s=>{$('notice').textContent=String(s)};
+async function api(action,data={}){
+ const e=await functions.createExecution({functionId:FUNCTION,body:JSON.stringify({action,...data}),async:false});
+ let r;try{r=JSON.parse(e.responseBody||'{}')}catch{throw Error('Backend returned an unreadable response')}
+ if(e.responseStatusCode!==200||!r.ok)throw Error(r.error||'Request failed ('+e.responseStatusCode+')');
+ return r;
+}
+function mobileNumber(input){
+ let n=String(input).replace(/\D/g,'');
+ if(n.length===12&&n.startsWith('91'))n=n.slice(2);
+ if(!/^[6-9]\d{9}$/.test(n))throw Error('Use a valid, unused 10-digit Indian mobile number.');
+ return '+91'+n;
+}
+function loggedOut(){
+ $('session').textContent='No logged-in user in this browser';
+ $('signup').hidden=false;$('verification').hidden=true;$('logout').hidden=true;$('finish').hidden=true;$('again').hidden=true;
+ say('Ready: use a new email alias and your second mobile number. No VC is granted before OTP verification.');
+}
+async function inspect(){
+ try{
+  const u=await account.get();
+  $('session').textContent='Signed in: '+u.email+' | Phone: '+(u.phone?'******'+u.phone.slice(-4):'Not set');
+  $('logout').hidden=false;$('signup').hidden=true;$('verification').hidden=true;$('finish').hidden=true;$('again').hidden=true;
+  if(!u.phone){say('This account has no phone. Please use a fresh test session or complete phone setup before continuing.');return}
+  const status=await api('sms_otp_status');
+  if(status.verified){
+    say('Phone OTP already verified on this account. You may test wallet registration if this is your newly created test account.');
+    $('finish').hidden=false;
+    $('again').hidden=false;
+  }else{
+    say(status.pending?'An OTP was requested; enter the received code below.':'Account is not OTP verified. Tap Send OTP and use only your own phone.');
+    $('verification').hidden=false;
+    $('phoneHint').textContent='OTP goes to number ending '+u.phone.slice(-4);
+    $('resend').textContent=status.pending?'Resend SMS OTP (after cooldown)':'Send SMS OTP';
+  }
+ }catch(e){if(e.code===401 || e.type==='general_unauthorized'||/missing scope|not authorized|unauthorized|no active session/i.test(e.message||'')){loggedOut();return}
+   // If authenticated session is absent, Appwrite can report multiple 401 messages.
+   try{await account.get()}catch{loggedOut();return}
+   say('Could not check OTP status: '+(e.message||'unknown error'));
+ }
+}
+$('logout').addEventListener('click',async()=>{
+ if(busy)return;busy=true;$('logout').disabled=true;
+ try{await account.deleteSession({sessionId:'current'});loggedOut()}
+ catch(e){say('Could not sign out: '+e.message)}
+ finally{busy=false;$('logout').disabled=false}
+});
+$('signup').addEventListener('submit',async event=>{
+ event.preventDefault();if(busy)return;
+ const name=$('name').value.trim(),email=$('email').value.trim().toLowerCase();
+ const password=$('password').value;
+ if(password!==$('confirm').value){say('Password and confirmation do not match.');return}
+ let phone;try{phone=mobileNumber($('phone').value)}catch(e){say(e.message);return}
+ busy=true;$('create').disabled=true;
+ try{
+   const created=await account.create({userId:Appwrite.ID.unique(),email,password,name});
+   say('Test Auth account created. Saving second mobile and requesting SMS OTP…');
+   await account.createEmailPasswordSession({email,password});
+   await account.updatePhone({phone,password});
+   const u=await account.get();
+   if(u.$id!==created.$id||u.phone!==phone)throw Error('New account or phone verification mismatch.');
+   const result=await api('start_sms_otp');
+   $('password').value='';$('confirm').value='';
+   $('signup').hidden=true;$('logout').hidden=false;$('verification').hidden=false;
+   $('session').textContent='New test user: '+u.email+' | Phone: ******'+phone.slice(-4);
+   $('phoneHint').textContent='Enter the SMS OTP sent to number ending '+phone.slice(-4);
+   say(result.verified?'Mobile was already verified.':'SMS request accepted. Check your second phone for the code.');
+ }catch(e){
+   $('password').value='';$('confirm').value='';
+   say('Signup setup: '+(e.message||'Unknown error')+'. If account was created, do NOT submit again; reload to resume the signed-in account.');
+ }finally{busy=false;$('create').disabled=false}
+});
+async function finish(){
+ const u=await account.get();
+ const check=await api('sms_otp_status');
+ if(!check.verified)throw Error('SMS OTP not verified. No signup bonus may be issued.');
+ const result=await api('register_profile',{name:u.name||'Samrat Test',email:u.email});
+ if(result.created===true&&result.signupBonusVC===1000){
+   $('verification').hidden=true;$('finish').hidden=true;$('again').hidden=false;
+   say('SUCCESS: new profile created with exactly 1,000 VC Signup Bonus. Now tap Check Bonus Again to ensure no duplicate credit.');
+ }else{
+   $('verification').hidden=true;$('finish').hidden=true;$('again').hidden=false;
+   say('No new bonus credited: profile already existed (created='+String(result.created)+', signupBonusVC='+String(result.signupBonusVC)+').');
+ }
+}
+$('verify').addEventListener('click',async()=>{
+ if(busy)return;
+ const code=$('otp').value.trim();
+ if(!/^\d{6}$/.test(code)){say('Enter the six-digit OTP from your second phone.');return}
+ busy=true;$('verify').disabled=true;
+ try{
+   await api('verify_sms_otp',{otp:code});
+   $('otp').value='';
+   await finish();
+ }catch(e){say('OTP or bonus test error: '+(e.message||'Unknown error'))}
+ finally{busy=false;$('verify').disabled=false}
+});
+$('resend').addEventListener('click',async()=>{
+ if(busy)return;busy=true;$('resend').disabled=true;
+ try{const r=await api('start_sms_otp');say(r.verified?'Already verified.':'SMS requested. Use the newest OTP received on your phone.')}
+ catch(e){say('SMS resend: '+e.message)}
+ finally{busy=false;$('resend').disabled=false}
+});
+$('finish').addEventListener('click',async()=>{if(busy)return;busy=true;$('finish').disabled=true;try{await finish()}catch(e){say('Wallet setup: '+e.message)}finally{busy=false;$('finish').disabled=false}});
+$('again').addEventListener('click',async()=>{if(busy)return;busy=true;$('again').disabled=true;
+ try{
+   const u=await account.get();
+   const result=await api('register_profile',{name:u.name,email:u.email});
+   const balance=await api('get_wallet');
+   say('REPEAT TEST: created='+String(result.created)+', bonus='+String(result.signupBonusVC)+' VC, actual wallet='+String(balance.wallet)+' VC. Expected: created=false, bonus=0, wallet=1000. No change was made if those values match.');
+ }catch(e){say('Repeat verification failed: '+e.message)}
+ finally{busy=false;$('again').disabled=false}
+});
+await inspect();
+})();
+</script>
+</body>
+</html>
