@@ -26,6 +26,11 @@ const eq = (attribute, value) => ({
   values: [value],
 });
 const lim = (n) => ({ method: "limit", values: [n] });
+const gte = (attribute, value) => ({
+  method: "greaterThanEqual",
+  attribute,
+  values: [value],
+});
 const order = (attribute, direction) => ({
   method: direction === "asc" ? "orderAsc" : "orderDesc",
   attribute,
@@ -1093,20 +1098,37 @@ function smsOtpService(key) {
   });
 }
 
-// Anonymous site analytics, deduplicated by a randomly generated browser token.
- // No IP address, phone number or email is stored in the visitor table.
+// India has a fixed UTC+05:30 offset, so day boundaries need no DST handling.
+function istDayStartMs(utcMs = Date.now()) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.floor((utcMs + IST_OFFSET_MS) / dayMs) * dayMs - IST_OFFSET_MS;
+}
+
+// Anonymous visitor analytics: one hashed row per browser across all time.
+// Appwrite updates $updatedAt when an existing browser returns on a new IST day.
+// This lets us count today's active browsers without creating a second table,
+// rewriting firstSeenAt, or collecting IP addresses and user identities.
 async function trackSiteVisit(body, key) {
   const browserId = typeof body.browserId === "string" ? body.browserId.trim() : "";
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(browserId))
     return { ok: false, error: "Invalid browser identifier" };
   const digest = createHash("sha256").update(PROJECT + ":browser:" + browserId).digest("hex");
   const rowId = "visitor_" + digest.slice(0, 28);
+  const visitorTablePath = tablePath("site_visitors");
+  const rowPath = visitorTablePath + "/" + encodeURIComponent(rowId);
   try {
-    await request("POST", tablePath("site_visitors"), key, { rowId, data: { firstSeenAt: new Date().toISOString() } });
+    await request("POST", visitorTablePath, key, { rowId, data: { firstSeenAt: new Date().toISOString() } });
     return { ok: true, created: true };
   } catch (e) {
-    if (e.status === 409) return { ok: true, created: false };
-    throw e;
+    if (e.status !== 409) throw e;
+    const existing = await request("GET", rowPath, key);
+    // Only one update per browser per IST day; total rows remain unchanged.
+    if (!(Date.parse(existing.$updatedAt) >= istDayStartMs())) {
+      await request("PATCH", rowPath, key, {
+        data: { firstSeenAt: existing.firstSeenAt || existing.$createdAt },
+      });
+    }
+    return { ok: true, created: false };
   }
 }
 
@@ -1130,8 +1152,10 @@ async function adminDashboard(user, key) {
   if (!dashboardIsAdmin(user))
     return { ok: false, error: "Admin access denied" };
 
+  const todayStartIST = new Date(istDayStartMs()).toISOString();
   const items = [
     ["players", "user_profiles", [order("$createdAt", "desc"), lim(40)]],
+    ["todayVisitors", "site_visitors", [gte("$updatedAt", todayStartIST), lim(1)]],
     ["visitors", "site_visitors", [lim(1)]],
     ["vouchers", "vouchers", [order("$createdAt", "desc"), lim(60)]],
     ["unused", "vouchers", [eq("isRedeemed", false), lim(1)]],
@@ -1161,6 +1185,7 @@ async function adminDashboard(user, key) {
     ok: true,
     stats: {
       players: data.players?.total ?? null,
+      todayVisitors: data.todayVisitors?.total ?? null,
       visitors: data.visitors?.total ?? null,
       vouchers: data.vouchers?.total ?? null,
       unused: data.unused?.total ?? null,
