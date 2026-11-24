@@ -566,7 +566,11 @@ $('signup').onclick = async () => {
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
     // Save a required mobile number in Appwrite Auth before provisioning the 1,000 VC wallet.
-    await SamratPhone.saveSignupMobile(account, password, phone);
+    const phoneStatus = await SamratPhone.beginPhoneVerification(account, functions, password, phone);
+    if (!phoneStatus.verified) {
+      window.location.replace('verify-phone.html');
+      return;
+    }
 
     let profileResult;
     let profileError;

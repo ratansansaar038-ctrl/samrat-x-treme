@@ -1,4 +1,5 @@
 import https from "node:https";
+import { createOtpService } from "./otp.js";
 import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
@@ -1029,6 +1030,69 @@ async function unusedVouchers(user, key) {
   };
 }
 
+// SMS OTP is delivered by APITxT; verification and one-time VC grants remain server-side.
+async function deliverApitxtOtp(phone, code) {
+  const authkey = process.env.APITXT_SMS_AUTHKEY || "";
+  if (!authkey) throw Error("APITxT SMS key not configured. Ask the admin.");
+  const body = new URLSearchParams({
+    authkey,
+    mobile: phone.replace(/^\+/, ""),
+    otp: code,
+    channel: "sms",
+  });
+  if (process.env.APITXT_SMS_TEMPLATE_ID)
+    body.set("template_id", process.env.APITXT_SMS_TEMPLATE_ID);
+  return new Promise((resolve, reject) => {
+    const req = https.request("https://apitxt.com/api/sendOTP", {
+      method: "POST",
+      timeout: 15000,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body.toString()),
+        Accept: "application/json",
+      },
+    }, (response) => {
+      let raw = "";
+      response.on("data", part => {
+        raw += part;
+        if (raw.length > 20000) response.destroy(Error("SMS gateway response too large"));
+      });
+      response.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(raw); }
+        catch { return reject(Error("Invalid SMS gateway response")); }
+        if (response.statusCode < 200 || response.statusCode >= 300 ||
+            String(parsed.status || "").toLowerCase() !== "success")
+          return reject(Error("SMS gateway rejected this OTP request. Check APITxT SMS access and credits."));
+        resolve();
+      });
+    });
+    req.on("timeout", () => req.destroy(Error("SMS gateway timeout")));
+    req.on("error", () => reject(Error("SMS gateway unavailable. Please try later.")));
+    req.end(body.toString());
+  });
+}
+
+function smsOtpService(key) {
+  const table = "phone_otp_challenges";
+  const basePath = tablePath(table);
+  return createOtpService({
+    secret: process.env.SAMRAT_SMS_OTP_SECRET,
+    authUser: uid => request("GET", "/users/" + encodeURIComponent(uid), key),
+    readRecord: async rowId => {
+      try { return await request("GET", basePath + "/" + encodeURIComponent(rowId), key); }
+      catch (e) { if (e.status === 404) return null; throw e; }
+    },
+    writeRecord: (rowId, data, exists) => request(
+      exists ? "PATCH" : "POST",
+      exists ? basePath + "/" + encodeURIComponent(rowId) : basePath,
+      key,
+      exists ? { data } : { rowId, data },
+    ),
+    sendSms: deliverApitxtOtp,
+  });
+}
+
 // Anonymous site analytics, deduplicated by a randomly generated browser token.
  // No IP address, phone number or email is stored in the visitor table.
 async function trackSiteVisit(body, key) {
@@ -1038,7 +1102,7 @@ async function trackSiteVisit(body, key) {
   const digest = createHash("sha256").update(PROJECT + ":browser:" + browserId).digest("hex");
   const rowId = "visitor_" + digest.slice(0, 28);
   try {
-    await request("POST", tablePath("site_visitors"), key, { rowId, data: {} });
+    await request("POST", tablePath("site_visitors"), key, { rowId, data: { firstSeenAt: new Date().toISOString() } });
     return { ok: true, created: true };
   } catch (e) {
     if (e.status === 409) return { ok: true, created: false };
@@ -3534,6 +3598,9 @@ export default async ({ req, res, error }) => {
       "my_history",
       "register_profile",
       "track_site_visit",
+      "start_sms_otp",
+      "verify_sms_otp",
+      "sms_otp_status",
       "get_leaderboard",
       "start_game",
       "finish_game",
@@ -3564,6 +3631,17 @@ export default async ({ req, res, error }) => {
     if (action === "track_site_visit") {
       const result = await trackSiteVisit(b, key);
       return send(res, result.ok ? 200 : 400, result);
+    }
+    if (action === "start_sms_otp") {
+      const result = await smsOtpService(key).begin(user);
+      return send(res, result.ok ? 200 : 429, result);
+    }
+    if (action === "verify_sms_otp") {
+      const result = await smsOtpService(key).verify(user, b.otp);
+      return send(res, result.ok ? 200 : 400, result);
+    }
+    if (action === "sms_otp_status") {
+      return send(res, 200, await smsOtpService(key).status(user));
     }
     if (action === "get_recent_activity") {
       return send(res, 200, await getRecentActivity(key));
@@ -3630,6 +3708,14 @@ export default async ({ req, res, error }) => {
           ok: true,
           created: false,
           signupBonusVC: 0,
+        });
+
+      // Verify the APITxT SMS challenge on the server. Client claims are never trusted.
+      // Existing profiles were returned above and keep their current balances.
+      if (!(await smsOtpService(key).isVerified(user)))
+        return send(res, 403, {
+          ok: false,
+          error: "Verify the SMS OTP sent via APITxT before claiming your Sign Up Bonus.",
         });
 
       let created = false;

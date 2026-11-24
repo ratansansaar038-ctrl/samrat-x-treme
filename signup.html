@@ -18,7 +18,7 @@
 <form id="form">
 <label for="name">Name</label><input id="name" required maxlength="128" autocomplete="name">
 <label for="email">Email</label><input id="email" type="email" required autocomplete="email">
-<label for="phone">Mobile Number (+91 India, required)</label><input id="phone" type="tel" required inputmode="numeric" pattern="(?:\\+?91)?[6-9][0-9]{9}" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number">
+<label for="phone">Mobile Number (+91 India, required)</label><input id="phone" type="tel" required inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number">
 <label for="password">Password</label><input id="password" type="password" required minlength="8" autocomplete="new-password">
 <label for="confirm">Confirm Password</label><input id="confirm" type="password" required minlength="8" autocomplete="new-password">
 <label for="ref">Referral Code (Optional)</label><input id="ref" maxlength="32" autocomplete="off" placeholder="Referral code">
@@ -36,7 +36,7 @@ const DATABASE="6a7f2d1d0035d9815939";
 const TABLE="user_profiles";
 const client=new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT);
 const account=new Appwrite.Account(client);
-const db=new Appwrite.TablesDB(client); const functions=new Appwrite.Functions(client);
+const functions=new Appwrite.Functions(client);
 const REFERRAL_FUNCTION="6adf3c3a003718eab6c2"; 
 const WALLET_FUNCTION="6ae1bcc500208a5a7efb";
 const form=document.getElementById('form');
@@ -52,19 +52,13 @@ async function signInOrUseCurrentSession(email,password){
  catch(error){const signedIn=await account.get().catch(()=>null);if(signedIn?.email?.toLowerCase()!==email.toLowerCase())throw error}
 }
 async function finishWalletProfile(user,name,email,entered){
- try{
-  await db.createRow({databaseId:DATABASE,tableId:TABLE,rowId:user.$id,data:{userId:user.$id,name,email,wallet:1000,wins:0,losses:0,rounds:0,referralCode:ownCode(name,user.$id),referredBy:entered,referralPoints:0}});
-  return true;
- }catch(error){
-  // A duplicate row or missing client write permission should not strand a newly created Auth user.
-  // The server function checks for an existing profile before granting the bonus.
-  const execution=await functions.createExecution({functionId:WALLET_FUNCTION,body:JSON.stringify({action:'register_profile',name,email}),async:false});
-  const result=JSON.parse(execution.responseBody||'{}');
-  if(!result.ok)throw Error(result.error||'Wallet profile setup failed');
-  return result.created===true&&result.signupBonusVC===1000;
- }
+ // Only the server can grant the one-time 1,000 VC bonus, after checking phoneVerification.
+ const execution=await functions.createExecution({functionId:WALLET_FUNCTION,body:JSON.stringify({action:'register_profile',name,email}),async:false});
+ let result;try{result=JSON.parse(execution.responseBody||'{}')}catch{throw Error('Invalid wallet server response')}
+ if(execution.responseStatusCode!==200||result.ok!==true)throw Error(result.error||'Wallet profile setup failed');
+ return result.created===true&&result.signupBonusVC===1000;
 }
-async function prepare(){try{await account.get();location.replace('number-draw.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
+async function prepare(){try{const u=await account.get();if(!u.phone){button.disabled=false;button.textContent='COMPLETE SIGNUP';notify('Add and verify your mobile number to finish signup.');return}const s=await SamratPhone.getPhoneOtpStatus(functions);location.replace(s.verified?'number-draw.html':'verify-phone.html')}catch{button.disabled=false;button.textContent='ACTIVATE ACCOUNT';notify('')}}
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(button.disabled)return;
  const name=document.getElementById('name').value.trim();
@@ -88,7 +82,8 @@ form.addEventListener('submit',async e=>{
   if(created)await signInOrUseCurrentSession(email,password);
   authReady=true;
   // The phone must be saved to Auth before the signup bonus can be issued.
-  await SamratPhone.saveSignupMobile(account,password,phone);
+  const phoneStatus = await SamratPhone.beginPhoneVerification(account,functions,password,phone);
+  if(!phoneStatus.verified){location.replace('verify-phone.html');return}
   const bonusAdded=await finishWalletProfile(user,name,email,entered);
   
 if (entered) {
