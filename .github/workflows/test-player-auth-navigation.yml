@@ -9,6 +9,8 @@ on:
       - 'number-draw.html'
       - 'admin-dashboard.html'
       - 'signup-phone.js'
+      - 'verify-phone.html'
+      - 'functions/game-wallet/src/otp.js'
       - 'site-visitor.js'
       - 'functions/game-wallet/src/main.js'
       - 'functions/game-wallet/tests/**'
@@ -22,6 +24,8 @@ on:
       - 'number-draw.html'
       - 'admin-dashboard.html'
       - 'signup-phone.js'
+      - 'verify-phone.html'
+      - 'functions/game-wallet/src/otp.js'
       - 'site-visitor.js'
       - 'functions/game-wallet/src/main.js'
       - 'functions/game-wallet/tests/**'
@@ -41,4 +45,4 @@ jobs:
       - name: Test signup recovery, bonus and Lucky Draw redirects
         run: |
           node --check functions/game-wallet/src/main.js
-          node --test functions/game-wallet/tests/signup-recovery.test.js functions/game-wallet/tests/visitor-phone.test.js
+          node --test functions/game-wallet/tests/signup-recovery.test.js functions/game-wallet/tests/visitor-phone.test.js functions/game-wallet/tests/sms-otp.test.js

@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'functions/game-wallet/src/main.js'
+      - 'functions/game-wallet/src/otp.js'
       - '.github/workflows/install-site-visitor-counter.yml'
 
 permissions:
@@ -27,7 +28,7 @@ jobs:
         run: |
           node --check functions/game-wallet/src/main.js
           if [ -z "$APPWRITE_DEPLOY_KEY" ]; then
-            echo "::error::Add APPWRITE_DEPLOY_KEY GitHub secret with tables.read, tables.write, functions.read and functions.write scopes; deployment not attempted."
+            echo "::error::Add APPWRITE_DEPLOY_KEY GitHub secret with tablesdb.write and functions.write scopes; deployment not attempted."
             exit 1
           fi
       - name: Create private visitor table if missing (does not touch user wallets)
@@ -61,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -czf /tmp/samrat-game-wallet.tar.gz -C functions/game-wallet package.json src/main.js
+          tar -czf /tmp/samrat-game-wallet.tar.gz -C functions/game-wallet package.json src/main.js src/otp.js
           STATUS=$(curl -sS -o /tmp/deploy.json -w "%{http_code}" \
             -X POST "$ENDPOINT/functions/$FUNCTION_ID/deployments" \
             -H "X-Appwrite-Project: $PROJECT_ID" \
