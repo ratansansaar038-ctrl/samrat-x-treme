@@ -417,6 +417,40 @@ const msg = (id, value) => {
   $(id).textContent = String(value ?? '');
 };
 
+// 📊 TRAFFIC SOURCE ATTRIBUTION (Telegram & Ad Networks)
+const TRAFFIC_STORAGE_KEY = 'samrat_traffic_attribution';
+
+function captureTrafficSource() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get('utm_source') || params.get('source');
+    const spot = params.get('spot') || params.get('zone') || params.get('placement') || '';
+    const ref = params.get('ref') || '';
+
+    if (source || spot || ref) {
+      const payload = {
+        utm_source: (source || 'direct').slice(0, 64),
+        spot_id: String(spot).slice(0, 64),
+        ref_code: String(ref).slice(0, 64),
+        landing_page: window.location.pathname,
+        captured_at: new Date().toISOString()
+      };
+      localStorage.setItem(TRAFFIC_STORAGE_KEY, JSON.stringify(payload));
+    }
+  } catch {}
+}
+
+function getTrafficAttribution() {
+  try {
+    const raw = localStorage.getItem(TRAFFIC_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { utm_source: 'organic', spot_id: '', ref_code: '' };
+  } catch {
+    return { utm_source: 'organic', spot_id: '', ref_code: '' };
+  }
+}
+
+captureTrafficSource();
+
 const { Client, Account, ID, Functions } = Appwrite;
 
 const client = new Client()
@@ -547,6 +581,7 @@ $('signup').onclick = async () => {
     const email = $('email').value.trim();
     const password = $('password').value;
     const phone = SamratPhone.normalizeMobile($('phone').value);
+    const attribution = getTrafficAttribution();
 
     if (!name) throw Error('Enter your name');
 
@@ -556,8 +591,6 @@ $('signup').onclick = async () => {
       newAccount = true;
     } catch (error) {
       if (!isExistingEmailError(error)) throw error;
-      // A previous attempt may have created the Auth account but failed to set up its wallet.
-      // Only resume after proving ownership with the same email and password.
       try {
         await signInOrUseCurrentSession(email, password);
       } catch {
@@ -565,7 +598,18 @@ $('signup').onclick = async () => {
       }
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
-    // Save a required mobile number in Appwrite Auth before provisioning the 1,000 VC wallet.
+
+    // Save traffic source in Appwrite User Prefs so it persists across phone verification redirect
+    if (newAccount && attribution.utm_source !== 'organic') {
+      try {
+        await account.updatePrefs({
+          utm_source: attribution.utm_source,
+          spot_id: attribution.spot_id,
+          ref_code: attribution.ref_code
+        });
+      } catch {}
+    }
+
     const phoneStatus = await SamratPhone.beginPhoneVerification(account, functions, password, phone);
     if (!phoneStatus.verified) {
       window.location.replace('verify-phone.html');
@@ -575,7 +619,13 @@ $('signup').onclick = async () => {
     let profileResult;
     let profileError;
     try {
-      profileResult = await api('register_profile', { name, email });
+      profileResult = await api('register_profile', {
+        name,
+        email,
+        utm_source: attribution.utm_source,
+        spot_id: attribution.spot_id,
+        ref_code: attribution.ref_code
+      });
     } catch (error) {
       profileError = error;
     }
