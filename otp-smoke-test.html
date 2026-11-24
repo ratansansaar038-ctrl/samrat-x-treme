@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#120b25">
+<title>SMS OTP Test | Samrat X-Treme</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:20px;min-height:100vh;background:#100820;color:#fff;font:16px Arial,sans-serif;display:flex;justify-content:center;align-items:center}.panel{width:100%;max-width:480px;padding:24px;border:1px solid #7046d8;border-radius:18px;background:#1e1235}h1{font-size:23px;margin:0 0 10px}p{line-height:1.5;color:#d5c7ea}.status{padding:12px;border:1px solid #684995;border-radius:9px;min-height:52px;white-space:pre-wrap;word-break:break-word;margin:16px 0}button,input{width:100%;font:inherit;padding:13px;border-radius:10px;margin:7px 0}button{background:#ecce4c;border:0;color:#210b2c;font-weight:bold}button:disabled{opacity:.55}input{background:#110a20;border:1px solid #805e9b;color:white}a{color:#ffdc73}.small{font-size:13px}
+</style>
+</head>
+<body>
+<main class="panel">
+<h1>Samrat X-Treme — SMS OTP Test</h1>
+<p class="small">This page only tests mobile OTP for your signed-in account. It will not change your wallet balance or grant VC. SMS charges may apply.</p>
+<div id="account">Checking login…</div>
+<div id="status" class="status" role="status" aria-live="polite">Checking account…</div>
+<a id="loginLink" href="login.html" hidden>Sign in to your existing account</a>
+<button id="send" type="button" disabled>Send SMS OTP</button>
+<label for="code">SMS OTP (6 digits)</label>
+<input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter SMS OTP">
+<button id="verify" type="button" disabled>Verify OTP</button>
+<p class="small">Do not share your password or OTP in chat. The OTP remains private.</p>
+</main>
+<script>
+(async()=>{
+'use strict';
+const accountText=document.getElementById('account');
+const statusText=document.getElementById('status');
+const sendButton=document.getElementById('send');
+const verifyButton=document.getElementById('verify');
+const codeInput=document.getElementById('code');
+const loginLink=document.getElementById('loginLink');
+const client=new Appwrite.Client().setEndpoint('https://sgp.cloud.appwrite.io/v1').setProject('6a7f2add0011a7bfc21a');
+const account=new Appwrite.Account(client);
+const functions=new Appwrite.Functions(client);
+const functionId='6ae1bcc500208a5a7efb';
+function message(s){statusText.textContent=s}
+async function call(action,extra={}){
+  const ex=await functions.createExecution({functionId,body:JSON.stringify({action,...extra}),async:false});
+  let result;
+  try{result=JSON.parse(ex.responseBody||'{}')}catch{throw Error('Could not read server response')}
+  if(ex.responseStatusCode!==200||result.ok!==true) throw Error(result.error||'OTP service returned '+ex.responseStatusCode);
+  return result;
+}
+try{
+  const u=await account.get();
+  accountText.textContent='Signed in: '+u.email+' | Phone: '+(u.phone?'******'+u.phone.slice(-4):'Not set');
+  if(!u.phone){message('Phone is not on this Auth account. Add your phone in Appwrite first.');return}
+  sendButton.disabled=false;verifyButton.disabled=false;
+  try{
+    const result=await call('sms_otp_status');
+    message(result.verified?'This mobile has already been verified.':'Ready to send SMS OTP. Tap Send SMS OTP once.');
+    if(result.verified)sendButton.disabled=true;
+  }catch(e){message('Status check: '+e.message+' (You can still try Send SMS OTP.)')}
+}catch{
+  accountText.textContent='Not signed in to the game website.';
+  loginLink.hidden=false;
+  message('Please sign in with your existing account first, then return to this page.');
+  return;
+}
+sendButton.addEventListener('click',async()=>{
+  sendButton.disabled=true;
+  message('Requesting SMS OTP…');
+  try{
+    const r=await call('start_sms_otp');
+    message(r.verified?'Mobile already verified.':'SMS request accepted. Check the phone ending '+(r.phoneLast4||'****')+'. Enter your OTP below.');
+  }catch(e){message('SMS request failed: '+e.message)}
+  finally{sendButton.disabled=false}
+});
+verifyButton.addEventListener('click',async()=>{
+  const code=codeInput.value.trim();
+  if(!/^\d{6}$/.test(code)){message('Enter the 6-digit SMS OTP.');return}
+  verifyButton.disabled=true;message('Checking OTP…');
+  try{
+    const r=await call('verify_sms_otp',{otp:code});
+    message(r.verified?'OTP verified successfully. Wallet was not changed.':'OTP was not verified.');
+    if(r.verified)sendButton.disabled=true;
+  }catch(e){message('OTP verification failed: '+e.message)}
+  finally{verifyButton.disabled=false;codeInput.value=''}
+});
+})();
+</script>
+</body>
+</html>
