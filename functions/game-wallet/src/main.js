@@ -1102,7 +1102,7 @@ async function trackSiteVisit(body, key) {
   const digest = createHash("sha256").update(PROJECT + ":browser:" + browserId).digest("hex");
   const rowId = "visitor_" + digest.slice(0, 28);
   try {
-    await request("POST", tablePath("site_visitors"), key, { rowId, data: {} });
+    await request("POST", tablePath("site_visitors"), key, { rowId, data: { firstSeenAt: new Date().toISOString() } });
     return { ok: true, created: true };
   } catch (e) {
     if (e.status === 409) return { ok: true, created: false };
