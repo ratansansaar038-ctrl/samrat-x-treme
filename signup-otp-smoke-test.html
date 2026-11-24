@@ -36,7 +36,7 @@ button:disabled{opacity:.6}button.secondary{background:#432d5c;color:#fff;border
 <input id="password" type="password" minlength="8" autocomplete="new-password" required>
 <label for="confirm">Confirm Password</label>
 <input id="confirm" type="password" minlength="8" autocomplete="new-password" required>
-<button id="create" type="submit">Create Test Account & Send SMS OTP</button>
+<button id="create" type="submit">Create / Continue Test Signup</button>
 </form>
 <div id="verification" hidden>
 <p id="phoneHint" class="small"></p>
@@ -47,7 +47,7 @@ button:disabled{opacity:.6}button.secondary{background:#432d5c;color:#fff;border
 </div>
 <button id="finish" type="button" hidden>Finish Wallet Signup (verified only)</button>
 <button id="again" class="secondary" type="button" hidden>Check Bonus Again (must not duplicate)</button>
-<p class="small">Do not share your password, OTP, or full mobile number in chat. This is an isolated test page; the normal public Signup flow is unchanged.</p>
+<p class="small">If the test email was already registered, enter its original password to continue. Do not share your password, OTP, or full mobile number in chat. This is an isolated test page; the normal public Signup flow is unchanged.</p>
 </main>
 <script>
 (async function(){
@@ -80,7 +80,7 @@ async function inspect(){
   const u=await account.get();
   $('session').textContent='Signed in: '+u.email+' | Phone: '+(u.phone?'******'+u.phone.slice(-4):'Not set');
   $('logout').hidden=false;$('signup').hidden=true;$('verification').hidden=true;$('finish').hidden=true;$('again').hidden=true;
-  if(!u.phone){say('This account has no phone. Please use a fresh test session or complete phone setup before continuing.');return}
+  if(!u.phone){$('signup').hidden=false;$('email').value=u.email;$('name').value=u.name||'Samrat Test';say('This test account exists but has no phone. Enter its original password and your second mobile, then tap Continue.');return}
   const status=await api('sms_otp_status');
   if(status.verified){
     say('Phone OTP already verified on this account. You may test wallet registration if this is your newly created test account.');
@@ -112,21 +112,52 @@ $('signup').addEventListener('submit',async event=>{
  let phone;try{phone=mobileNumber($('phone').value)}catch(e){say(e.message);return}
  busy=true;$('create').disabled=true;
  try{
-   const created=await account.create({userId:Appwrite.ID.unique(),email,password,name});
-   say('Test Auth account created. Saving second mobile and requesting SMS OTP…');
-   await account.createEmailPasswordSession({email,password});
-   await account.updatePhone({phone,password});
-   const u=await account.get();
-   if(u.$id!==created.$id||u.phone!==phone)throw Error('New account or phone verification mismatch.');
-   const result=await api('start_sms_otp');
+   let u=await account.get().catch(()=>null);
+   let newAccount=false;
+   if(u && u.email.toLowerCase()!==email)throw Error('A different account is signed in. Sign out before continuing this test signup.');
+   if(!u){
+     try{
+       await account.create({userId:Appwrite.ID.unique(),email,password,name});
+       newAccount=true;
+       say('Test Auth account created. Signing in…');
+     }catch(error){
+       if(!(error.code===409||/already exists|already in use|already used/i.test(error.message||'')))throw error;
+       say('Test email already exists. Checking its original password to safely resume signup…');
+     }
+     try{
+       await account.createEmailPasswordSession({email,password});
+     }catch(error){
+       if(!newAccount)throw Error('This test email already exists, but its password does not match. Enter the ORIGINAL password for this test account or choose a new unused +alias email.');
+       throw Error('The test account was created, but sign-in failed. Do NOT create another account. Reload and sign in using this same email.');
+     }
+     u=await account.get();
+     if(u.email.toLowerCase()!==email)throw Error('Signed-in account mismatch.');
+   }
+   if(u.phone && u.phone!==phone)throw Error('This account is already linked to a different phone. No phone was changed. Use its original mobile, or create a new test account using a different unused email alias.');
+   if(!u.phone){
+     say('Signed in. Saving the second mobile to this test account…');
+     await account.updatePhone({phone,password});
+     u=await account.get();
+     if(u.phone!==phone)throw Error('Mobile was not saved. No OTP sent.');
+   }
    $('password').value='';$('confirm').value='';
-   $('signup').hidden=true;$('logout').hidden=false;$('verification').hidden=false;
-   $('session').textContent='New test user: '+u.email+' | Phone: ******'+phone.slice(-4);
-   $('phoneHint').textContent='Enter the SMS OTP sent to number ending '+phone.slice(-4);
-   say(result.verified?'Mobile was already verified.':'SMS request accepted. Check your second phone for the code.');
+   $('signup').hidden=true;$('logout').hidden=false;
+   $('session').textContent='Test user: '+u.email+' | Phone: ******'+phone.slice(-4);
+   const status=await api('sms_otp_status');
+   if(status.verified===true){
+     $('verification').hidden=true;$('finish').hidden=false;$('again').hidden=false;
+     say('This mobile is already verified. Tap Finish Wallet Signup to check the one-time bonus.');
+   }else{
+     $('verification').hidden=false;
+     $('phoneHint').textContent='SMS OTP for number ending '+phone.slice(-4);
+     const result=await api('start_sms_otp');
+     say(result.verified?'Mobile was already verified.':'SMS request accepted. Check your second phone for the OTP code.');
+   }
  }catch(e){
    $('password').value='';$('confirm').value='';
-   say('Signup setup: '+(e.message||'Unknown error')+'. If account was created, do NOT submit again; reload to resume the signed-in account.');
+   const existing=await account.get().catch(()=>null);
+   if(existing){$('signup').hidden=false;$('session').textContent='Signed in: '+existing.email+' | Phone: '+(existing.phone?'******'+existing.phone.slice(-4):'Not set');}
+   say('Signup setup: '+(e.message||'Unknown error')+'. Do not repeatedly create accounts; correct the details or reload to resume this account.');
  }finally{busy=false;$('create').disabled=false}
 });
 async function finish(){
