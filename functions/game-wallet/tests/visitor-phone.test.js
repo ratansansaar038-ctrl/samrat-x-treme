@@ -96,6 +96,7 @@ test('browser visitor tracker sends one pseudonymous token per session', async (
 
 test('backend visitor table uses hashed browser id and handles duplicate rows safely', () => {
   assert.match(backend, /async function trackSiteVisit\(body, key\)/);
+  assert.match(backend, /rowId, data: \{ firstSeenAt: new Date\(\)\.toISOString\(\) \}/);
   assert.match(backend, /createHash\("sha256"\)/);
   assert.match(backend, /if \(e\.status === 409\) return \{ ok: true, created: false \}/);
   assert.match(backend, /\["visitors", "site_visitors", \[lim\(1\)\]\]/);
