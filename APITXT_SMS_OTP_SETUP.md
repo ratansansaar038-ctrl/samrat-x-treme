@@ -32,7 +32,7 @@ Create **private** TablesDB table `phone_otp_challenges` under the database:
 
 Table row ID is `otp_<28 hexadecimal chars>`, uniquely based on user ID. **Do not grant direct client row permissions.**
 
-Create a second **private** table `site_visitors`. The counter stores a hashed random browser token in each row ID; no extra columns are required by the application. The dashboard shows **estimated unique browsers since counting started**, not historic visits, page views, or verified unique people. No IP or phone is recorded for the counter.
+Create a second **private** table `site_visitors`. Add one required column `firstSeenAt` of type **String**, size **32** (UTC ISO timestamp). Appwrite rejects row creation with empty `data: {}`, so the server populates this timestamp for each new browser. The counter stores a hashed random browser token in each row ID; it does not store the raw browser token. The dashboard shows **estimated unique browsers since counting started**, not historic visits, page views, or verified unique people. No IP or phone is recorded for the counter.
 
 ## 3. Safeguards
 - Only the server generates the six-digit code.
