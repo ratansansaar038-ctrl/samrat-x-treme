@@ -2,7 +2,10 @@
 (async function () {
   'use strict';
   try {
-    if (sessionStorage.getItem('samratSiteVisitRecordedV1') === '1') return;
+    // Log a returning browser once per India calendar day, not once per browser tab.
+    const istDay = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+    const dayKey = 'samratSiteVisitRecordedISTDayV2';
+    if (sessionStorage.getItem(dayKey) === istDay) return;
     if (!window.crypto || typeof window.crypto.randomUUID !== 'function') return;
     let browserId = localStorage.getItem('samratSiteVisitorIdV1');
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,7 +31,7 @@
     let result = {};
     try { result = JSON.parse(execution.responseBody || '{}'); } catch {}
     if (execution.responseStatusCode === 200 && result.ok === true) {
-      sessionStorage.setItem('samratSiteVisitRecordedV1', '1');
+      sessionStorage.setItem(dayKey, istDay);
     }
   } catch {
     // Analytics must never interrupt signup or game play.

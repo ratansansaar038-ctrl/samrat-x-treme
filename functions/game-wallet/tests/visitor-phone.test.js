@@ -61,10 +61,12 @@ test('public pages include the privacy-conscious visitor tracker', () => {
     'speed-tap.html','memory-x.html','math-challenge.html','player-profile.html']) {
     assert.match(read(name), /site-visitor\.js/);
   }
+  assert.match(read('admin-dashboard.html'), /id="mTodayVisitors"/);
   assert.match(read('admin-dashboard.html'), /id="mVisitors"/);
+  assert.match(read('admin-dashboard.html'), /id="mPlayers"/);
 });
 
-test('browser visitor tracker sends one pseudonymous token per session', async () => {
+test('browser visitor tracker sends one pseudonymous token per IST calendar day', async () => {
   const local = new Map(), session = new Map(), calls = [];
   const store = map => ({
     getItem: key => map.get(key) ?? null,
@@ -88,19 +90,41 @@ test('browser visitor tracker sends one pseudonymous token per session', async (
   assert.equal(calls.length,1);
   assert.equal(JSON.parse(calls[0].body.body).action,'track_site_visit');
   assert.equal(JSON.parse(calls[0].body.body).browserId,browserId);
-  assert.equal(session.get('samratSiteVisitRecordedV1'),'1');
+  const todayIST = new Date(Date.now() + 330 * 60000).toISOString().slice(0,10);
+  assert.equal(session.get('samratSiteVisitRecordedISTDayV2'),todayIST);
   new Script(tracker).runInContext(ctx);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length,1);
+  // A returning browser from another India day reuses its token.
+  session.set('samratSiteVisitRecordedISTDayV2','2000-01-01');
+  new Script(tracker).runInContext(ctx);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length,2);
+  assert.equal(JSON.parse(calls[1].body.body).browserId,browserId);
+  assert.equal(session.get('samratSiteVisitRecordedISTDayV2'),todayIST);
 });
 
-test('backend visitor table uses hashed browser id and handles duplicate rows safely', () => {
+test('backend visitor table keeps all-time unique rows and counts daily returning browsers', () => {
   assert.match(backend, /async function trackSiteVisit\(body, key\)/);
   assert.match(backend, /rowId, data: \{ firstSeenAt: new Date\(\)\.toISOString\(\) \}/);
   assert.match(backend, /createHash\("sha256"\)/);
-  assert.match(backend, /if \(e\.status === 409\) return \{ ok: true, created: false \}/);
+  assert.match(backend, /if \(e\.status !== 409\) throw e/);
+  assert.match(backend, /request\("GET", rowPath, key\)/);
+  assert.match(backend, /Date\.parse\(existing\.\$updatedAt\) >= istDayStartMs\(\)/);
+  assert.match(backend, /request\("PATCH", rowPath, key/);
+  assert.match(backend, /firstSeenAt: existing\.firstSeenAt \|\| existing\.\$createdAt/);
+  assert.match(backend, /\["todayVisitors", "site_visitors", \[gte\("\$updatedAt", todayStartIST\), lim\(1\)\]\]/);
   assert.match(backend, /\["visitors", "site_visitors", \[lim\(1\)\]\]/);
+  assert.match(backend, /todayVisitors: data\.todayVisitors\?\.total \?\? null/);
   assert.match(backend, /visitors: data\.visitors\?\.total \?\? null/);
   assert.match(backend, /"track_site_visit"/);
   assert.doesNotMatch(backend.match(/async function trackSiteVisit[\s\S]*?const dashboardIsAdmin/)[0], /remoteAddress|x-forwarded-for|req\.ip|phoneNumber|email/);
+});
+
+test('India day starts at 00:00 IST, not at midnight UTC', () => {
+  const source = backend.match(/function istDayStartMs\(utcMs = Date\.now\(\)\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(source, 'IST day boundary helper must be present');
+  const startOfDay = new Function('IST_OFFSET_MS', source + '\nreturn istDayStartMs;')(330 * 60000);
+  assert.equal(new Date(startOfDay(Date.parse('2026-11-24T12:34:56Z'))).toISOString(), '2026-11-23T18:30:00.000Z');
+  assert.equal(new Date(startOfDay(Date.parse('2026-11-23T18:29:59Z'))).toISOString(), '2026-11-22T18:30:00.000Z');
 });
