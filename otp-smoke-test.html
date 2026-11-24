@@ -25,6 +25,14 @@
   <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your account password">
   <button id="signIn" type="submit">Sign in and continue</button>
 </form>
+<form id="setPhoneForm" hidden autocomplete="on">
+  <p><strong>Your account currently has no mobile number.</strong> Add your own Indian mobile number for this OTP test.</p>
+  <label for="mobile">Mobile number (10 digits)</label>
+  <input id="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" required placeholder="Your 10-digit mobile" maxlength="15">
+  <label for="phonePassword">Current account password (required by Appwrite)</label>
+  <input id="phonePassword" type="password" autocomplete="current-password" required placeholder="Current password">
+  <button id="savePhone" type="submit">Save My Mobile Number</button>
+</form>
 <button id="send" type="button" disabled>Send SMS OTP</button>
 <label for="code">SMS OTP (6 digits)</label>
 <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter SMS OTP">
@@ -39,6 +47,10 @@ const statusText=document.getElementById('status');
 const sendButton=document.getElementById('send');
 const verifyButton=document.getElementById('verify');
 const codeInput=document.getElementById('code');
+const setPhoneForm=document.getElementById('setPhoneForm');
+const mobileInput=document.getElementById('mobile');
+const phonePasswordInput=document.getElementById('phonePassword');
+const savePhoneButton=document.getElementById('savePhone');
 const signInForm=document.getElementById('signInForm');
 const signInButton=document.getElementById('signIn');
 const loginEmail=document.getElementById('loginEmail');
@@ -62,7 +74,8 @@ async function refreshAccount(){
     const u=await account.get();
     signInForm.hidden=true;
     accountText.textContent='Signed in: '+u.email+' | Phone: '+(u.phone?'******'+u.phone.slice(-4):'Not set');
-    if(!u.phone){message('No phone on this account. Add it in Appwrite Auth, then reload this test page.');return}
+    setPhoneForm.hidden=!!u.phone;
+    if(!u.phone){message('Your account has no mobile number in Appwrite Auth. Add your own mobile below and save it before sending an SMS OTP.');return}
     verifyButton.disabled=false;
     try{
       const result=await call('sms_otp_status');
@@ -75,6 +88,24 @@ async function refreshAccount(){
     message('Sign in directly below to test. Account check: '+(e&&e.message?e.message:'No active login session'));
   }
 }
+setPhoneForm.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(savePhoneButton.disabled)return;
+  let digits=mobileInput.value.replace(/\D/g,'');
+  if(digits.length===12 && digits.startsWith('91'))digits=digits.slice(2);
+  if(!/^[6-9]\d{9}$/.test(digits)){message('Enter a valid Indian 10-digit mobile number.');return}
+  savePhoneButton.disabled=true;
+  message('Saving your own mobile number in your authenticated Appwrite account…');
+  try{
+    await account.updatePhone({phone:'+91'+digits,password:phonePasswordInput.value});
+    phonePasswordInput.value='';
+    mobileInput.value='';
+    await refreshAccount();
+  }catch(e){
+    phonePasswordInput.value='';
+    message('Could not save mobile: '+(e&&e.message?e.message:'Check your account password or phone number.'));
+  }finally{savePhoneButton.disabled=false}
+});
 signInForm.addEventListener('submit',async event=>{
   event.preventDefault();
   if(signInButton.disabled)return;
