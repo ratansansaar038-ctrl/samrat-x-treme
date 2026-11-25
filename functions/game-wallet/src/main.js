@@ -3761,7 +3761,7 @@ export default async ({ req, res, error }) => {
           data: {
             userId: user,
             name: typeof b.name === "string" ? b.name.slice(0, 80) : "",
-            email: typeof b.email === "string" ? b.email.slice(0, 160) : "",
+            email: authUser.email.slice(0, 160),
             wallet: SIGN_UP_BONUS_VC,
             dailyDrawsPlayed: 0,
             lastPlayDate: "",
