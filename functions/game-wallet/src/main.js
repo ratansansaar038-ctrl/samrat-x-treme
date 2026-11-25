@@ -3735,9 +3735,20 @@ export default async ({ req, res, error }) => {
           signupBonusVC: 0,
         });
 
-      // Verify the APITxT SMS challenge on the server. Client claims are never trusted.
-      // Existing profiles were returned above and keep their current balances.
-      if (!(await smsOtpService(key).isVerified(user)))
+      // A guest / anonymous Appwrite session is NOT a real email signup.
+      // This also prevents automatic guest sessions from creating player wallets.
+      const authUser = await request("GET", "/users/" + encodeURIComponent(user), key);
+      if (typeof authUser.email !== "string" || !authUser.email.trim())
+        return send(res, 403, {
+          ok: false,
+          error: "Create a real email account before activating a player wallet.",
+        });
+
+      // Mobile OTP was intentionally disabled for new signups. Preserve the
+      // optional server-side check only if it is explicitly re-enabled.
+      // Existing profiles were returned above, so no duplicate VC is credited.
+      const requireSmsOtp = /^(true|1|yes)$/i.test(process.env.SAMRAT_REQUIRE_SMS_OTP || "");
+      if (requireSmsOtp && !(await smsOtpService(key).isVerified(user)))
         return send(res, 403, {
           ok: false,
           error: "Verify the SMS OTP sent via APITxT before claiming your Sign Up Bonus.",
@@ -3750,7 +3761,7 @@ export default async ({ req, res, error }) => {
           data: {
             userId: user,
             name: typeof b.name === "string" ? b.name.slice(0, 80) : "",
-            email: typeof b.email === "string" ? b.email.slice(0, 160) : "",
+            email: authUser.email.slice(0, 160),
             wallet: SIGN_UP_BONUS_VC,
             dailyDrawsPlayed: 0,
             lastPlayDate: "",

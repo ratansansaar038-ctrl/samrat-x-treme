@@ -463,10 +463,26 @@ async function loadLiveTicker() {
 async function refreshWalletSummary() {
   if (!currentUser) return;
   try {
-    const w = await api('get_wallet');
+    let w;
+    try {
+      w = await api('get_wallet');
+    } catch (error) {
+      // Users whose Auth account was created while OTP blocked the wallet
+      // can now safely complete their profile. The server creates it once.
+      if (!/Profile missing or duplicated/i.test(String(error?.message || ''))) throw error;
+      const result = await api('register_profile', {
+        name: currentUser.name || '',
+        email: currentUser.email || ''
+      });
+      if (result.created === true && result.signupBonusVC === 1000) {
+        msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
+        try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
+      }
+      w = await api('get_wallet');
+    }
     $('walletSummary').textContent = `Wallet: ${w.wallet} VC (Spendable: ${w.spendableVC} VC)`;
-  } catch {
-    $('walletSummary').textContent = 'Wallet: Active';
+  } catch (error) {
+    $('walletSummary').textContent = 'Wallet activation pending: ' + (error?.message || 'Please try again');
   }
 }
 

@@ -249,3 +249,20 @@ test('both homepage and referral signup scripts parse and implement recovery', (
   assert.match(signupPage, /WALLET_FUNCTION="6ae1bcc500208a5a7efb"/);
   assert.match(homepage, /if \(signupButton\.disabled\) return/);
 });
+
+test('server respects deliberately disabled SMS OTP for real email accounts', () => {
+  assert.match(server, /const requireSmsOtp = \/\^\(true\|1\|yes\)\$\/i\.test\(process\.env\.SAMRAT_REQUIRE_SMS_OTP \|\| ""\)/);
+  assert.match(server, /if \(requireSmsOtp && !\(await smsOtpService\(key\)\.isVerified\(user\)\)\)/);
+  assert.match(server, /const authUser = await request\("GET", "\/users\/" \+ encodeURIComponent\(user\), key\)/);
+  assert.match(server, /!authUser\.email\.trim\(\)/);
+  assert.match(server, /email: authUser\.email\.slice\(0, 160\)/);
+  assert.match(server, /if \(existing\.length\)[\s\S]*?signupBonusVC: 0/);
+});
+
+test('stuck auth accounts resume missing player wallet without sending SMS OTP', () => {
+  assert.match(homepage, /Profile missing or duplicated/i);
+  assert.match(homepage, /const result = await api\('register_profile',/);
+  assert.match(homepage, /w = await api\('get_wallet'\)/);
+  assert.doesNotMatch(homepage, /SamratPhone\.beginPhoneVerification/);
+  assert.match(loginPage, /href="index\.html#authPanel">CREATE ACCOUNT<\/a>/);
+});
