@@ -126,7 +126,7 @@ test('repeated signup signs in but does not credit another bonus when profile al
     verifiedPhone: true
   });
   await h.clickSignup();
-  assert.match(h.elements.get('signedMsg').textContent, /duplicate bonus nahi/);
+  assert.match(h.elements.get('signedMsg').textContent, /no duplicate bonus/);
   assert.match(h.elements.get('walletSummary').textContent, /Wallet: 210 VC/);
   assert.deepEqual(h.redirects, ['number-draw.html']);
   assert.equal(h.storage.get('samratSignupBonusVC'), undefined);
@@ -145,15 +145,16 @@ test('existing email with wrong password cannot get a bonus or bypass login', as
   assert.equal(h.redirects.length, 0);
 });
 
-test('new signup must send phone OTP and cannot claim the bonus before verification', async () => {
-  const h = fakeHome({ profile: { ok: true, created: true, signupBonusVC: 1000, wallet: 1000 } });
+test('disabled homepage OTP path does not send SMS, and blocks wallet on backend verification error', async () => {
+  const h = fakeHome({ profile: { ok: false, error: 'Mobile verification required to create wallet.' } });
   await h.clickSignup();
-  assert.ok(h.calls.includes('updatePhone'));
-  assert.ok(h.calls.includes('start_sms_otp'));
-  assert.ok(!h.calls.includes('register_profile'));
-  assert.deepEqual(h.redirects, ['verify-phone.html']);
-  assert.equal(h.storage.get('samratSignupBonusVC'), undefined);
-});
+  assert.ok(h.calls.includes('create'));
+  assert.ok(h.calls.includes('register_profile'));
+  assert.ok(!h.calls.includes('updatePhone'));
+  assert.ok(!h.calls.includes('start_sms_otp'));
+  assert.equal(h.redirects.length, 0);
+  assert.match(h.elements.get('signedMsg').textContent, /wallet setup pending/i);
+})
 
 test('APITxT OTP must verify through the backend before the profile is created', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
@@ -164,13 +165,23 @@ test('APITxT OTP must verify through the backend before the profile is created',
   assert.equal((await h.phoneHelper.getPhoneOtpStatus(h.functions)).verified, true);
 });
 
-test('SMS OTP send errors must not grant a wallet bonus', async () => {
-  const h = fakeHome({ profile: { ok: true, created: true, signupBonusVC: 1000 }, otpSendError: Error('SMS service not enabled') });
+test('disabled homepage SMS flow never calls the SMS gateway', async () => {
+  const h = fakeHome({
+    profile: { ok: false, error: 'Phone verification required' },
+    otpSendError: Error('SMS service is disabled')
+  });
   await h.clickSignup();
-  assert.ok(!h.calls.includes('register_profile'));
+  assert.ok(!h.calls.includes('start_sms_otp'));
+  assert.ok(!h.calls.includes('verify_sms_otp'));
   assert.equal(h.redirects.length, 0);
-  assert.match(h.elements.get('authMsg').textContent, /SMS service not enabled/);
-});
+})
+
+test('homepage routes login and signup to Lucky Number Draw, not Speed Tap', () => {
+  assert.equal(homepage.match(/window\.location\.replace\('number-draw\.html'\)/g)?.length, 2);
+  assert.doesNotMatch(homepage, /window\.location\.replace\('speed-tap\.html'\)/);
+  // The homepage does not activate the optional SMS phone verification helper.
+  assert.doesNotMatch(homepage, /SamratPhone\.beginPhoneVerification/);
+})
 
 test('homepage login redirects only after successful authentication', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 800 } });
@@ -188,27 +199,24 @@ test('wallet setup failure does not redirect to a broken game session', async ()
   assert.match(h.elements.get('signedMsg').textContent, /wallet setup pending/);
 });
 
-test('main Lucky Draw card is promoted ahead of signup and free coins', () => {
+test('Lucky Number Draw remains available and dedicated login defaults to it', () => {
   const card = homepage.indexOf('class="skill-card draw" href="number-draw.html"');
   assert.ok(card > 0);
-  assert.ok(card < homepage.indexOf('id="authPanel"'));
+  assert.ok(card > homepage.indexOf('id="authPanel"'));
   assert.ok(card < homepage.indexOf('id="freeVcPanel"'));
-  assert.ok(homepage.indexOf('id="freeVcPanel"') < homepage.indexOf('class="skill-card speed"'));
   assert.match(loginPage, /: "number-draw\.html";/);
-  assert.equal(signupPage.match(/location\.replace\('number-draw\.html'\)/g)?.length, 1);
   assert.match(signupPage, /s\.verified\?'number-draw\.html':'verify-phone\.html'/);
   assert.match(drawPage, /id="signupBonusNotice"/);
-});
+})
 
-test('signup mobile validation rejects invalid or missing numbers before new Auth account', async () => {
+test('homepage existing-login path needs no SMS OTP when optional feature is disabled', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
-  h.getElement('phone').value = '000';
-  await h.clickSignup();
-  assert.equal(h.calls.includes('create'), false);
-  assert.equal(h.calls.includes('register_profile'), false);
-  assert.equal(h.redirects.length, 0);
-  assert.match(h.elements.get('authMsg').textContent, /valid 10-digit Indian mobile/);
-});
+  await h.clickLogin();
+  assert.deepEqual(h.redirects, ['number-draw.html']);
+  assert.ok(!h.calls.includes('start_sms_otp'));
+  assert.ok(!h.calls.includes('updatePhone'));
+  assert.doesNotMatch(homepage, /id="phone"/);
+})
 
 test('both homepage and referral signup scripts parse and implement recovery', () => {
   new Script(inlineScript(homepage));
@@ -219,7 +227,7 @@ test('both homepage and referral signup scripts parse and implement recovery', (
   new Script(phoneHelper);
   assert.match(signupPage, /finishWalletProfile\(user,name,email,entered\)/);
   assert.match(signupPage, /SamratPhone\.beginPhoneVerification\(account,functions,password,phone\)/);
-  assert.match(homepage, /SamratPhone\.beginPhoneVerification\(account, functions, password, phone\)/);
+  assert.doesNotMatch(homepage, /SamratPhone\.beginPhoneVerification/);
   assert.match(otpPage, /completePhoneVerification\(account/);
   assert.match(otpPage, /SamratPhone\.getPhoneOtpStatus\(functions\)/);
   assert.doesNotMatch(signupPage, /db\.createRow/);

@@ -514,7 +514,7 @@ $('login').onclick = async () => {
     await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
     if (!currentUser) throw Error('Login session could not be verified');
-    window.location.replace('speed-tap.html');
+    window.location.replace('number-draw.html');
   } catch (error) {
     msg('authMsg', error.message);
   } finally {
@@ -567,10 +567,12 @@ $('signup').onclick = async () => {
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
       try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
+    } else if (profileResult?.created === false) {
+      msg('signedMsg', 'Existing profile: no duplicate bonus. Your current wallet is unchanged.');
     }
     if (!profileError) {
       if (!currentUser) throw Error('Login session could not be verified');
-      window.location.replace('speed-tap.html');
+      window.location.replace('number-draw.html');
     }
   } catch (error) {
     msg('authMsg', error.message);
