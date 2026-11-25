@@ -176,7 +176,7 @@ test('homepage routes login and signup to Lucky Number Draw, not Speed Tap', () 
   assert.equal(homepage.match(/window\\.location\\.replace\\('number-draw\\.html'\\)/g)?.length, 2);
   assert.doesNotMatch(homepage, /window\\.location\\.replace\\('speed-tap\\.html'\\)/);
   // No changes to the owner's chosen OTP feature setting or account creation flow.
-  assert.match(homepage, /const phone = SamratPhone/);
+  assert.doesNotMatch(homepage, /SamratPhone\\.beginPhoneVerification/);
 });
 
 test('homepage login redirects only after successful authentication', async () => {
