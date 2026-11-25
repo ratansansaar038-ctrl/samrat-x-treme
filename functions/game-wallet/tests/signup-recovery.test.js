@@ -209,6 +209,15 @@ test('Lucky Number Draw remains available and dedicated login defaults to it', (
   assert.match(drawPage, /id="signupBonusNotice"/);
 })
 
+test('paid traffic sees Number Draw and signup before free skill games', () => {
+  assert.ok(homepage.indexOf('class="skill-card draw"') < homepage.indexOf('class="skill-card speed"'));
+  assert.match(homepage, /NEW PLAYER\? CREATE FREE ACCOUNT/);
+  assert.match(homepage, /href="#authPanel"/);
+  assert.match(drawPage, /CREATE FREE ACCOUNT/);
+  assert.match(drawPage, /Preview only: no virtual coins/);
+  assert.match(drawPage, /<details>/);
+});
+
 test('homepage existing-login path needs no SMS OTP when optional feature is disabled', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 1000 } });
   await h.clickLogin();
