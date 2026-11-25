@@ -208,7 +208,12 @@ const button=document.getElementById("loginButton");
 const message=document.getElementById("message");
 
 
-function loginDestination() {
+function loginDestination(user) {
+  // Redirect only after Appwrite has authenticated the actual account.
+  // Admin authorization still happens server-side using ADMIN_USER_IDS.
+  if (typeof user?.email === "string" &&
+      user.email.trim().toLowerCase() === "gauravguptabjr@gmail.com")
+    return "admin-dashboard.html";
   const allowed = [
     "number-draw.html",
     "speed-tap.html",
@@ -229,11 +234,11 @@ async function prepareLoginPage(){
 
 try{
 
-await account.get();
+const signedInUser=await account.get();
 
 /* already logged in */
 
-window.location.replace(loginDestination());
+window.location.replace(loginDestination(signedInUser));
 return;
 
 }catch(error){
@@ -276,7 +281,8 @@ password:password
 message.style.color="#60ff9a";
 message.innerText="Login successful ✅";
 
-window.location.replace(loginDestination());
+const signedInUser=await account.get();
+window.location.replace(loginDestination(signedInUser));
 
 }catch(error){
 

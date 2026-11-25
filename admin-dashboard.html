@@ -135,8 +135,8 @@ async function loadWinningReport(roundId){
 
 function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
  for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
-async function refresh(){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
- try{const d=await api('admin_dashboard');text('mTodayVisitors',fmtVisitorCount(d.stats?.todayVisitors));text('mVisitors',fmtVisitorCount(d.stats?.visitors));el('visitorCapWarning').hidden=d.stats?.todayVisitors!==5000&&d.stats?.visitors!==5000;text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
+async function refresh(initialData=null){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
+ try{const d=initialData || await api('admin_dashboard');text('mTodayVisitors',fmtVisitorCount(d.stats?.todayVisitors));text('mVisitors',fmtVisitorCount(d.stats?.visitors));el('visitorCapWarning').hidden=d.stats?.todayVisitors!==5000&&d.stats?.visitors!==5000;text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
  renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
  const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
  if(latest)loadWinningReport(latest.roundId);
@@ -146,7 +146,20 @@ el('refresh').addEventListener('click',refresh);
 el('searchForm').addEventListener('submit',async e=>{e.preventDefault();if(!verified)return;const userId=el('playerId').value.trim();if(!/^[a-zA-Z0-9._-]{1,36}$/.test(userId)){text('searchStatus','Enter a valid exact Player ID.');return;}
  text('searchStatus','Looking up player…');try{const d=await api('admin_find_player',{userId});renderPlayers(d.players);text('searchStatus',d.players?.length?'Player found. Clear to restore recent list.':'No matching player.');}catch(err){text('searchStatus','Lookup failed: '+err.message);}});
 el('clearSearch').addEventListener('click',()=>{el('playerId').value='';text('searchStatus','');refresh();});
-(async()=>{try{await account.get();const r=await api('get_wallet');if(r.isAdmin!==true)throw Error('You are not an authorized administrator.');verified=true;el('dashboard').hidden=false;text('authBadge','ADMIN VERIFIED');await refresh();}catch(e){text('authBadge','ACCESS RESTRICTED');message('Admin login required: '+e.message+' · Sign in via the homepage, then reopen this page.',true);}})();
+(async()=>{try{
+  const user=await account.get();
+  if(!user?.$id)throw Error('Not signed in.');
+  // Verify admin permission through the admin-only backend endpoint itself.
+  // Do not require a player wallet/profile for admin access.
+  const snapshot=await api('admin_dashboard');
+  verified=true;
+  el('dashboard').hidden=false;
+  text('authBadge','ADMIN VERIFIED');
+  await refresh(snapshot);
+}catch(e){
+  text('authBadge','ACCESS RESTRICTED');
+  message('Admin login/permission required: '+e.message+' · Sign in with gauravguptabjr@gmail.com in this browser using Login, then reopen this page.',true);
+}})();
 </script>
 </body>
 </html>
