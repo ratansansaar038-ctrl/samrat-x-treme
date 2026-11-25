@@ -29,6 +29,8 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <section class="metrics" aria-label="System statistics">
 <div class="metric"><small>Today visitors (IST)</small><strong id="mTodayVisitors">—</strong><small>Browser IDs recorded today, India time; not verified people.</small></div>
 <div class="metric"><small>Total visitors</small><strong id="mVisitors">—</strong><small>Browser IDs since tracking started; not verified people.</small></div>
+<div class="metric"><small>Today's new signups (IST)</small><strong id="mTodaySignups">—</strong><small>New completed player profiles today; excludes anonymous guests.</small></div>
+<div class="metric"><small>Signup conversion today</small><strong id="mConversionRate">—</strong><small>New completed player profiles ÷ today's active browser IDs; site-wide estimate, not Clickaine-only.</small></div>
 <div class="metric"><small>Registered players</small><strong id="mPlayers">—</strong><small>All registered player profiles.</small></div>
 <div class="metric"><small>Total vouchers</small><strong id="mVouchers">—</strong></div>
 <div class="metric"><small>Unused vouchers</small><strong id="mUnused">—</strong></div>
@@ -135,6 +137,13 @@ async function loadWinningReport(roundId){
 
 function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
  for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
+// Show site-wide conversion without claiming that browsers equal people.
+let todaySignupCount=null;
+function signupConversionPct(signups,visitors){
+ if(!Number.isSafeInteger(signups)||signups<0||
+    !Number.isSafeInteger(visitors)||visitors<=0)return '—';
+ return (100*signups/visitors).toFixed(2)+'%';
+}
 let visitorMetricsRefreshId=0;
 async function refreshVisitorCounters(){
  const requestId=++visitorMetricsRefreshId;
@@ -145,20 +154,26 @@ async function refreshVisitorCounters(){
   if(requestId!==visitorMetricsRefreshId)return;
   text('mTodayVisitors',fmtVisitorCount(d.todayVisitors));
   text('mVisitors',fmtVisitorCount(d.totalVisitors));
+  text('mConversionRate',signupConversionPct(todaySignupCount,d.todayVisitors));
   const stamp=date(d.countedAt);
   const note=el('visitorCapWarning');
   note.textContent='Counted '+fmtVisitorCount(d.totalVisitors)+' recorded browser IDs as of '+stamp+'. More than 5,000 are counted too. Browser IDs do not prove unique human visitors; paid traffic may include bots.';
   note.hidden=false;
  }catch(e){
   if(requestId!==visitorMetricsRefreshId)return;
-  text('mTodayVisitors','—');text('mVisitors','—');
+  text('mTodayVisitors','—');text('mVisitors','—');text('mConversionRate','—');
   const note=el('visitorCapWarning');
   note.textContent='Unable to finish full visitor count: '+e.message+'. Check that the new game-wallet backend deployment is Active, then Refresh.';
   note.hidden=false;
  }
 }
 async function refresh(initialData=null){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
- try{const d=initialData || await api('admin_dashboard');void refreshVisitorCounters();text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
+ try{const d=initialData || await api('admin_dashboard');
+ todaySignupCount=Number.isSafeInteger(d.stats?.todaySignups)?d.stats.todaySignups:null;
+ text('mTodaySignups',fmt(todaySignupCount));
+ text('mConversionRate','Calculating…');
+ void refreshVisitorCounters();
+ text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
  renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
  const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
  if(latest)loadWinningReport(latest.roundId);
