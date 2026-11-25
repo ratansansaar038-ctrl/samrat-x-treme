@@ -1140,6 +1140,78 @@ const dashboardIsAdmin = (user) =>
     .filter(Boolean)
     .includes(user);
 
+// Appwrite listRows.total can stop at 5,000 even while more rows exist.
+// Scan compact metadata pages with a stable cursor to obtain real recorded
+// browser-ID counts without adding a DB table or rewriting visitor history.
+// Keep this separate from admin_dashboard so slow scans never block admin login.
+const VISITOR_PAGE_SIZE = 750;
+const VISITOR_METRICS_CACHE_MS = 30 * 1000;
+let visitorMetricsCached = null;
+let visitorMetricsPending = null;
+
+async function scanVisitorMetrics(key, nowMs = Date.now()) {
+  let cursor = null;
+  let totalVisitors = 0;
+  let todayVisitors = 0;
+  const todayStartMs = istDayStartMs(nowMs);
+  const seenCursors = new Set();
+  while (true) {
+    const queries = [
+      order("$createdAt", "asc"),
+      lim(VISITOR_PAGE_SIZE),
+      { method: "select", values: ["$id", "$updatedAt", "$createdAt"] },
+    ];
+    if (cursor) queries.push({ method: "cursorAfter", values: [cursor] });
+    const data = await request(
+      "GET",
+      tablePath("site_visitors", queries) + "&total=false",
+      key
+    );
+    if (!Array.isArray(data.rows))
+      throw Error("Visitor table returned an invalid page");
+    const batch = data.rows;
+    for (const row of batch) {
+      if (typeof row.$id !== "string" || !row.$id)
+        throw Error("Visitor row ID missing");
+      const lastSeenMs = Date.parse(row.$updatedAt || row.$createdAt);
+      if (!Number.isFinite(lastSeenMs))
+        throw Error("Visitor timestamp missing");
+      totalVisitors++;
+      if (lastSeenMs >= todayStartMs && lastSeenMs <= nowMs)
+        todayVisitors++;
+    }
+    if (batch.length < VISITOR_PAGE_SIZE) break;
+    const nextCursor = batch[batch.length - 1].$id;
+    if (seenCursors.has(nextCursor))
+      throw Error("Visitor pagination repeated a cursor");
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+  return { todayVisitors, totalVisitors, countedAt: new Date(nowMs).toISOString() };
+}
+
+async function cachedVisitorMetrics(key) {
+  const now = Date.now();
+  if (visitorMetricsCached && now - visitorMetricsCached.at < VISITOR_METRICS_CACHE_MS)
+    return visitorMetricsCached.data;
+  if (visitorMetricsPending) return visitorMetricsPending;
+  const pending = scanVisitorMetrics(key);
+  visitorMetricsPending = pending;
+  try {
+    const data = await pending;
+    visitorMetricsCached = { at: Date.now(), data };
+    return data;
+  } finally {
+    if (visitorMetricsPending === pending) visitorMetricsPending = null;
+  }
+}
+
+async function adminVisitorMetrics(user, key) {
+  if (!dashboardIsAdmin(user))
+    return { ok: false, error: "Admin access denied" };
+  return { ok: true, ...(await cachedVisitorMetrics(key)) };
+}
+
 async function adminSnapshot(table, queries, key) {
   const data = await request("GET", tablePath(table, queries), key);
   return {
@@ -3616,6 +3688,7 @@ export default async ({ req, res, error }) => {
       "redeem_voucher",
       "generate_vouchers",
       "admin_dashboard",
+      "admin_visitor_stats",
       "admin_round_report",
       "admin_find_player",
       "unused_vouchers",
@@ -3865,6 +3938,10 @@ export default async ({ req, res, error }) => {
 
     if (action === "admin_dashboard") {
       const d = await adminDashboard(user, key);
+      return send(res, d.ok ? 200 : 403, d);
+    }
+    if (action === "admin_visitor_stats") {
+      const d = await adminVisitorMetrics(user, key);
       return send(res, d.ok ? 200 : 403, d);
     }
     if (action === "admin_round_report") {
