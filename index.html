@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090315">
   <link rel="manifest" href="manifest.json">
-  <title>Lucky Number Draw 00–99 & Free Games | Samrat X-Treme</title><meta name="description" content="Play the free Lucky Number Draw (00–99) on Samrat X-Treme with results every 20 minutes, plus Speed Tap, Memory X and Math Challenge. No cash prizes."><link rel="canonical" href="https://samratxtreme.online/">
+  <title>Free Skill Games & Lucky Number Arena | Samrat X-Treme</title>
+  <meta name="description" content="Play free browser skill games on Samrat X-Treme: Speed Tap Arena, Memory X, Math Challenge & Lucky Number Draw with free virtual coins. Entertainment only, no cash prizes.">
+  <link rel="canonical" href="https://samratxtreme.online/">
   <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
-  <script src="signup-phone.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -55,10 +56,10 @@
     }
 
     .app { max-width: 520px; margin: auto; padding: 14px 15px 50px; }
-    .hero { text-align: center; padding: 16px 0 12px; }
-    .brand { font: 900 43px Georgia, serif; color: #ffe080; text-shadow: 0 4px 18px #ffad2b44; }
-    .sub { font-size: 23px; letter-spacing: 5px; color: #e7c2ff; font-weight: 800; }
-    .small { font-size: 12px; color: #d7c0f5; line-height: 1.7; }
+    .hero { text-align: center; padding: 14px 0 8px; }
+    .brand { font: 900 42px Georgia, serif; color: #ffe080; text-shadow: 0 4px 18px #ffad2b44; }
+    .sub { font-size: 22px; letter-spacing: 5px; color: #e7c2ff; font-weight: 800; }
+    .small { font-size: 12px; color: #d7c0f5; line-height: 1.65; }
 
     .live-bar {
       display: flex;
@@ -69,7 +70,7 @@
       border: 1px solid #ff6eb4;
       border-radius: 14px;
       padding: 11px 14px;
-      margin: 12px 0;
+      margin: 10px 0;
       box-shadow: 0 6px 20px #0006;
     }
     .live-badge {
@@ -194,66 +195,36 @@
       gap: 12px;
     }
     h3 { margin: 0 0 10px; color: #ffe28a; }
-    button:disabled { opacity: .5; }
-    .guide-box {
-      background: #140824;
-      border: 1px dashed #7b4fb8;
-      border-radius: 12px;
-      padding: 11px;
-      font-size: 12px;
-      color: #e4d2fa;
-      text-align: left;
-      line-height: 1.6;
-      margin: 10px 0;
-    }
-    .tab-bar {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 11px 8px;
-      border-radius: 11px;
-      border: 1px solid #7f53b5;
-      background: #160928;
-      color: #d9c0f7;
-      font-weight: 800;
-      font-size: 12.5px;
-      cursor: pointer;
-    }
-    .tab-btn.active {
-      background: linear-gradient(100deg, #ffe34c, #ffad2b);
-      color: #230b24;
-      border-color: #ffe34c;
-    }
-    .skill-grid { display:grid; gap:16px; margin:20px 0; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    .skill-grid { display: grid; gap: 14px; margin: 16px 0; }
     .skill-card {
-      display:flex; align-items:center; gap:18px; padding:24px 18px;
-      min-height:150px; border-radius:22px; text-decoration:none;
-      color:white; border:1px solid #8054ba; box-shadow:0 12px 30px #0007;
+      display: flex; align-items: center; gap: 16px; padding: 20px 16px;
+      min-height: 128px; border-radius: 20px; text-decoration: none;
+      color: white; border: 1px solid #8054ba; box-shadow: 0 10px 26px #0007;
     }
-    .skill-card.speed { background:linear-gradient(120deg,#51218b,#17102c); }
-    .skill-card.memory { background:linear-gradient(120deg,#174777,#17102c); }
-    .skill-card.math { background:linear-gradient(120deg,#79501f,#26102d); }
-    .skill-card.draw { background:linear-gradient(120deg,#7b1854,#1f0d2e); border-color:#ff6eb4; }
-    .skill-icon { font-size:48px; }
-    .skill-card h2 { font-size:21px; color:#ffe58a; margin:8px 0; }
-    .skill-card p { font-size:13px; color:#ddd0ee; }
-    .skill-card small { color:#89ffb4; font-weight:800; }
-    .skill-card strong { color:#ffdf63; font-size:13px; }
+    .skill-card.speed { background: linear-gradient(120deg, #51218b, #17102c); }
+    .skill-card.memory { background: linear-gradient(120deg, #174777, #17102c); }
+    .skill-card.math { background: linear-gradient(120deg, #79501f, #26102d); }
+    .skill-card.draw { background: linear-gradient(120deg, #7b1854, #1f0d2e); border-color: #ff6eb4; }
+    .skill-icon { font-size: 42px; }
+    .skill-card h2 { font-size: 19px; color: #ffe58a; margin: 6px 0; }
+    .skill-card p { font-size: 13px; color: #ddd0ee; margin: 0 0 6px; }
+    .skill-card small { color: #89ffb4; font-weight: 800; }
+    .skill-card strong { color: #ffdf63; font-size: 12.5px; }
   </style>
-<script src="site-visitor.js" defer></script></head>
+  <script src="site-visitor.js" defer></script>
+</head>
 
 <body>
 
-<!-- 🔴 LIVE SCROLLING PATTI -->
+<!-- LIVE SCROLLING TICKER -->
 <div class="ticker-wrap">
   <div class="ticker-move" id="liveTicker">
-    <span class="ticker-item"><span class="ticker-dot">●</span>🪙 FREE Virtual Coins • No deposits, purchases or cash withdrawals!</span>
-    <span class="ticker-item"><span class="ticker-dot">●</span>🎯 Lucky Number Live Draw: every 20 minutes, 9 AM–10 PM IST — Win up to 50× VC!</span>
-    <span class="ticker-item"><span class="ticker-dot">●</span>🎁 Request free VC or redeem an admin-issued free voucher!</span>
-    <span class="ticker-item"><span class="ticker-dot">●</span>📢 Join @samratxtremegame on Telegram for live draw results & updates!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>🪙 100% Free Browser Skill Games — Play with Free Virtual Coins!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>⚡ Speed Tap, Memory X & Math Challenge — Instant Play, No Downloads!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>🎯 Number Arena Live Rounds: Every 20 minutes (9 AM–10 PM IST) — Entertainment Only!</span>
+    <span class="ticker-item"><span class="ticker-dot">●</span>📢 Join @samratxtreme on Telegram for community updates & daily free coin drops!</span>
   </div>
 </div>
 
@@ -263,55 +234,27 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      3 SKILL GAMES • LUCKY NUMBER LIVE DRAW • FREE VIRTUAL COINS
+      FREE BROWSER SKILL GAMES • INSTANT PLAY • VIRTUAL COINS ONLY
     </p>
-    <a class="btn tg-btn" href="https://t.me/samratxtremegame" target="_blank" style="max-width:290px; margin:10px auto 0; padding:11px 16px;">
-      📢 JOIN OFFICIAL TELEGRAM CHANNEL
-    </a>
   </header>
 
-  <div class="live-bar" id="homeDrawLiveBar">
-    <div>
-      <div class="live-badge"><span class="pulse-dot"></span> LIVE DRAW ACTIVE</div>
-      <div style="font-size:12px; color:#f3d9ff; margin-top:2px;">Next 50× Lucky Draw in:</div>
-    </div>
-    <div class="timer-box" id="drawCountdown">00:00</div>
-  </div>
-  <div class="panel hide" id="homeNightBreak" role="status" aria-live="polite" style="text-align:center;border-color:#9869cb;background:linear-gradient(145deg,#201536,#13213e)">
-    <strong style="color:#ffe080">🌙 Night Break (10:00 PM – 9:00 AM). Next Lucky Draw opens sharply at 9:00 AM IST!</strong>
-    <div class="small" style="margin-top:8px">Reopens in</div>
-    <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
-  </div>
-
-  <section class="skill-grid" aria-label="Lucky Number Live Draw">
-    <a class="skill-card draw" href="number-draw.html">
-      <span class="skill-icon">🎯</span>
-      <div>
-        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
-        <h2>LUCKY NUMBER LIVE DRAW</h2>
-        <p>Pick 00–99 • Win 50× Virtual Coins</p>
-        <strong>PLAY FREE NUMBER DRAW →</strong>
-      </div>
-    </a>
-
-  </section>
-
+  <!-- INSTANT SIGNUP / LOGIN ABOVE THE FOLD FOR FAST CONVERSION -->
   <section class="panel" id="authPanel">
-    <h3>Player Login / Signup</h3>
-    <div class="welcome-badge">🎁 Sign Up Bonus: Get 1,000 FREE VC once when you create your account! No cash value.</div>
+    <h3>⚡ Instant Free Account (10 Seconds)</h3>
+    <div class="welcome-badge">🎁 Welcome Bonus: Get 1,000 FREE Virtual Coins instantly! Entertainment only, no cash value.</div>
 
+    <input id="name" type="text" placeholder="Your Name (for new signup)" autocomplete="name">
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
-    <input id="password" type="password" placeholder="Password (8+ characters)">
-    <input id="name" placeholder="Name (only for new signup)">
-    <label for="phone" class="small" style="display:block;margin-top:8px">Mobile number (required for SIGN UP, +91 India)</label>
-    <input id="phone" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel-national" placeholder="10-digit mobile number" aria-label="Mobile number required for new signup">
+    <input id="password" type="password" placeholder="Create or enter password (8+ chars)" autocomplete="current-password">
 
     <div class="row">
-      <button class="btn" id="login">LOGIN</button>
-      <button class="btn secondary" id="signup">SIGN UP</button>
+      <button class="btn green-btn" id="signup">CREATE FREE ACCOUNT</button>
+      <button class="btn secondary" id="login">LOGIN</button>
     </div>
 
-    <p style="text-align:center;margin:12px"><a href="forgot-password.html" style="color:#ffe16a">Forgot Password?</a></p>
+    <p style="text-align:center;margin:10px 0 4px;font-size:13px;">
+      <a href="forgot-password.html" style="color:#ffe16a">Forgot Password?</a>
+    </p>
     <div class="status" id="authMsg"></div>
   </section>
 
@@ -329,49 +272,75 @@
     <div class="status" id="signedMsg"></div>
   </section>
 
-  <section class="panel" id="freeVcPanel" style="text-align:center; border: 1px solid #5cff9d;">
-    <h3 style="color:#89ffb4; margin-bottom:4px;">🪙 FREE VIRTUAL COINS</h3>
-    <p class="small">Play with free VC. Coins are for in-game entertainment only and have no cash value.</p>
-    <p class="small">No UPI deposits, paid gift cards, bank withdrawals or cash rewards.</p>
-    <a class="btn green-btn" href="number-draw.html">REQUEST FREE VC / REDEEM A FREE VOUCHER →</a>
-  </section>
-
-  <section class="skill-grid" aria-label="Other skill games">
+  <!-- SKILL GAMES FIRST (MAINSTREAM AD POLICY FRIENDLY) -->
+  <section class="skill-grid" aria-label="Skill games">
     <a class="skill-card speed" href="speed-tap.html">
       <span class="skill-icon">⚡</span>
       <div>
-        <small>● LIVE GAME</small>
+        <small>● INSTANT SKILL GAME</small>
         <h2>SPEED TAP ARENA</h2>
-        <p>Reflex & Speed Challenge</p>
-        <strong>PLAY NOW →</strong>
+        <p>Test your reflex & tapping speed</p>
+        <strong>PLAY FREE NOW →</strong>
       </div>
     </a>
 
     <a class="skill-card memory" href="memory-x.html">
       <span class="skill-icon">🧠</span>
       <div>
-        <small>● LIVE GAME</small>
+        <small>● BRAIN CHALLENGE</small>
         <h2>MEMORY X</h2>
-        <p>24 Cards · 12 Pairs</p>
-        <strong>PLAY NOW →</strong>
+        <p>Match 24 Cards · 12 Pairs</p>
+        <strong>PLAY FREE NOW →</strong>
       </div>
     </a>
 
     <a class="skill-card math" href="math-challenge.html">
       <span class="skill-icon">🔢</span>
       <div>
-        <small>● NEW SKILL GAME</small>
+        <small>● QUICK LOGIC</small>
         <h2>MATH CHALLENGE</h2>
-        <p>Quick Calculation & Logic</p>
-        <strong>PLAY NOW →</strong>
+        <p>Fast Mental Calculation & Accuracy</p>
+        <strong>PLAY FREE NOW →</strong>
       </div>
     </a>
   </section>
 
+  <!-- NUMBER ARENA LIVE TIMER -->
+  <div class="live-bar" id="homeDrawLiveBar">
+    <div>
+      <div class="live-badge"><span class="pulse-dot"></span> NUMBER ARENA LIVE</div>
+      <div style="font-size:12px; color:#f3d9ff; margin-top:2px;">Next Free Virtual Round in:</div>
+    </div>
+    <div class="timer-box" id="drawCountdown">00:00</div>
+  </div>
+  <div class="panel hide" id="homeNightBreak" role="status" aria-live="polite" style="text-align:center;border-color:#9869cb;background:linear-gradient(145deg,#201536,#13213e)">
+    <strong style="color:#ffe080">🌙 Night Break (10:00 PM – 9:00 AM IST). Skill games above remain open 24/7!</strong>
+    <div class="small" style="margin-top:8px">Number Arena reopens in</div>
+    <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
+  </div>
+
+  <section class="skill-grid" aria-label="Number Arena">
+    <a class="skill-card draw" href="number-draw.html">
+      <span class="skill-icon">🎯</span>
+      <div>
+        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
+        <h2>NUMBER ARENA (00–99)</h2>
+        <p>Pick 00–99 with Free Virtual Points</p>
+        <strong>ENTER FREE ARENA →</strong>
+      </div>
+    </a>
+  </section>
+
+  <section class="panel" id="freeVcPanel" style="text-align:center; border: 1px solid #5cff9d;">
+    <h3 style="color:#89ffb4; margin-bottom:4px;">🪙 100% FREE VIRTUAL COINS</h3>
+    <p class="small">Play all games using free virtual points. Coins are strictly for in-game entertainment and carry zero monetary value.</p>
+    <p class="small">No real-money deposits, paid purchases, or cash withdrawals.</p>
+    <a class="btn green-btn" href="number-draw.html">CLAIM FREE VC / REDEEM VOUCHER →</a>
+  </section>
+
   <section class="panel" id="freeGameGuides" aria-labelledby="freeGameGuidesHeading">
-    <h3 id="freeGameGuidesHeading">🎯 Lucky Number Draw is our main game</h3>
-    <p class="small">Choose a number from 00 to 99, follow live results every 20 minutes between 9 AM and 10 PM IST, and enjoy free virtual-point gameplay. Virtual coins have no cash value, and there are no deposits or cash prizes.</p>
-    <p class="small"><a href="number-draw.html">▶ Explore the free Lucky Number Draw</a></p>
+    <h3 id="freeGameGuidesHeading">📘 How to Play Free Skill Games</h3>
+    <p class="small">Sharpen your reflexes in Speed Tap, train your focus in Memory X, solve fast equations in Math Challenge, or join our 20-minute virtual Number Arena rounds.</p>
     <div class="links" aria-label="Free game guides">
       <a href="speed-tap-arena.html">⚡ Speed Tap guide</a>
       <a href="memory-x-challenge.html">🧠 Memory X guide</a>
@@ -379,22 +348,18 @@
     </div>
   </section>
 
-  <section class="panel" id="permanentApkDownload" style="text-align:center">
-    <h3>📱 DOWNLOAD ANDROID APP</h3>
-    <a class="btn" href="https://github.com/ratansansaar038-ctrl/samrat-x-treme/releases/latest/download/app-release.apk">
-      ⬇ DOWNLOAD APK
+  <div style="text-align:center; margin: 14px 0;">
+    <a class="btn tg-btn" href="https://t.me/samratxtreme" target="_blank" rel="noopener" style="max-width:300px; margin:0 auto; padding:12px 16px;">
+      📢 JOIN TELEGRAM (@samratxtreme)
     </a>
-    <p class="small">
-      Official Samrat X-Treme Android App
-    </p>
-  </section>
+  </div>
 
   <nav class="links">
     <a href="index.html">Home</a>
     <a href="player-profile.html">My Profile</a>
     <a href="referral.html">Referral</a>
     <a href="reward.html">Rewards</a>
-    <a href="https://t.me/samratxtremegame" target="_blank">📢 Telegram</a>
+    <a href="https://t.me/samratxtreme" target="_blank" rel="noopener">📢 Telegram</a>
   </nav>
 
   <div class="policy-links" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0;font-size:12px">
@@ -404,7 +369,7 @@
   </div>
 
   <footer class="small" style="text-align:center;margin-top:22px">
-    Entertainment only • Virtual coins have no monetary value
+    Free-to-play entertainment only • Virtual coins have no cash or monetary value
   </footer>
 
 </main>
@@ -414,42 +379,9 @@
 
 const $ = id => document.getElementById(id);
 const msg = (id, value) => {
-  $(id).textContent = String(value ?? '');
+  const el = $(id);
+  if (el) el.textContent = String(value ?? '');
 };
-
-// 📊 TRAFFIC SOURCE ATTRIBUTION (Telegram & Ad Networks)
-const TRAFFIC_STORAGE_KEY = 'samrat_traffic_attribution';
-
-function captureTrafficSource() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const source = params.get('utm_source') || params.get('source');
-    const spot = params.get('spot') || params.get('zone') || params.get('placement') || '';
-    const ref = params.get('ref') || '';
-
-    if (source || spot || ref) {
-      const payload = {
-        utm_source: (source || 'direct').slice(0, 64),
-        spot_id: String(spot).slice(0, 64),
-        ref_code: String(ref).slice(0, 64),
-        landing_page: window.location.pathname,
-        captured_at: new Date().toISOString()
-      };
-      localStorage.setItem(TRAFFIC_STORAGE_KEY, JSON.stringify(payload));
-    }
-  } catch {}
-}
-
-function getTrafficAttribution() {
-  try {
-    const raw = localStorage.getItem(TRAFFIC_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { utm_source: 'organic', spot_id: '', ref_code: '' };
-  } catch {
-    return { utm_source: 'organic', spot_id: '', ref_code: '' };
-  }
-}
-
-captureTrafficSource();
 
 const { Client, Account, ID, Functions } = Appwrite;
 
@@ -486,32 +418,42 @@ async function api(action, extra = {}) {
 
 function startDrawTimer() {
   function tick() {
-    const now=Date.now();
-    const ist=new Date(now+19800000);
-    const hour=ist.getUTCHours(),mins=ist.getUTCMinutes(),secs=ist.getUTCSeconds();
-    const closed=hour>=22||hour<9;
-    $('homeDrawLiveBar').classList.toggle('hide',closed);
-    $('homeNightBreak').classList.toggle('hide',!closed);
-    if(closed){
-      const midnight=Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),ist.getUTCDate())-19800000;
-      const until=midnight+(hour>=22?86400000:0)+9*3600000-now;
-      const n=Math.max(0,Math.ceil(until/1000));
-      $('homeNightClock').textContent=`${String(Math.floor(n/3600)).padStart(2,'0')}:${String(Math.floor((n%3600)/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
+    const now = Date.now();
+    const ist = new Date(now + 19800000);
+    const hour = ist.getUTCHours(), mins = ist.getUTCMinutes(), secs = ist.getUTCSeconds();
+    const closed = hour >= 22 || hour < 9;
+    $('homeDrawLiveBar').classList.toggle('hide', closed);
+    $('homeNightBreak').classList.toggle('hide', !closed);
+    if (closed) {
+      const midnight = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - 19800000;
+      const until = midnight + (hour >= 22 ? 86400000 : 0) + 9 * 3600000 - now;
+      const n = Math.max(0, Math.ceil(until / 1000));
+      $('homeNightClock').textContent = `${String(Math.floor(n / 3600)).padStart(2, '0')}:${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
     } else {
-      const remaining=20*60-(mins%20)*60-secs;
-      $('drawCountdown').textContent=`${String(Math.floor(remaining/60)).padStart(2,'0')}m : ${String(remaining%60).padStart(2,'0')}s`;
+      const remaining = 20 * 60 - (mins % 20) * 60 - secs;
+      $('drawCountdown').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}m : ${String(remaining % 60).padStart(2, '0')}s`;
     }
   }
-  tick();setInterval(tick,1000);
+  tick();
+  setInterval(tick, 1000);
 }
 
 async function loadLiveTicker() {
   try {
     const res = await api('get_recent_activity');
     if (res && Array.isArray(res.items) && res.items.length > 0) {
-      $('liveTicker').innerHTML = res.items
-        .map(text => `<span class="ticker-item"><span class="ticker-dot">●</span>${text}</span>`)
-        .join('');
+      const ticker = $('liveTicker');
+      ticker.textContent = '';
+      res.items.forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'ticker-item';
+        const dot = document.createElement('span');
+        dot.className = 'ticker-dot';
+        dot.textContent = '●';
+        span.appendChild(dot);
+        span.appendChild(document.createTextNode(String(text)));
+        ticker.appendChild(span);
+      });
     }
   } catch {}
 }
@@ -562,13 +504,22 @@ async function signInOrUseCurrentSession(email, password) {
 }
 
 $('login').onclick = async () => {
+  const loginBtn = $('login');
+  if (loginBtn.disabled) return;
+  loginBtn.disabled = true;
+  const origText = loginBtn.textContent;
+  loginBtn.textContent = 'LOGGING IN...';
+  msg('authMsg', '');
   try {
     await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
     if (!currentUser) throw Error('Login session could not be verified');
-    window.location.replace('number-draw.html');
+    window.location.replace('speed-tap.html');
   } catch (error) {
     msg('authMsg', error.message);
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = origText;
   }
 };
 
@@ -576,14 +527,17 @@ $('signup').onclick = async () => {
   const signupButton = $('signup');
   if (signupButton.disabled) return;
   signupButton.disabled = true;
+  const origText = signupButton.textContent;
+  signupButton.textContent = 'CREATING ACCOUNT...';
+  msg('authMsg', '');
   try {
     const name = $('name').value.trim();
     const email = $('email').value.trim();
     const password = $('password').value;
-    const phone = SamratPhone.normalizeMobile($('phone').value);
-    const attribution = getTrafficAttribution();
 
-    if (!name) throw Error('Enter your name');
+    if (!name) throw Error('Please enter your name');
+    if (!email) throw Error('Please enter your email');
+    if (password.length < 8) throw Error('Password must be at least 8 characters');
 
     let newAccount = false;
     try {
@@ -594,59 +548,35 @@ $('signup').onclick = async () => {
       try {
         await signInOrUseCurrentSession(email, password);
       } catch {
-        throw Error('Email already registered. Agar pehle signup kiya tha to LOGIN dabao, warna Forgot Password use karo.');
+        throw Error('Email already registered. Click LOGIN if you already have an account.');
       }
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
 
-    // Save traffic source in Appwrite User Prefs so it persists across phone verification redirect
-    if (newAccount && attribution.utm_source !== 'organic') {
-      try {
-        await account.updatePrefs({
-          utm_source: attribution.utm_source,
-          spot_id: attribution.spot_id,
-          ref_code: attribution.ref_code
-        });
-      } catch {}
-    }
-
-    const phoneStatus = await SamratPhone.beginPhoneVerification(account, functions, password, phone);
-    if (!phoneStatus.verified) {
-      window.location.replace('verify-phone.html');
-      return;
-    }
-
     let profileResult;
     let profileError;
     try {
-      profileResult = await api('register_profile', {
-        name,
-        email,
-        utm_source: attribution.utm_source,
-        spot_id: attribution.spot_id,
-        ref_code: attribution.ref_code
-      });
+      profileResult = await api('register_profile', { name, email });
     } catch (error) {
       profileError = error;
     }
 
     await refreshUser();
     if (profileError) {
-      msg('signedMsg', 'Account login ho gaya, lekin wallet setup pending hai: ' + profileError.message + '. Dobara SIGN UP mat karo.');
+      msg('signedMsg', 'Account logged in, wallet setup pending: ' + profileError.message);
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
       try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
-    } else if (!newAccount) {
-      msg('signedMsg', 'Welcome back! Ye account pehle se bana hua tha; wallet mein duplicate bonus nahi diya gaya.');
     }
     if (!profileError) {
       if (!currentUser) throw Error('Login session could not be verified');
-      window.location.replace('number-draw.html');
+      window.location.replace('speed-tap.html');
     }
   } catch (error) {
     msg('authMsg', error.message);
   } finally {
     signupButton.disabled = false;
+    signupButton.textContent = origText;
   }
 };
 
