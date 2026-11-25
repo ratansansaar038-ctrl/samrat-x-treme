@@ -20,7 +20,7 @@ function inlineScript(html) {
   return match[1];
 }
 
-function fakeHome({ createError, signInError, profile, verifiedPhone = false, otpSendError }) {
+function fakeHome({ createError, signInError, profile, verifiedPhone = false, otpSendError, adminEmail = false }) {
   const elements = new Map();
   const calls = [];
   const redirects = [];
@@ -28,7 +28,7 @@ function fakeHome({ createError, signInError, profile, verifiedPhone = false, ot
   let signedIn = false;
   let storedPhone = verifiedPhone ? '+919876543210' : '';
   let isPhoneVerified = verifiedPhone;
-  const email = 'brand-new-player@example.com';
+  const email = adminEmail ? 'gauravguptabjr@gmail.com' : 'brand-new-player@example.com';
   const data = { email, password: 'Safe-Test-Pass-123', name: 'Player', phone: '9876543210' };
   const getElement = (id) => {
     if (!elements.has(id)) {
@@ -182,6 +182,20 @@ test('homepage routes login and signup to Lucky Number Draw, not Speed Tap', () 
   // The homepage does not activate the optional SMS phone verification helper.
   assert.doesNotMatch(homepage, /SamratPhone\.beginPhoneVerification/);
 })
+
+test('primary admin login opens dashboard directly without loading player wallet', async () => {
+  const h = fakeHome({ profile: { ok: true, wallet: 999 }, adminEmail: true });
+  await h.clickLogin();
+  assert.deepEqual(h.redirects, ['admin-dashboard.html']);
+  assert.equal(h.calls.includes('get_wallet'), false);
+  assert.match(homepage, /PRIMARY_ADMIN_EMAIL = 'gauravguptabjr@gmail.com'/);
+  assert.match(loginPage, /return "admin-dashboard.html"/);
+  assert.match(loginPage, /loginDestination\(signedInUser\)/);
+  assert.match(drawPage, /window\.location\.replace\('admin-dashboard\.html'\)/);
+  assert.match(admin, /const snapshot=await api\('admin_dashboard'\)/);
+  assert.doesNotMatch(admin, /const r=await api\('get_wallet'\)/);
+  assert.match(server, /const dashboardIsAdmin = \(user\)/);
+});
 
 test('homepage login redirects only after successful authentication', async () => {
   const h = fakeHome({ profile: { ok: true, wallet: 800 } });
