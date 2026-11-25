@@ -396,6 +396,10 @@ const functions = new Functions(client);
 const FUNCTION_ID = '6ae1bcc500208a5a7efb';
 
 let currentUser = null;
+const PRIMARY_ADMIN_EMAIL = 'gauravguptabjr@gmail.com';
+function isPrimaryAdmin(user) {
+  return typeof user?.email === 'string' && user.email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
+}
 
 async function api(action, extra = {}) {
   const result = await functions.createExecution({
@@ -489,6 +493,11 @@ async function refreshWalletSummary() {
 async function refreshUser() {
   try {
     currentUser = await account.get();
+    // Admin always goes straight to the control room; only the backend grants access.
+    if (isPrimaryAdmin(currentUser)) {
+      window.location.replace('admin-dashboard.html');
+      return;
+    }
     $('authPanel').classList.add('hide');
     $('signedPanel').classList.remove('hide');
     msg('signedName', currentUser.name || currentUser.email);
@@ -532,6 +541,7 @@ $('login').onclick = async () => {
     await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
     if (!currentUser) throw Error('Login session could not be verified');
+    if (isPrimaryAdmin(currentUser)) return; // refreshUser already routed admin.
     window.location.replace('number-draw.html');
   } catch (error) {
     msg('authMsg', error.message);
@@ -571,6 +581,11 @@ $('signup').onclick = async () => {
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
 
+    const signedInUser = await account.get();
+    if (isPrimaryAdmin(signedInUser)) {
+      window.location.replace('admin-dashboard.html');
+      return;
+    }
     let profileResult;
     let profileError;
     try {
@@ -580,6 +595,7 @@ $('signup').onclick = async () => {
     }
 
     await refreshUser();
+    if (isPrimaryAdmin(currentUser)) return;
     if (profileError) {
       msg('signedMsg', 'Account logged in, wallet setup pending: ' + profileError.message);
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
