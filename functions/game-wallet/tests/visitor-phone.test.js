@@ -158,3 +158,24 @@ test('admin visitor counts load separately without blocking dashboard stats', ()
   assert.match(page, /More than 5,000 are counted too/);
   assert.doesNotMatch(page, /n===5000\?'≥5,000'/);
 });
+
+test('new signup count uses IST day boundary and completed player profiles', () => {
+  assert.match(backend, /\["todaySignups", "user_profiles", \[gte\("\$createdAt", todayStartIST\), lim\(1\)\]\]/);
+  assert.match(backend, /todaySignups: data\.todaySignups\?\.total \?\? null/);
+  assert.match(read('admin-dashboard.html'), /id="mTodaySignups"/);
+  assert.match(read('admin-dashboard.html'), /New completed player profiles today/);
+});
+
+test('conversion is new completed signups divided by active visitor IDs, not all players', () => {
+  const page=read('admin-dashboard.html');
+  const source=page.match(/function signupConversionPct\(signups,visitors\)\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(source, 'conversion calculation helper found');
+  const calc=new Function(source+'\nreturn signupConversionPct;')();
+  assert.equal(calc(1,7504),'0.01%');
+  assert.equal(calc(12,1200),'1.00%');
+  assert.equal(calc(0,1200),'0.00%');
+  assert.equal(calc(5,0),'—');
+  assert.equal(calc(null,1000),'—');
+  assert.match(page,/signupConversionPct\(todaySignupCount,d\.todayVisitors\)/);
+  assert.match(page,/site-wide estimate, not Clickaine-only/);
+});

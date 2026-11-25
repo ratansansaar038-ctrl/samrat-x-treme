@@ -1227,6 +1227,8 @@ async function adminDashboard(user, key) {
   const todayStartIST = new Date(istDayStartMs()).toISOString();
   const items = [
     ["players", "user_profiles", [order("$createdAt", "desc"), lim(40)]],
+    // Count completed new-player registrations, not anonymous/unfinished Auth accounts.
+    ["todaySignups", "user_profiles", [gte("$createdAt", todayStartIST), lim(1)]],
     ["todayVisitors", "site_visitors", [gte("$updatedAt", todayStartIST), lim(1)]],
     ["visitors", "site_visitors", [lim(1)]],
     ["vouchers", "vouchers", [order("$createdAt", "desc"), lim(60)]],
@@ -1257,6 +1259,7 @@ async function adminDashboard(user, key) {
     ok: true,
     stats: {
       players: data.players?.total ?? null,
+      todaySignups: data.todaySignups?.total ?? null,
       todayVisitors: data.todayVisitors?.total ?? null,
       visitors: data.visitors?.total ?? null,
       vouchers: data.vouchers?.total ?? null,
