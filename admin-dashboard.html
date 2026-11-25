@@ -27,13 +27,14 @@ a{color:inherit}button,input{font:inherit}button{cursor:pointer}button:disabled{
 <div id="notice" role="status" aria-live="polite">Checking admin session…</div>
 <section id="dashboard" hidden>
 <section class="metrics" aria-label="System statistics">
-<div class="metric"><small>Today visitors (IST)</small><strong id="mTodayVisitors">—</strong><small>Unique browsers active today, India time.</small></div>
-<div class="metric"><small>Total visitors</small><strong id="mVisitors">—</strong><small>Unique browsers since tracking started; not exact people.</small></div>
+<div class="metric"><small>Today visitors (IST)</small><strong id="mTodayVisitors">—</strong><small>Browser IDs recorded today, India time; not verified people.</small></div>
+<div class="metric"><small>Total visitors</small><strong id="mVisitors">—</strong><small>Browser IDs since tracking started; not verified people.</small></div>
 <div class="metric"><small>Registered players</small><strong id="mPlayers">—</strong><small>All registered player profiles.</small></div>
 <div class="metric"><small>Total vouchers</small><strong id="mVouchers">—</strong></div>
 <div class="metric"><small>Unused vouchers</small><strong id="mUnused">—</strong></div>
 <div class="metric"><small>Redeemed vouchers</small><strong id="mUsed">—</strong></div>
 </section>
+<p class="hint" id="visitorCapWarning" hidden role="status">⚠ Appwrite may cap database totals at 5,000. “≥5,000” means at least 5,000 recorded browser IDs, not confirmed human visitors. The numbers may include bots or repeated IDs from separate browsers.</p>
 <section class="panel"><div class="line"><div><h2>Admin actions</h2><p class="hint">Existing tested tools, linked together here.</p></div><button class="primary" id="refresh">↻ Refresh</button></div>
 <div class="actions">
 <a class="action" href="admin-vouchers.html"><em>🎟️</em> Generate vouchers <span>20, 50, 100, 200 VC • CSV</span></a>
@@ -74,6 +75,8 @@ const text=(id,value)=>el(id).textContent=String(value??'—');
 const message=(s,error=false)=>{const n=el('notice');n.textContent=s;n.className=error?'error':'success';};
 function node(tag,content,cls){const e=document.createElement(tag);if(content!=null)e.textContent=String(content);if(cls)e.className=cls;return e;}
 function fmt(n){return typeof n==='number'?n.toLocaleString('en-IN'):'—';}
+// Appwrite listRows total can be capped at 5,000. Never present it as an exact count.
+function fmtVisitorCount(n){return n===5000?'≥5,000':fmt(n);}
 function date(s){if(!s)return '—';const d=new Date(s);return Number.isFinite(+d)?d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';}
 async function api(action,body={}){
  const r=await functions.createExecution({functionId:FUNCTION_ID,body:JSON.stringify({action,...body}),async:false});
@@ -133,7 +136,7 @@ async function loadWinningReport(roundId){
 function renderGames(items){const dst=el('games');dst.replaceChildren();if(!items?.length){dst.append(node('p','No scores found.','blank'));return;}
  for(const g of items){item(dst,String(g.gameId||'Game').replaceAll('_',' ').toUpperCase(),'Player '+String(g.userId||'—').slice(0,8)+' · '+date(g.playedAt)+' · '+(g.verified?'Verified':'Unverified'),fmt(g.score)+' pts');}}
 async function refresh(){if(!verified)return;el('refresh').disabled=true;message('Loading current statistics…');
- try{const d=await api('admin_dashboard');text('mTodayVisitors',fmt(d.stats?.todayVisitors));text('mVisitors',fmt(d.stats?.visitors));text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
+ try{const d=await api('admin_dashboard');text('mTodayVisitors',fmtVisitorCount(d.stats?.todayVisitors));text('mVisitors',fmtVisitorCount(d.stats?.visitors));el('visitorCapWarning').hidden=d.stats?.todayVisitors!==5000&&d.stats?.visitors!==5000;text('mPlayers',fmt(d.stats?.players));text('mVouchers',fmt(d.stats?.vouchers));text('mUnused',fmt(d.stats?.unused));text('mUsed',fmt(d.stats?.redeemed));
  renderPlayers(d.players);renderVouchers(d.vouchers);renderRounds(d.rounds);renderGames(d.games);
  const latest=(d.rounds||[]).find(r=>r.status==='settled'&&Number.isInteger(r.winningNumber));
  if(latest)loadWinningReport(latest.roundId);
