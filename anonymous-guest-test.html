@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#130622">
+  <title>Samrat X-Treme — Anonymous Guest Session Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+  <style>
+    * { box-sizing:border-box }
+    body{margin:0;background:#11051e;color:#fff;font:16px system-ui,Arial,sans-serif;padding:35px 16px}
+    main{max-width:520px;margin:0 auto;background:#28123e;border:1px solid #8753bb;border-radius:20px;padding:24px}
+    h1{font-size:24px;color:#ffe080} p{line-height:1.6}
+    button{width:100%;padding:14px;border:0;border-radius:12px;background:#ffe040;color:#271130;font-weight:800;font-size:16px}
+    button:disabled{opacity:.6} #result{margin-top:18px;white-space:pre-wrap;overflow-wrap:anywhere;padding:13px;border:1px solid #8462b6;border-radius:10px}
+    a{color:#ffe080} small{color:#ddcce5}
+  </style>
+</head>
+<body>
+ <main>
+  <h1>Anonymous Guest Session — Safe Test</h1>
+  <p>This page tests whether Appwrite Anonymous Auth works on <strong>samratxtreme.online</strong>. It does <strong>not</strong> create a player wallet, pay a bonus or enroll the user in the number draw.</p>
+  <p><strong>Open this test in an Incognito tab</strong> to protect existing sessions. Tap the button once, then check Appwrite Console → Auth → Users for the newly generated anonymous account.</p>
+  <button type="button" id="tryGuest">Create one anonymous guest test session</button>
+  <div id="result" role="status" aria-live="polite">Ready. No account has been created by opening this page.</div>
+  <p><small>Existing sign-ins are never logged out or replaced. This test does not automatically run on page load. Keep anonymous guests separate from real registered players.</small></p>
+  <p><a href="index.html">Back to Samrat X-Treme</a></p>
+ </main>
+ <script>
+'use strict';
+const client = new Appwrite.Client()
+  .setEndpoint('https://sgp.cloud.appwrite.io/v1')
+  .setProject('6a7f2add0011a7bfc21a');
+const account = new Appwrite.Account(client);
+const btn = document.getElementById('tryGuest');
+const result = document.getElementById('result');
+let working = false;
+btn.addEventListener('click', async () => {
+  if(working) return;
+  working = true;btn.disabled=true;
+  result.textContent='Checking whether this browser already has a session...';
+  try {
+    let existing=null;
+    try {existing=await account.get()}catch(e){if(e?.code!==401)throw e}
+    if(existing) {
+      const isAnonymous=!existing.email;
+      result.textContent=isAnonymous?
+       'An anonymous guest session already exists in this browser. Guest User ID: '+existing.$id+'. No duplicate session created.':
+       'Already signed in as a registered account. We have NOT created or replaced an anonymous session. Use Incognito to test.';
+      return;
+    }
+    result.textContent='Requesting one Appwrite anonymous session...';
+    await account.createAnonymousSession();
+    const guest=await account.get();
+    if(guest.email)throw Error('Unexpected registered account. No wallet has been changed.');
+    result.textContent='SUCCESS — Anonymous session created.\nGuest User ID: '+guest.$id+'\nNo phone, password, SMS OTP, VC wallet or signup bonus was created.\nNow open Appwrite Console → Auth → Users to inspect the guest user.';
+  }catch(error){
+    result.textContent='Guest test failed: '+(error?.message||String(error))+'\nCheck: Appwrite → Auth → Settings → Anonymous ON; your Web platform hostname is samratxtreme.online.';
+  }finally{working=false;btn.disabled=false}
+});
+ </script>
+</body>
+</html>

@@ -128,3 +128,13 @@ test('India day starts at 00:00 IST, not at midnight UTC', () => {
   assert.equal(new Date(startOfDay(Date.parse('2026-11-24T12:34:56Z'))).toISOString(), '2026-11-23T18:30:00.000Z');
   assert.equal(new Date(startOfDay(Date.parse('2026-11-23T18:29:59Z'))).toISOString(), '2026-11-22T18:30:00.000Z');
 });
+
+test('anonymous guest diagnostic is click-initiated and never credits a wallet', () => {
+  const page = read('anonymous-guest-test.html');
+  assert.match(page, /account\.createAnonymousSession\(\)/);
+  assert.match(page, /btn\.addEventListener\('click'/);
+  assert.match(page, /await account\.get\(\)/);
+  assert.match(page, /Open this test in an Incognito tab/);
+  assert.doesNotMatch(page, /register_profile|signupBonusVC|wallet:\s*1000|start_sms_otp/);
+  assert.doesNotMatch(read('index.html'), /createAnonymousSession\(/);
+});
