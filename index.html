@@ -9,6 +9,7 @@
   <meta name="description" content="Play free browser skill games on Samrat X-Treme: Speed Tap Arena, Memory X, Math Challenge & Lucky Number Draw with free virtual coins. Entertainment only, no cash prizes.">
   <link rel="canonical" href="https://samratxtreme.online/">
   <script src="https://cdn.jsdelivr.net/npm/appwrite@21.4.0"></script>
+  <script src="signup-phone.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -238,23 +239,59 @@
     </p>
   </header>
 
+  <!-- NUMBER ARENA LIVE TIMER -->
+  <div class="live-bar" id="homeDrawLiveBar">
+    <div>
+      <div class="live-badge"><span class="pulse-dot"></span> NUMBER ARENA LIVE</div>
+      <div style="font-size:12px; color:#f3d9ff; margin-top:2px;">Next Free Virtual Round in:</div>
+    </div>
+    <div class="timer-box" id="drawCountdown">00:00</div>
+  </div>
+  <div class="panel hide" id="homeNightBreak" role="status" aria-live="polite" style="text-align:center;border-color:#9869cb;background:linear-gradient(145deg,#201536,#13213e)">
+    <strong style="color:#ffe080">🌙 Night Break (10:00 PM – 9:00 AM IST). Skill games above remain open 24/7!</strong>
+    <div class="small" style="margin-top:8px">Number Arena reopens in</div>
+    <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
+  </div>
+
+  <section class="skill-grid" aria-label="Number Arena">
+    <a class="skill-card draw" href="number-draw.html">
+      <span class="skill-icon">🎯</span>
+      <div>
+        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
+        <h2>NUMBER ARENA (00–99)</h2>
+        <p>Pick 00–99 with Free Virtual Points</p>
+        <strong>ENTER FREE ARENA →</strong>
+      </div>
+    </a>
+  </section>
+
+  <section class="panel" id="freeVcPanel" style="text-align:center; border: 1px solid #5cff9d;">
+    <h3 style="color:#89ffb4; margin-bottom:4px;">🪙 100% FREE VIRTUAL COINS</h3>
+    <p class="small">Play all games using free virtual points. Coins are strictly for in-game entertainment and carry zero monetary value.</p>
+    <p class="small">No real-money deposits, paid purchases, or cash withdrawals.</p>
+    <a class="btn green-btn" href="number-draw.html">CLAIM FREE VC / REDEEM VOUCHER →</a>
+  </section>
+
+
   <!-- INSTANT SIGNUP / LOGIN ABOVE THE FOLD FOR FAST CONVERSION -->
   <section class="panel" id="authPanel">
-    <h3>⚡ Instant Free Account (10 Seconds)</h3>
-    <div class="welcome-badge">🎁 Welcome Bonus: Get 1,000 FREE Virtual Coins instantly! Entertainment only, no cash value.</div>
+    <h3>🎯 Join the Lucky Number Draw</h3>
+    <div class="welcome-badge">🎁 New players receive 1,000 FREE Virtual Coins after SMS OTP verification. No cash value or cash prizes.</div>
 
-    <input id="name" type="text" placeholder="Your Name (for new signup)" autocomplete="name">
+    <input id="name" type="text" placeholder="Your Name (new signup only)" autocomplete="name">
+    <input id="phone" type="tel" inputmode="numeric" placeholder="10-digit mobile number (new signup only)" autocomplete="tel-national">
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
     <input id="password" type="password" placeholder="Create or enter password (8+ chars)" autocomplete="current-password">
 
     <div class="row">
-      <button class="btn green-btn" id="signup">CREATE FREE ACCOUNT</button>
+      <button class="btn green-btn" id="signup">SIGN UP FREE · SMS OTP</button>
       <button class="btn secondary" id="login">LOGIN</button>
     </div>
 
     <p style="text-align:center;margin:10px 0 4px;font-size:13px;">
       <a href="forgot-password.html" style="color:#ffe16a">Forgot Password?</a>
     </p>
+    <p class="small" style="margin:8px 0 0;">Already registered? Enter email + password and tap LOGIN. New players need SMS mobile verification for the 1,000 VC bonus.</p>
     <div class="status" id="authMsg"></div>
   </section>
 
@@ -303,39 +340,6 @@
         <strong>PLAY FREE NOW →</strong>
       </div>
     </a>
-  </section>
-
-  <!-- NUMBER ARENA LIVE TIMER -->
-  <div class="live-bar" id="homeDrawLiveBar">
-    <div>
-      <div class="live-badge"><span class="pulse-dot"></span> NUMBER ARENA LIVE</div>
-      <div style="font-size:12px; color:#f3d9ff; margin-top:2px;">Next Free Virtual Round in:</div>
-    </div>
-    <div class="timer-box" id="drawCountdown">00:00</div>
-  </div>
-  <div class="panel hide" id="homeNightBreak" role="status" aria-live="polite" style="text-align:center;border-color:#9869cb;background:linear-gradient(145deg,#201536,#13213e)">
-    <strong style="color:#ffe080">🌙 Night Break (10:00 PM – 9:00 AM IST). Skill games above remain open 24/7!</strong>
-    <div class="small" style="margin-top:8px">Number Arena reopens in</div>
-    <div id="homeNightClock" style="color:#a4ffda;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums">--:--:--</div>
-  </div>
-
-  <section class="skill-grid" aria-label="Number Arena">
-    <a class="skill-card draw" href="number-draw.html">
-      <span class="skill-icon">🎯</span>
-      <div>
-        <small style="color:#ff9cd2;">● EVERY 20 MINUTES · 9 AM–10 PM IST</small>
-        <h2>NUMBER ARENA (00–99)</h2>
-        <p>Pick 00–99 with Free Virtual Points</p>
-        <strong>ENTER FREE ARENA →</strong>
-      </div>
-    </a>
-  </section>
-
-  <section class="panel" id="freeVcPanel" style="text-align:center; border: 1px solid #5cff9d;">
-    <h3 style="color:#89ffb4; margin-bottom:4px;">🪙 100% FREE VIRTUAL COINS</h3>
-    <p class="small">Play all games using free virtual points. Coins are strictly for in-game entertainment and carry zero monetary value.</p>
-    <p class="small">No real-money deposits, paid purchases, or cash withdrawals.</p>
-    <a class="btn green-btn" href="number-draw.html">CLAIM FREE VC / REDEEM VOUCHER →</a>
   </section>
 
   <section class="panel" id="freeGameGuides" aria-labelledby="freeGameGuidesHeading">
@@ -514,7 +518,7 @@ $('login').onclick = async () => {
     await signInOrUseCurrentSession($('email').value.trim(), $('password').value);
     await refreshUser();
     if (!currentUser) throw Error('Login session could not be verified');
-    window.location.replace('speed-tap.html');
+    window.location.replace('number-draw.html');
   } catch (error) {
     msg('authMsg', error.message);
   } finally {
@@ -538,6 +542,7 @@ $('signup').onclick = async () => {
     if (!name) throw Error('Please enter your name');
     if (!email) throw Error('Please enter your email');
     if (password.length < 8) throw Error('Password must be at least 8 characters');
+    const phone = SamratPhone.normalizeMobile($('phone').value);
 
     let newAccount = false;
     try {
@@ -553,6 +558,13 @@ $('signup').onclick = async () => {
     }
     if (newAccount) await signInOrUseCurrentSession(email, password);
 
+    // OTP verification is mandatory before creating a wallet or signup bonus.
+    const phoneStatus = await SamratPhone.beginPhoneVerification(account, functions, password, phone);
+    if (!phoneStatus.verified) {
+      window.location.replace('verify-phone.html');
+      return;
+    }
+
     let profileResult;
     let profileError;
     try {
@@ -567,10 +579,12 @@ $('signup').onclick = async () => {
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
       try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
+    } else {
+      msg('signedMsg', 'Account already registered; duplicate bonus nahi milega. Existing wallet is safe.');
     }
     if (!profileError) {
       if (!currentUser) throw Error('Login session could not be verified');
-      window.location.replace('speed-tap.html');
+      window.location.replace('number-draw.html');
     }
   } catch (error) {
     msg('authMsg', error.message);
