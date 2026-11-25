@@ -138,3 +138,23 @@ test('anonymous guest diagnostic is click-initiated and never credits a wallet',
   assert.doesNotMatch(page, /register_profile|signupBonusVC|wallet:\s*1000|start_sms_otp/);
   assert.doesNotMatch(read('index.html'), /createAnonymousSession\(/);
 });
+
+test('backend traverses all visitor pages without trusting capped totals', () => {
+  assert.match(backend, /const VISITOR_PAGE_SIZE = 750/);
+  assert.match(backend, /async function scanVisitorMetrics/);
+  assert.match(backend, /method: "cursorAfter", values: \[cursor\]/);
+  assert.match(backend, /total=false/);
+  assert.match(backend, /totalVisitors\+\+/);
+  assert.match(backend, /todayVisitors\+\+/);
+  assert.match(backend, /batch.length < VISITOR_PAGE_SIZE/);
+  assert.match(backend, /"admin_visitor_stats"/);
+  assert.match(backend, /if \(!dashboardIsAdmin\(user\)\)/);
+});
+
+test('admin visitor counts load separately without blocking dashboard stats', () => {
+  const page=read('admin-dashboard.html');
+  assert.match(page, /api\('admin_visitor_stats'\)/);
+  assert.match(page, /void refreshVisitorCounters\(\)/);
+  assert.match(page, /More than 5,000 are counted too/);
+  assert.doesNotMatch(page, /n===5000\?'≥5,000'/);
+});
