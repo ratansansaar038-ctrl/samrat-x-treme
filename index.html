@@ -567,6 +567,8 @@ $('signup').onclick = async () => {
     } else if (profileResult?.created && profileResult.signupBonusVC === 1000) {
       msg('signedMsg', '🎁 Sign Up Bonus: +1,000 VC credited to your wallet!');
       try { sessionStorage.setItem('samratSignupBonusVC', '1000'); } catch {}
+    } else if (profileResult?.created === false) {
+      msg('signedMsg', 'Existing profile: no duplicate bonus. Your current wallet is unchanged.');
     }
     if (!profileError) {
       if (!currentUser) throw Error('Login session could not be verified');
