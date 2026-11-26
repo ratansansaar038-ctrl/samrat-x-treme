@@ -280,3 +280,35 @@ test('stuck auth accounts resume missing player wallet without sending SMS OTP',
   assert.doesNotMatch(homepage, /SamratPhone\.beginPhoneVerification/);
   assert.match(loginPage, /href="index\.html#authPanel">CREATE ACCOUNT<\/a>/);
 });
+
+test('homepage Telegram ticker and backend activity use the same real handle', () => {
+  assert.match(homepage, /Join @samratxtreme on Telegram/);
+  assert.match(homepage, /href="https:\/\/t\.me\/samratxtreme"/);
+  assert.doesNotMatch(homepage.slice(homepage.indexOf('<div class="ticker-move"'), homepage.indexOf('</div>', homepage.indexOf('<div class="ticker-move"'))), /@samratxtremegame/);
+  assert.match(homepage, /replace\(\/@samratxtremegame\\b\/gi, '@samratxtreme'\)/);
+  assert.match(server, /Join @samratxtreme on Telegram for live draw results/);
+  assert.doesNotMatch(server, /@samratxtremegame/);
+});
+
+test('homepage emphasizes free game engagement while keeping legal disclaimer in footer', () => {
+  assert.match(homepage, /FREE SKILL & NUMBER ARENA • TOP RANKS • DAILY STREAKS • FREE VOUCHERS/);
+  const beforeSignup = homepage.slice(homepage.indexOf('<header class="hero">'), homepage.indexOf('<input id="name"'));
+  assert.doesNotMatch(beforeSignup, /have no cash value/);
+  assert.match(homepage, /Free-to-play entertainment only • Virtual coins have no cash or monetary value/);
+  assert.match(homepage, /No real-money deposits, paid purchases, or cash withdrawals/);
+});
+
+test('homepage public top players box uses server-verified leaderboards and never exposes wallets', () => {
+  assert.match(homepage, /id="homeTopPlayers"/);
+  assert.match(homepage, /id="homeBoardSpeed"/);
+  assert.match(homepage, /id="homeBoardMemory"/);
+  assert.match(homepage, /id="homeBoardMath"/);
+  assert.match(homepage, /api\('get_leaderboard', \{ gameId: HOME_BOARD_GAMES\[buttonId\] \}\)/);
+  assert.match(homepage, /entries\.slice\(0, 3\)/);
+  assert.match(homepage, /Verified game scores only|server-verified skill-game scores/);
+  assert.match(homepage, /rankings are not based on VC wallet balances/i);
+  assert.match(server, /async function getLeaderboard\(gameId, key\)/);
+  assert.match(server, /eq\("verified", true\)/);
+  assert.match(homepage, /typeof IntersectionObserver === 'function'/);
+  assert.ok(homepage.indexOf('id="homeTopPlayers"') < homepage.indexOf('class="skill-card speed"'));
+});

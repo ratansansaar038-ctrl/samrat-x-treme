@@ -3531,7 +3531,7 @@ async function getRecentActivity(key) {
   }
 
   items.push("🎁 Request free VC or redeem an admin-issued free voucher!");
-  items.push("📢 Join @samratxtremegame on Telegram for live draw results!");
+  items.push("📢 Join @samratxtreme on Telegram for live draw results!");
 
   return {
     ok: true,

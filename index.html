@@ -212,6 +212,12 @@
     .skill-card p { font-size: 13px; color: #ddd0ee; margin: 0 0 6px; }
     .skill-card small { color: #89ffb4; font-weight: 800; }
     .skill-card strong { color: #ffdf63; font-size: 12.5px; }
+    .top-board-tabs { display:flex; gap:7px; flex-wrap:wrap; margin:12px 0; }
+    .top-board-tabs button { flex:1; min-width:95px; border:1px solid #9266c2; border-radius:10px; background:#2b1740; padding:9px 5px; color:#ecd8ff; font-weight:800; }
+    .top-board-tabs button[aria-pressed="true"] { border-color:#ffdc66; background:#513070; color:#ffe38b; }
+    .top-board-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 0; border-bottom:1px solid #ffffff28; font-size:13px; }
+    .top-board-row:last-child { border:0; }
+    .top-board-row strong { color:#ffe38b; font-variant-numeric:tabular-nums; white-space:nowrap; }
   </style>
   <script src="site-visitor.js" defer></script>
 </head>
@@ -234,14 +240,14 @@
     <div class="brand">SAMRAT</div>
     <div class="sub">X-TREME</div>
     <p class="small">
-      FREE BROWSER SKILL GAMES • INSTANT PLAY • VIRTUAL COINS ONLY
+      FREE SKILL & NUMBER ARENA • TOP RANKS • DAILY STREAKS • FREE VOUCHERS
     </p>
   </header>
 
   <!-- INSTANT SIGNUP / LOGIN ABOVE THE FOLD FOR FAST CONVERSION -->
   <section class="panel" id="authPanel">
     <h3>⚡ Instant Free Account (10 Seconds)</h3>
-    <div class="welcome-badge">🎁 New players can claim a 1,000 VC signup bonus after completing registration and any required account checks. Virtual coins have no cash value.</div>
+    <div class="welcome-badge">🎁 Join free • New players receive 1,000 in-game VC after successful registration • Challenge the leaderboard!</div>
 
     <input id="name" type="text" placeholder="Your Name (for new signup)" autocomplete="name">
     <input id="email" type="email" placeholder="Email address" autocomplete="email">
@@ -298,6 +304,20 @@
     </a>
   </section>
 
+
+  <!-- Public leaderboard: server-verified skill scores, not private wallet balances. -->
+  <section class="panel" id="homeTopPlayers" aria-labelledby="homeTopPlayersHeading">
+    <h3 id="homeTopPlayersHeading">🏆 Top Players • Live Rankings</h3>
+    <p class="small">Real, server-verified skill-game scores. Can you reach the top 3?</p>
+    <div class="top-board-tabs" role="group" aria-label="Choose ranking game">
+      <button id="homeBoardSpeed" type="button" aria-pressed="true">⚡ Speed Tap</button>
+      <button id="homeBoardMemory" type="button" aria-pressed="false">🧠 Memory X</button>
+      <button id="homeBoardMath" type="button" aria-pressed="false">🔢 Math</button>
+    </div>
+    <div id="homeTopPlayersList" class="small" aria-live="polite">Loading verified rankings…</div>
+    <a href="player-profile.html" class="btn secondary">VIEW TOP 10 &amp; MY RANK →</a>
+    <p class="small">Verified game scores only • No cash prizes • Rankings are not based on VC wallet balances.</p>
+  </section>
 
   <!-- SKILL GAMES FIRST (MAINSTREAM AD POLICY FRIENDLY) -->
   <section class="skill-grid" aria-label="Skill games">
@@ -457,11 +477,56 @@ async function loadLiveTicker() {
         dot.className = 'ticker-dot';
         dot.textContent = '●';
         span.appendChild(dot);
-        span.appendChild(document.createTextNode(String(text)));
+        span.appendChild(document.createTextNode(String(text).replace(/@samratxtremegame\b/gi, '@samratxtreme')));
         ticker.appendChild(span);
       });
     }
   } catch {}
+}
+
+const HOME_BOARD_GAMES = Object.freeze({
+  homeBoardSpeed: 'speed_tap',
+  homeBoardMemory: 'memory_x_24',
+  homeBoardMath: 'math_challenge'
+});
+let activeHomeBoard = 'homeBoardSpeed';
+let homeBoardRequestId = 0;
+
+async function loadHomeTopPlayers(buttonId = 'homeBoardSpeed') {
+  if (!Object.hasOwn(HOME_BOARD_GAMES, buttonId)) return;
+  activeHomeBoard = buttonId;
+  const requestId = ++homeBoardRequestId;
+  for (const id of Object.keys(HOME_BOARD_GAMES))
+    $(id).setAttribute('aria-pressed', id === buttonId ? 'true' : 'false');
+  const list = $('homeTopPlayersList');
+  list.textContent = 'Loading verified rankings…';
+  try {
+    // Existing public, verified-only Appwrite leaderboard API. No new DB table.
+    const data = await api('get_leaderboard', { gameId: HOME_BOARD_GAMES[buttonId] });
+    if (requestId !== homeBoardRequestId) return;
+    const entries = Array.isArray(data.entries) ? data.entries.slice(0, 3) : [];
+    if (!entries.length) {
+      list.textContent = 'No verified scores yet. Play free and be first on the leaderboard!';
+      return;
+    }
+    list.replaceChildren();
+    entries.forEach((entry, index) => {
+      if (!Number.isSafeInteger(entry.score) || entry.score < 0) return;
+      const row = document.createElement('div');
+      row.className = 'top-board-row';
+      const name = document.createElement('span');
+      const score = document.createElement('strong');
+      const label = typeof entry.player === 'string' ? entry.player.slice(0, 40) : 'Player';
+      name.textContent = '#' + (index + 1) + ' · ' + label;
+      score.textContent = entry.score.toLocaleString('en-IN') + ' pts';
+      row.append(name, score);
+      list.appendChild(row);
+    });
+    if (!list.childNodes.length) list.textContent = 'No verified scores yet.';
+  } catch {
+    if (requestId === homeBoardRequestId)
+      list.textContent = 'Rankings are temporarily unavailable. Try again later.';
+  }
 }
 
 async function refreshWalletSummary() {
@@ -625,8 +690,23 @@ $('logout').onclick = async () => {
   }
 };
 
+for (const id of Object.keys(HOME_BOARD_GAMES)) {
+  $(id).onclick = () => loadHomeTopPlayers(id);
+}
 startDrawTimer();
 loadLiveTicker();
+// Load when the panel approaches the viewport, reducing ad-campaign API traffic.
+if (typeof IntersectionObserver === 'function') {
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      observer.disconnect();
+      void loadHomeTopPlayers();
+    }
+  }, { rootMargin: '250px' });
+  observer.observe($('homeTopPlayers'));
+} else if (typeof document.createElement === 'function') {
+  void loadHomeTopPlayers();
+}
 refreshUser();
 </script>
 
