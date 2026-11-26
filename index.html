@@ -256,7 +256,7 @@
       <div class="public-stat">
         <small>🏆 Total Players &amp; Visitors</small>
         <strong id="publicTotalVisitors">12,156+</strong>
-        <small>Reported visits + new recorded browsers</small>
+        <small>Previously reported website visits</small>
       </div>
     </div>
   </section>
@@ -457,29 +457,6 @@ async function api(action, extra = {}) {
   }
 
   return data;
-}
-
-// Historical visit report supplied separately; count only new browser IDs after
-// the observed 7,529-browser snapshot, not the existing records a second time.
-const REPORTED_VISITS_BASE = 12156;
-const RECORDED_BROWSER_BASE = 7529;
-let publicStatsLoading = false;
-let displayedVisitTotal = REPORTED_VISITS_BASE;
-async function loadPublicSiteStats() {
-  if (publicStatsLoading) return;
-  publicStatsLoading = true;
-  try {
-    const data = await api('get_public_site_stats');
-    if (!Number.isSafeInteger(data.totalVisitors) || data.totalVisitors < RECORDED_BROWSER_BASE) return;
-    const total = REPORTED_VISITS_BASE + (data.totalVisitors - RECORDED_BROWSER_BASE);
-    if (!Number.isSafeInteger(total) || total < displayedVisitTotal) return;
-    displayedVisitTotal = total;
-    $('publicTotalVisitors').textContent = total.toLocaleString('en-US') + '+';
-  } catch {
-    // Keep last reported count when analytics is temporarily unavailable.
-  } finally {
-    publicStatsLoading = false;
-  }
 }
 
 function startDrawTimer() {
@@ -735,13 +712,7 @@ for (const id of Object.keys(HOME_BOARD_GAMES)) {
 }
 startDrawTimer();
 loadLiveTicker();
-void loadPublicSiteStats();
-setInterval(() => {
-  if (document.visibilityState !== 'hidden') void loadPublicSiteStats();
-}, 65000);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') void loadPublicSiteStats();
-});
+// Full visitor scans are disabled on public pages to protect database quota.
 
 // Load when the panel approaches the viewport, reducing ad-campaign API traffic.
 if (typeof IntersectionObserver === 'function') {
