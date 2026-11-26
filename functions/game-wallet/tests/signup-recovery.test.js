@@ -284,7 +284,7 @@ test('stuck auth accounts resume missing player wallet without sending SMS OTP',
 test('homepage Telegram ticker and backend activity use the same real handle', () => {
   assert.match(homepage, /Join @samratxtreme on Telegram/);
   assert.match(homepage, /href="https:\/\/t\.me\/samratxtreme"/);
-  assert.doesNotMatch(homepage, /@samratxtremegame/);
+  assert.doesNotMatch(homepage.slice(homepage.indexOf('<div class="ticker-move"'), homepage.indexOf('</div>', homepage.indexOf('<div class="ticker-move"'))), /@samratxtremegame/);
   assert.match(homepage, /replace\(\/@samratxtremegame\\b\/gi, '@samratxtreme'\)/);
   assert.match(server, /Join @samratxtreme on Telegram for live draw results/);
   assert.doesNotMatch(server, /@samratxtremegame/);
