@@ -179,3 +179,29 @@ test('conversion is new completed signups divided by active visitor IDs, not all
   assert.match(page,/signupConversionPct\(todaySignupCount,d\.todayVisitors\)/);
   assert.match(page,/site-wide estimate, not Clickaine-only/);
 });
+
+test('public homepage counters show user-reported baseline then backend-only aggregates', () => {
+  const home = read('index.html');
+  assert.match(home, /id="publicTotalVisitors">12,156\+</);
+  assert.match(home, /id="publicTotalPlayers"/);
+  assert.match(home, /api\('get_public_site_stats'\)/);
+  assert.match(home, /data\.totalVisitors\.toLocaleString\('en-IN'\)/);
+  assert.match(home, /data\.totalPlayers\.toLocaleString\('en-IN'\)/);
+  assert.match(home, /setInterval\(\(\) => \{/);
+  assert.match(home, /document\.visibilityState !== 'hidden'/);
+  assert.doesNotMatch(home, /publicTotalVisitors.*\+\+/);
+});
+
+test('public visitor/player endpoint shares existing exact visitor scanner and returns no private rows', () => {
+  assert.match(backend, /async function publicSiteStats\(key\)/);
+  assert.match(backend, /cachedVisitorMetrics\(key\)/);
+  assert.match(backend, /adminSnapshot\("user_profiles", \[lim\(1\)\], key\)/);
+  assert.match(backend, /totalVisitors: visitorStats\.totalVisitors/);
+  assert.match(backend, /totalPlayers: players\.total/);
+  assert.match(backend, /if \(action === "get_public_site_stats"\)/);
+  assert.equal((backend.match(/"get_public_site_stats",/g) || []).length, 2,
+    'allowlisted for both routing and anonymous access');
+  const src = backend.match(/async function publicSiteStats\(key\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(src, 'public stats method present');
+  assert.doesNotMatch(src, /email|phone|password|userId|wallet|apiKey/);
+});

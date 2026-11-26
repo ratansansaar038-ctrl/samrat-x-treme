@@ -1212,6 +1212,23 @@ async function adminVisitorMetrics(user, key) {
   return { ok: true, ...(await cachedVisitorMetrics(key)) };
 }
 
+// Public aggregate counts only; never expose player records or private details.
+// The 5,000+ visitor total uses the existing cursor scanner and process cache.
+async function publicSiteStats(key) {
+  const [visitorStats, players] = await Promise.all([
+    cachedVisitorMetrics(key),
+    adminSnapshot("user_profiles", [lim(1)], key),
+  ]);
+  if (!Number.isSafeInteger(players.total))
+    throw Error("Registered player count is temporarily unavailable");
+  return {
+    ok: true,
+    totalVisitors: visitorStats.totalVisitors,
+    totalPlayers: players.total,
+    countedAt: visitorStats.countedAt,
+  };
+}
+
 async function adminSnapshot(table, queries, key) {
   const data = await request("GET", tablePath(table, queries), key);
   return {
@@ -3673,6 +3690,7 @@ export default async ({ req, res, error }) => {
       "get_round",
       "get_last_result",
       "get_recent_activity",
+      "get_public_site_stats",
       "get_draw_trends",
       "get_daily_loyalty",
       "claim_finale_ticket",
@@ -3719,6 +3737,7 @@ export default async ({ req, res, error }) => {
       "get_last_result",
       "get_leaderboard",
       "get_recent_activity",
+      "get_public_site_stats",
       "get_draw_trends",
       "track_site_visit",
     ].includes(action)
@@ -3746,6 +3765,9 @@ export default async ({ req, res, error }) => {
     }
     if (action === "get_recent_activity") {
       return send(res, 200, await getRecentActivity(key));
+    }
+    if (action === "get_public_site_stats") {
+      return send(res, 200, await publicSiteStats(key));
     }
     if (action === "get_draw_trends") {
       return send(res, 200, await getDrawTrends(key));
