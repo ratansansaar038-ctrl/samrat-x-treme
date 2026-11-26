@@ -1140,53 +1140,51 @@ const dashboardIsAdmin = (user) =>
     .filter(Boolean)
     .includes(user);
 
-// Appwrite listRows.total can stop at 5,000 even while more rows exist.
-// Scan compact metadata pages with a stable cursor to obtain real recorded
-// browser-ID counts without adding a DB table or rewriting visitor history.
-// Keep this separate from admin_dashboard so slow scans never block admin login.
-const VISITOR_PAGE_SIZE = 750;
-const VISITOR_METRICS_CACHE_MS = 30 * 1000;
+// Count using metadata and at most one returned row per query. If Appwrite
+// caps the total, split the date interval until each count is below the cap.
+// Never fall back to downloading the full visitor table.
+const VISITOR_COUNT_CAP = 5000;
+const VISITOR_METRICS_CACHE_MS = 5 * 60 * 1000;
 let visitorMetricsCached = null;
 let visitorMetricsPending = null;
 
-async function scanVisitorMetrics(key, nowMs = Date.now()) {
-  let cursor = null;
-  let totalVisitors = 0;
-  let todayVisitors = 0;
-  const todayStartMs = istDayStartMs(nowMs);
-  const seenCursors = new Set();
-  while (true) {
+async function countVisitorRange(key, attribute, startMs, endMs) {
+  const pending = [[startMs, endMs]];
+  let total = 0;
+  let queriesUsed = 0;
+  while (pending.length) {
+    const [start, end] = pending.pop();
+    if (start >= end) continue;
+    if (++queriesUsed > 40) throw Error("Visitor count query budget exceeded");
     const queries = [
-      order("$createdAt", "asc"),
-      lim(VISITOR_PAGE_SIZE),
-      { method: "select", values: ["$id", "$updatedAt", "$createdAt"] },
+      gte(attribute, new Date(start).toISOString()),
+      { method: "lessThan", attribute, values: [new Date(end).toISOString()] },
+      order(attribute, "asc"),
+      lim(1),
+      { method: "select", values: ["$id", attribute] },
     ];
-    if (cursor) queries.push({ method: "cursorAfter", values: [cursor] });
-    const data = await request(
-      "GET",
-      tablePath("site_visitors", queries) + "&total=false",
-      key
-    );
-    if (!Array.isArray(data.rows))
-      throw Error("Visitor table returned an invalid page");
-    const batch = data.rows;
-    for (const row of batch) {
-      if (typeof row.$id !== "string" || !row.$id)
-        throw Error("Visitor row ID missing");
-      const lastSeenMs = Date.parse(row.$updatedAt || row.$createdAt);
-      if (!Number.isFinite(lastSeenMs))
-        throw Error("Visitor timestamp missing");
-      totalVisitors++;
-      if (lastSeenMs >= todayStartMs && lastSeenMs <= nowMs)
-        todayVisitors++;
+    const data = await request("GET", tablePath("site_visitors", queries) + "&total=true", key);
+    if (!Number.isSafeInteger(data.total) || data.total < 0 || !Array.isArray(data.rows))
+      throw Error("Invalid visitor total");
+    if (data.total < VISITOR_COUNT_CAP) {
+      total += data.total;
+      continue;
     }
-    if (batch.length < VISITOR_PAGE_SIZE) break;
-    const nextCursor = batch[batch.length - 1].$id;
-    if (seenCursors.has(nextCursor))
-      throw Error("Visitor pagination repeated a cursor");
-    seenCursors.add(nextCursor);
-    cursor = nextCursor;
+    const first = Date.parse(data.rows[0]?.[attribute]);
+    if (!Number.isFinite(first) || first < start || first >= end || end - first < 2)
+      throw Error("Visitor count cannot be resolved within query budget");
+    const mid = first + Math.floor((end - first) / 2);
+    pending.push([first, mid], [mid, end]);
   }
+  return total;
+}
+
+async function queryVisitorMetrics(key, nowMs = Date.now()) {
+  const end = nowMs + 1;
+  const [totalVisitors, todayVisitors] = await Promise.all([
+    countVisitorRange(key, "$createdAt", 0, end),
+    countVisitorRange(key, "$updatedAt", istDayStartMs(nowMs), end),
+  ]);
   return { todayVisitors, totalVisitors, countedAt: new Date(nowMs).toISOString() };
 }
 
@@ -1195,12 +1193,15 @@ async function cachedVisitorMetrics(key) {
   if (visitorMetricsCached && now - visitorMetricsCached.at < VISITOR_METRICS_CACHE_MS)
     return visitorMetricsCached.data;
   if (visitorMetricsPending) return visitorMetricsPending;
-  const pending = scanVisitorMetrics(key);
+  const pending = queryVisitorMetrics(key);
   visitorMetricsPending = pending;
   try {
     const data = await pending;
     visitorMetricsCached = { at: Date.now(), data };
     return data;
+  } catch (e) {
+    if (visitorMetricsCached) return visitorMetricsCached.data;
+    throw e;
   } finally {
     if (visitorMetricsPending === pending) visitorMetricsPending = null;
   }
@@ -1213,7 +1214,7 @@ async function adminVisitorMetrics(user, key) {
 }
 
 // Public aggregate counts only; never expose player records or private details.
-// The 5,000+ visitor total uses the existing cursor scanner and process cache.
+// The 5,000+ visitor total uses bounded aggregate queries and process cache.
 async function publicSiteStats(key) {
   const [visitorStats, players] = await Promise.all([
     cachedVisitorMetrics(key),
@@ -3403,6 +3404,23 @@ async function finishGame(user, b, key) {
   };
 }
 
+const publicReadCache = new Map();
+const publicReadPending = new Map();
+async function cachedPublicRead(cacheKey, load) {
+  const hit = publicReadCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < 300000) return hit.data;
+  if (publicReadPending.has(cacheKey)) return publicReadPending.get(cacheKey);
+  const pending = Promise.resolve().then(load);
+  publicReadPending.set(cacheKey, pending);
+  try {
+    const data = await pending;
+    if (data?.ok) publicReadCache.set(cacheKey, { at: Date.now(), data });
+    return data;
+  } finally {
+    if (publicReadPending.get(cacheKey) === pending) publicReadPending.delete(cacheKey);
+  }
+}
+
 async function getLeaderboard(gameId, key) {
   if (!GAME_IDS.includes(gameId)) return { ok: false, error: "Invalid game" };
 
@@ -3691,6 +3709,7 @@ export default async ({ req, res, error }) => {
       "get_last_result",
       "get_recent_activity",
       "get_public_site_stats",
+      "get_public_visit_counter_v2",
       "get_draw_trends",
       "get_daily_loyalty",
       "claim_finale_ticket",
@@ -3738,6 +3757,7 @@ export default async ({ req, res, error }) => {
       "get_leaderboard",
       "get_recent_activity",
       "get_public_site_stats",
+      "get_public_visit_counter_v2",
       "get_draw_trends",
       "track_site_visit",
     ].includes(action)
@@ -3764,9 +3784,9 @@ export default async ({ req, res, error }) => {
       return send(res, 200, await smsOtpService(key).status(user));
     }
     if (action === "get_recent_activity") {
-      return send(res, 200, await getRecentActivity(key));
+      return send(res, 200, await cachedPublicRead('recent-activity', () => getRecentActivity(key)));
     }
-    if (action === "get_public_site_stats") {
+    if (action === "get_public_site_stats" || action === "get_public_visit_counter_v2") {
       return send(res, 200, await publicSiteStats(key));
     }
     if (action === "get_draw_trends") {
@@ -3791,7 +3811,9 @@ export default async ({ req, res, error }) => {
     }
 
     if (action === "get_leaderboard") {
-      const x = await getLeaderboard(b.gameId, key);
+      const x = GAME_IDS.includes(b.gameId)
+        ? await cachedPublicRead('leaderboard:' + b.gameId, () => getLeaderboard(b.gameId, key))
+        : { ok: false, error: 'Invalid game' };
       return send(res, x.ok ? 200 : 400, x);
     }
 

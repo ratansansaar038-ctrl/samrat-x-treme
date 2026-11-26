@@ -256,7 +256,7 @@
       <div class="public-stat">
         <small>🏆 Total Players &amp; Visitors</small>
         <strong id="publicTotalVisitors">12,156+</strong>
-        <small>Previously reported website visits</small>
+        <small>Reported visits + new recorded browsers</small>
       </div>
     </div>
   </section>
@@ -331,7 +331,7 @@
       <button id="homeBoardMemory" type="button" aria-pressed="false">🧠 Memory X</button>
       <button id="homeBoardMath" type="button" aria-pressed="false">🔢 Math</button>
     </div>
-    <div id="homeTopPlayersList" class="small" aria-live="polite">Loading verified rankings…</div>
+    <div id="homeTopPlayersList" class="small" aria-live="polite">Select a game to view verified rankings.</div>
     <a href="player-profile.html" class="btn secondary">VIEW TOP 10 &amp; MY RANK →</a>
     <p class="small">Verified game scores only • No cash prizes • Rankings are not based on VC wallet balances.</p>
   </section>
@@ -712,20 +712,39 @@ for (const id of Object.keys(HOME_BOARD_GAMES)) {
 }
 startDrawTimer();
 loadLiveTicker();
-// Full visitor scans are disabled on public pages to protect database quota.
-
-// Load when the panel approaches the viewport, reducing ad-campaign API traffic.
-if (typeof IntersectionObserver === 'function') {
-  const observer = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      observer.disconnect();
-      void loadHomeTopPlayers();
-    }
-  }, { rootMargin: '250px' });
-  observer.observe($('homeTopPlayers'));
-} else if (typeof document.createElement === 'function') {
-  void loadHomeTopPlayers();
+// Fetch only the new quota-safe endpoint. No legacy full-scan fallback.
+const visitorCountCacheKey = 'samratVisitorCountV2';
+let visitorCounterPending = false;
+let visitorCounterLastAttempt = 0;
+function showVisitorCount(data) {
+  if (!Number.isSafeInteger(data?.totalVisitors) || data.totalVisitors < 7529) return;
+  const value = 12156 + data.totalVisitors - 7529;
+  if (Number.isSafeInteger(value)) $('publicTotalVisitors').textContent = value.toLocaleString('en-US') + '+';
 }
+async function loadPublicVisitCounter() {
+  if (visitorCounterPending || Date.now() - visitorCounterLastAttempt < 300000) return;
+  visitorCounterLastAttempt = Date.now();
+  visitorCounterPending = true;
+  try {
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(visitorCountCacheKey) || 'null'); } catch {}
+    if (cached?.data) showVisitorCount(cached.data);
+    if (cached?.data && Date.now() - cached.at < 300000) return;
+    const data = await api('get_public_visit_counter_v2');
+    showVisitorCount(data);
+    try { localStorage.setItem(visitorCountCacheKey, JSON.stringify({ at: Date.now(), data: { totalVisitors: data.totalVisitors } })); } catch {}
+  } catch {
+    // Display the previously reported visit count if the safe endpoint is unavailable.
+  } finally {
+    visitorCounterPending = false;
+  }
+}
+void loadPublicVisitCounter();
+setInterval(() => {
+  if (document.visibilityState !== 'hidden') void loadPublicVisitCounter();
+}, 300000);
+
+// Load verified rankings only when the visitor selects a game.
 refreshUser();
 </script>
 

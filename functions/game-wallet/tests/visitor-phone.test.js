@@ -91,17 +91,17 @@ test('browser visitor tracker sends one pseudonymous token per IST calendar day'
   assert.equal(JSON.parse(calls[0].body.body).action,'track_site_visit');
   assert.equal(JSON.parse(calls[0].body.body).browserId,browserId);
   const todayIST = new Date(Date.now() + 330 * 60000).toISOString().slice(0,10);
-  assert.equal(session.get('samratSiteVisitRecordedISTDayV2'),todayIST);
+  assert.equal(local.get('samratSiteVisitRecordedISTDayV2'),todayIST);
   new Script(tracker).runInContext(ctx);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length,1);
   // A returning browser from another India day reuses its token.
-  session.set('samratSiteVisitRecordedISTDayV2','2000-01-01');
+  local.set('samratSiteVisitRecordedISTDayV2','2000-01-01');
   new Script(tracker).runInContext(ctx);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length,2);
   assert.equal(JSON.parse(calls[1].body.body).browserId,browserId);
-  assert.equal(session.get('samratSiteVisitRecordedISTDayV2'),todayIST);
+  assert.equal(local.get('samratSiteVisitRecordedISTDayV2'),todayIST);
 });
 
 test('backend visitor table keeps all-time unique rows and counts daily returning browsers', () => {
@@ -139,16 +139,30 @@ test('anonymous guest diagnostic is click-initiated and never credits a wallet',
   assert.doesNotMatch(read('index.html'), /createAnonymousSession\(/);
 });
 
-test('backend traverses all visitor pages without trusting capped totals', () => {
-  assert.match(backend, /const VISITOR_PAGE_SIZE = 750/);
-  assert.match(backend, /async function scanVisitorMetrics/);
-  assert.match(backend, /method: "cursorAfter", values: \[cursor\]/);
-  assert.match(backend, /total=false/);
-  assert.match(backend, /totalVisitors\+\+/);
-  assert.match(backend, /todayVisitors\+\+/);
-  assert.match(backend, /batch.length < VISITOR_PAGE_SIZE/);
-  assert.match(backend, /"admin_visitor_stats"/);
-  assert.match(backend, /if \(!dashboardIsAdmin\(user\)\)/);
+test('visitor counter resolves capped totals with bounded one-row aggregate queries', async () => {
+  const source = backend.match(/async function countVisitorRange\(key, attribute, startMs, endMs\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(source);
+  const start=Date.parse('2026-11-24T00:00:00Z');
+  const rows = Array.from({length:7529}, (_,i)=>({$id:String(i),$createdAt:new Date(start+i*1000).toISOString()}));
+  let reads=0;
+  const request = async (_method, queries) => {
+    reads++;
+    const q=JSON.parse(queries.split('&total=true')[0]);
+    assert.equal(q.find(x=>x.method==='limit').values[0],1);
+    const lo=q.find(x=>x.method==='greaterThanEqual').values[0];
+    const hi=q.find(x=>x.method==='lessThan').values[0];
+    const matching=rows.filter(r=>r.$createdAt>=lo&&r.$createdAt<hi);
+    return {total:Math.min(5000,matching.length),rows:matching.slice(0,1)};
+  };
+  const fn=new Function('VISITOR_COUNT_CAP','request','tablePath','gte','lim','order',source+'\nreturn countVisitorRange;')(
+    5000,request,(_table,q)=>JSON.stringify(q),(attribute,value)=>({method:'greaterThanEqual',attribute,values:[value]}),
+    n=>({method:'limit',values:[n]}),(attribute)=>({method:'orderAsc',attribute})
+  );
+  assert.equal(await fn('key','$createdAt',0,start+8000000),7529);
+  assert.ok(reads<40);
+  assert.equal(await fn('key','$createdAt',start+8000000,start+9000000),0);
+  assert.doesNotMatch(backend,/async function scanVisitorMetrics/);
+  assert.match(backend,/if \(!dashboardIsAdmin\(user\)\)/);
 });
 
 test('admin visitor counts load separately without blocking dashboard stats', () => {
@@ -180,28 +194,26 @@ test('conversion is new completed signups divided by active visitor IDs, not all
   assert.match(page,/site-wide estimate, not Clickaine-only/);
 });
 
-test('public homepage counters show user-reported baseline then backend-only aggregates', () => {
-  const home = read('index.html');
-  assert.match(home, /id="publicTotalVisitors">12,156\+</);
-  assert.match(home, /id="publicTotalPlayers"/);
-  assert.match(home, /api\('get_public_site_stats'\)/);
-  assert.match(home, /data\.totalVisitors\.toLocaleString\('en-IN'\)/);
-  assert.match(home, /data\.totalPlayers\.toLocaleString\('en-IN'\)/);
-  assert.match(home, /setInterval\(\(\) => \{/);
-  assert.match(home, /document\.visibilityState !== 'hidden'/);
-  assert.doesNotMatch(home, /publicTotalVisitors.*\+\+/);
+test('homepage uses safe versioned aggregate, five-minute polling and no separate player counter', () => {
+  const home=read('index.html');
+  assert.match(home,/id="publicTotalVisitors">12,156\+/);
+  assert.doesNotMatch(home,/id="publicTotalPlayers"/);
+  assert.match(home,/api\('get_public_visit_counter_v2'\)/);
+  assert.doesNotMatch(home,/api\('get_public_site_stats'\)/);
+  assert.match(home,/300000/);
+  assert.match(home,/document\.visibilityState !== 'hidden'/);
+  assert.doesNotMatch(home,/publicTotalVisitors.*\+\+/);
 });
 
-test('public visitor/player endpoint shares existing exact visitor scanner and returns no private rows', () => {
-  assert.match(backend, /async function publicSiteStats\(key\)/);
-  assert.match(backend, /cachedVisitorMetrics\(key\)/);
-  assert.match(backend, /adminSnapshot\("user_profiles", \[lim\(1\)\], key\)/);
-  assert.match(backend, /totalVisitors: visitorStats\.totalVisitors/);
-  assert.match(backend, /totalPlayers: players\.total/);
-  assert.match(backend, /if \(action === "get_public_site_stats"\)/);
-  assert.equal((backend.match(/"get_public_site_stats",/g) || []).length, 2,
-    'allowlisted for both routing and anonymous access');
-  const src = backend.match(/async function publicSiteStats\(key\) \{[\s\S]*?\n\}/)?.[0];
-  assert.ok(src, 'public stats method present');
-  assert.doesNotMatch(src, /email|phone|password|userId|wallet|apiKey/);
+test('public endpoint uses bounded visitor queries and preserves the old action contract', () => {
+  assert.match(backend,/async function publicSiteStats\(key\)/);
+  assert.match(backend,/cachedVisitorMetrics\(key\)/);
+  assert.match(backend,/adminSnapshot\("user_profiles", \[lim\(1\)\], key\)/);
+  assert.match(backend,/totalVisitors: visitorStats\.totalVisitors/);
+  assert.match(backend,/totalPlayers: players\.total/);
+  assert.equal((backend.match(/"get_public_visit_counter_v2",/g)||[]).length,2);
+  assert.match(backend,/await cachedPublicRead\('recent-activity'/);
+  const src=backend.match(/async function publicSiteStats\(key\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(src);
+  assert.doesNotMatch(src,/email|phone|password|userId|wallet|apiKey/);
 });
