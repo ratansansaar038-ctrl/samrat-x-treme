@@ -212,7 +212,7 @@
     .skill-card p { font-size: 13px; color: #ddd0ee; margin: 0 0 6px; }
     .skill-card small { color: #89ffb4; font-weight: 800; }
     .skill-card strong { color: #ffdf63; font-size: 12.5px; }
-    .public-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:8px 0 14px; }
+    .public-stats { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; margin:8px 0 14px; }
     .public-stat { border:1px solid #8051ac; border-radius:15px; padding:13px 10px; background:linear-gradient(135deg,#281244,#201034); text-align:center; min-width:0; }
     .public-stat strong { display:block; color:#ffe38b; font:900 clamp(24px,6vw,34px) system-ui,Arial; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
     .public-stat small { display:block; color:#ddc2ff; font-size:11px; line-height:1.4; font-weight:700; }
@@ -250,21 +250,16 @@
     </p>
   </header>
 
-  <!-- Totals come from Appwrite's public aggregate endpoint, not fake page increments. -->
+  <!-- Previously reported visit total; live unique-browser analytics remain separate. -->
   <section aria-label="Samrat X-Treme community totals">
     <div class="public-stats">
       <div class="public-stat">
-        <small>🌍 Total Visitors</small>
+        <small>🏆 Total Players &amp; Visitors</small>
         <strong id="publicTotalVisitors">12,156+</strong>
-        <small>Recorded browser IDs</small>
-      </div>
-      <div class="public-stat">
-        <small>🏆 Total Players</small>
-        <strong id="publicTotalPlayers">—</strong>
-        <small>Registered accounts</small>
+        <small>Previously reported website visits</small>
       </div>
     </div>
-    <p class="public-stats-note" id="publicStatsStatus" role="status">12,156+ visitors previously reported • Checking the live count…</p>
+    <p class="public-stats-note" id="publicStatsStatus">Historical visit total • Not a unique-player count</p>
   </section>
 
   <!-- INSTANT SIGNUP / LOGIN ABOVE THE FOLD FOR FAST CONVERSION -->
@@ -465,28 +460,6 @@ async function api(action, extra = {}) {
   return data;
 }
 
-// Display real stored counts. Repeated page views from the same browser
-// do not create another visitor record; counts refresh about once per minute.
-let lastPublicStatsAt = 0;
-let publicStatsLoading = false;
-async function loadPublicSiteStats() {
-  if (publicStatsLoading || Date.now() - lastPublicStatsAt < 60000) return;
-  publicStatsLoading = true;
-  try {
-    const data = await api('get_public_site_stats');
-    if (!Number.isSafeInteger(data.totalVisitors) || data.totalVisitors < 0 ||
-        !Number.isSafeInteger(data.totalPlayers) || data.totalPlayers < 0)
-      throw Error('Invalid public statistics');
-    $('publicTotalVisitors').textContent = data.totalVisitors.toLocaleString('en-IN');
-    $('publicTotalPlayers').textContent = data.totalPlayers.toLocaleString('en-IN');
-    $('publicStatsStatus').textContent = 'Auto-updated from recorded visits • Each browser counts once • Totals may include bots';
-    lastPublicStatsAt = Date.now();
-  } catch {
-    $('publicStatsStatus').textContent = 'Latest reported: 12,156+ visitors • Live count temporarily unavailable';
-  } finally {
-    publicStatsLoading = false;
-  }
-}
 function startDrawTimer() {
   function tick() {
     const now = Date.now();
@@ -740,10 +713,7 @@ for (const id of Object.keys(HOME_BOARD_GAMES)) {
 }
 startDrawTimer();
 loadLiveTicker();
-void loadPublicSiteStats();
-setInterval(() => {
-  if (document.visibilityState !== 'hidden') void loadPublicSiteStats();
-}, 65000);
+
 // Load when the panel approaches the viewport, reducing ad-campaign API traffic.
 if (typeof IntersectionObserver === 'function') {
   const observer = new IntersectionObserver((entries) => {
