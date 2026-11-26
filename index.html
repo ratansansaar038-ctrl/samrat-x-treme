@@ -704,7 +704,7 @@ if (typeof IntersectionObserver === 'function') {
     }
   }, { rootMargin: '250px' });
   observer.observe($('homeTopPlayers'));
-} else {
+} else if (typeof document.createElement === 'function') {
   void loadHomeTopPlayers();
 }
 refreshUser();
